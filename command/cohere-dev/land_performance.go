@@ -7,8 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
-	"path/filepath"
 	"regexp"
 	"slices"
 	"strconv"
@@ -21,9 +19,11 @@ import (
 )
 
 // Every landing measures itself (#6wnsnq2), in Kirk's words "nothing gets committed to main without timing numbers".
-// After the gate passes and before the landing commit is made, land runs cohere-go on Shackler, the quiet house Mac
-// that holds numbers of record, and writes what it measured to Performance.jsonc at the root of the tree that lands. So
-// main's history is its performance series, and each landing's diff of the file shows what it did to cohere.
+// After the gate passes and before the landing is made, cohere-go is run on Shackler, the quiet house Mac that holds
+// numbers of record, and what it measured is a record, the JSON performanceFile, read against the baseline, main's last
+// landed record. The record lives beside main, never in its tree (#6v8r4nn, Kirk's ruling): the integrate job prints
+// it on its last lines (landingLines), Loom keeps it by main's commit, and Loom hands the next job its baseline in
+// performanceBaselineVariable. Until #6v8r4nn it was spliced into the landing's tree as Performance.jsonc.
 //
 // Rulings that keep it honest (@system_cohere, on #6wnsnq2):
 //
@@ -32,21 +32,27 @@ import (
 //     claim every performanceAgain and saying whose claim it waits behind and since when, and refuses once
 //     performanceWaitVariable's wait has passed, naming the holder. A measurement that runs and fails refuses the
 //     landing in the box's words.
-//   - What was gated is what lands, plus this file alone. It is written after the gate, so nothing that builds or tests
-//     may read it, which internal/testing/guard holds (TestNothingThatBuildsOrTestsReadsPerformanceJsonc).
+//   - What was gated is what lands, byte for byte: the tree that lands is the gated tree, the record outside it.
 //   - The comparison is honest: a number is "moved" only when its new minimum to maximum range doesn't overlap the
 //     old one, and "level" otherwise; another machine, another build or another shape of measurement is a line of its
 //     own, never a comparison.
-//   - The file records that the box was held quiet, and her load before and after. Held is not quiet: a measurement
-//     whose one-minute load before or after passes a quarter of her cores (performanceBusy) records nothing, main's
-//     file stays, and the landing says her load and that a later landing measures (#6ex523f).
+//   - The record says that the box was held quiet, and her load before and after. Held is not quiet: a measurement
+//     whose one-minute load before or after passes a quarter of her cores (performanceBusy) records no numbers, its
+//     record saying why it skipped them, and the landing says her load and that a later landing measures (#6ex523f).
 //   - A test-only landing measures too, and Go is the only language measured.
 //
 // A tree with no command/cohere, every land test's fixture, has no cohere to time, and lands saying so. cohere's own
 // tree always has it.
 
-// performanceFileName is the file at the root of every landing's tree that holds main's performance at that commit.
-const performanceFileName = "Performance.jsonc"
+// performanceBaselineVariable holds the baseline a measurement is read against, main's last landed record, as its JSON
+// bytes in base64's standard encoding, which Loom hands the integrate job. Unset or empty, there is no baseline, and
+// the note says none was handed: Loom's series is seeded, so for the integrate job that means the hand-off broke, and
+// land, which nothing hands one, compares with nothing. A value that doesn't read is said in the note and never
+// refuses.
+const performanceBaselineVariable = "COHERE_PERFORMANCE_BASELINE"
+
+// performanceRecordName is the name a record is printed under, which the house format reads its language from.
+const performanceRecordName = "performance.json"
 
 // performanceBox is the Mac the measurement runs on: Shackler, who holds numbers of record, which is why no land gate
 // runs on her (gateBoxRefused).
@@ -71,7 +77,7 @@ const performanceGapBound = "30m"
 const performanceScratch = macBoxScratch + "/performance"
 
 // performanceReference is the older cohere every landing also times, deeafbf4, Kirk's bar row's second tree, laid once
-// on Shackler and kept; performanceReferenceTree is its name in the script's rows and in the file.
+// on Shackler and kept; performanceReferenceTree is its name in the script's rows and in the record.
 const (
 	performanceReference     = "deeafbf43e5dfb39c7bacdcdc3f165b571b97276"
 	performanceReferenceTree = "deeafbf4"
@@ -103,19 +109,16 @@ const (
 )
 
 // performanceBuild is how the script builds the binary it times: a release's Go build, without cohere-swift. The
-// file's tools say it whole.
+// record's tools say it whole.
 const performanceBuild = "CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags='-s -w'"
 
-// performanceSchema is the file's schema (#hed1mkb). Schema 2 spells each key whole, minimum, maximum and system where
-// schema 1 wrote min, max and sys (Kirk, Nov 23, #cc5ftw6), and schema 3 names the measurement checks where schema 2
-// named it engine (#9gjmwgs), so a file of an older schema is another shape of measurement, its note's own line, never
-// compared, and a renamed key is never read as a zero. Adamic's Performance.jsonc still writes schema 2.
+// performanceSchema is the record's schema (#hed1mkb). Schema 2 spells each key whole, minimum, maximum and system
+// where schema 1 wrote min, max and sys (Kirk, Nov 23, #cc5ftw6), and schema 3 names the measurement checks where
+// schema 2 named it engine (#9gjmwgs), so a record of an older schema is another shape of measurement, its note's own
+// line, never compared, and a renamed key is never read as a zero. The keys #6v8r4nn added, parent, against, measured
+// and skipped, keep schema 3, since a record without them reads as it did. Adamic's Performance.jsonc still writes
+// schema 2.
 const performanceSchema = 3
-
-// performanceHeader opens the file, above the body native.FormatHouse prints.
-const performanceHeader = "// Performance.jsonc: main's performance at this commit, rewritten by cohere-dev land " +
-	"in every landing commit (#6wnsnq2).\n// Git history is the series. Never edit it by hand. Times are integer " +
-	"milliseconds, the median of the rounds with their minimum and maximum.\n"
 
 // performanceScript is what Shackler runs, from the land that runs it rather than from the tree it measures, so no
 // branch can change how it is measured. Its arguments are the commit, deeafbf4's commit, the counts of fills, cold
@@ -220,7 +223,7 @@ done
 cd root
 phase modules
 # The build's Go cache is kept under the scratch across landings, so a landing compiles only what it changed: the binary
-# is built on a cache the box kept, as the file's tools say. A -trimpath build's bytes are the same on any cache.
+# is built on a cache the box kept, as the record's tools say. A -trimpath build's bytes are the same on any cache.
 # Under an integrate job whose runner declared a Go cache, its program in GOCACHEPROG, go builds through the runner's
 # cache instead, and that is left as it is (#e94a6r4, system_cohere's ruling): this builds the binary under test, a
 # warm build only shortens this phase, and what the measurement times is cohere's runs, never the build. The build
@@ -239,8 +242,8 @@ say "tested $commit on $(go env GOOS)/$(go env GOARCH)"
 # binary compiles builds main's binary again, and its note can say any difference is the box's (#6wnsnq2).
 binary=$(sha256sum "$base/cohere" | cut -d' ' -f1)
 say "binary $binary"
-# main's binary, when the integrate job names it (#6ex523f): built again, it is the program main's file already
-# measured, so nothing runs, and the integrate job keeps main's file.
+# main's binary, when the integrate job names it (#6ex523f): built again, it is the program main's record already
+# measured, so nothing runs, and the integrate job's record says it skipped.
 if [ -n "$mainBinary" ] && [ "$binary" = "$mainBinary" ]; then echo "` + performanceSameBinaryMarker + `"; exit 0; fi
 say "machine $(sysctl -n hw.ncpu) $(sysctl -n machdep.cpu.brand_string)"
 say "go $(go env GOVERSION)"
@@ -323,8 +326,8 @@ type performanceChecked struct {
 	Findings int `json:"findings"`
 }
 
-// performanceRow is a row's wall, user and system times, and what its rounds checked. Checked is a pointer since a file
-// written before rows recorded it holds none, which the note says rather than reading it as nothing checked.
+// performanceRow is a row's wall, user and system times, and what its rounds checked. Checked is a pointer since a
+// record written before rows recorded it holds none, which the note says rather than reading it as nothing checked.
 type performanceRow struct {
 	Wall    performanceSpread   `json:"wall"`
 	User    performanceSpread   `json:"user"`
@@ -343,7 +346,7 @@ type performanceTimeline struct {
 }
 
 // performanceTimelineStamps are the timeline's stamps each area of performanceTimeline is read from, the host's, in the
-// order the file names them.
+// order the record names them.
 var performanceTimelineStamps = []string{"host.listing.end", "handover.end", "builds.end", "run.end"}
 
 // performanceRounds is how many timed rounds each row took.
@@ -378,36 +381,46 @@ type performanceChecks struct {
 }
 
 // performanceMachine is the box measured on, her cores and her load before and after, and whether she was held quiet,
-// which a measurement taken inside her gap claim always is.
+// which a measurement taken inside her gap claim and under performanceBusy's bound is. A record that measured nothing
+// says what it knows of her and leaves the rest out: one that built the baseline's binary names her alone, since the
+// script stops before it reads her, and one whose box wasn't quiet says her load, and never that she was held quiet.
 type performanceMachine struct {
 	Name       string    `json:"name"`
-	Cpu        string    `json:"cpu"`
-	Cores      int       `json:"cores"`
-	LoadBefore []float64 `json:"loadBefore"`
-	LoadAfter  []float64 `json:"loadAfter"`
-	HeldQuiet  bool      `json:"heldQuiet"`
+	Cpu        string    `json:"cpu,omitempty"`
+	Cores      int       `json:"cores,omitempty"`
+	LoadBefore []float64 `json:"loadBefore,omitempty"`
+	LoadAfter  []float64 `json:"loadAfter,omitempty"`
+	HeldQuiet  bool      `json:"heldQuiet,omitempty"`
 }
 
 // performanceTools is what ran: the binary, by the commit it was built at and how, the Go that built it, and the
-// binary's sha256. Binary is empty in a file written before files recorded it.
+// binary's sha256. Binary is empty in a record written before records held it, and Go in one that built the baseline's
+// binary, whose script stops before it says its Go.
 type performanceTools struct {
 	Cohere string `json:"cohere"`
-	Go     string `json:"go"`
+	Go     string `json:"go,omitempty"`
 	Binary string `json:"binary,omitempty"`
 }
 
 // sha256Pattern is a sha256 as sha256sum prints it, which the measurement says its binary's digest as.
 var sha256Pattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
 
-// performanceFile is Performance.jsonc's body (#hed1mkb's schema).
+// performanceFile is a measurement's record (#hed1mkb's schema, with #6v8r4nn's keys): the commit measured and its
+// first parent, main when it was measured; when; whether numbers were taken, and when they weren't, why; the machine
+// and the tools; the commit of the baseline it was read against, whenever a baseline read; the note; and the numbers.
+// Checks is a pointer since a record that measured nothing carries none, and leaves the key out.
 type performanceFile struct {
 	Schema     int                `json:"schema"`
 	Commit     string             `json:"commit"`
+	Parent     string             `json:"parent,omitempty"`
 	MeasuredAt string             `json:"measuredAt"`
+	Measured   bool               `json:"measured"`
+	Skipped    string             `json:"skipped,omitempty"`
 	Machine    performanceMachine `json:"machine"`
 	Tools      performanceTools   `json:"tools"`
-	Note       string             `json:"note"`
-	Checks     performanceChecks  `json:"checks"`
+	Against    string             `json:"against,omitempty"`
+	Note       string             `json:"note,omitempty"`
+	Checks     *performanceChecks `json:"checks,omitempty"`
 }
 
 // performanceRun is one run of cohere the script said: its row's mode and tree, its round, "fill" for an untimed one,
@@ -436,34 +449,33 @@ type performanceMeasurement struct {
 // performanceRows are the rows the note compares, by the name it says each by.
 var performanceRows = []struct {
 	name string
-	row  func(file performanceFile) performanceRow
+	row  func(checks *performanceChecks) performanceRow
 }{
-	{"cold root", func(file performanceFile) performanceRow { return file.Checks.Cold.Root }},
-	{"cold deeafbf4", func(file performanceFile) performanceRow { return file.Checks.Cold.Deeafbf4 }},
-	{"warm root", func(file performanceFile) performanceRow { return file.Checks.Warm.Root }},
+	{"cold root", func(checks *performanceChecks) performanceRow { return checks.Cold.Root }},
+	{"cold deeafbf4", func(checks *performanceChecks) performanceRow { return checks.Cold.Deeafbf4 }},
+	{"warm root", func(checks *performanceChecks) performanceRow { return checks.Warm.Root }},
 }
 
-// measurePerformance measures gating, the commit the gate ran on, whose tree is tree, on Shackler, against main's
-// performance file at mainCommit, and returns the tree that lands: tree with the file written from the measurement, or
-// tree itself when it has no command/cohere to measure. With it come the sentence the land line and the landing's body
-// say of the measurement, and an exit code, 0 unless it refused the landing, which it has said why.
-func measurePerformance(worktree string, gating string, tree string, mainCommit string) (string, string, int) {
+// measurePerformance measures gating, the commit the gate ran on, on Shackler, against the baseline
+// performanceBaselineVariable holds, and returns the sentence the land line and the landing's body say of the
+// measurement, and an exit code, 0 unless it refused the landing, which it has said why. The tree that lands is the
+// gated tree whatever it measured, so it takes none, and the record it makes is said, never written: the integrate job
+// alone writes one, for Loom to collect. mainCommit is gating's first parent, as land merges it.
+func measurePerformance(worktree string, gating string, mainCommit string) (string, int) {
 	said, measurable, code := cohereToMeasure(worktree, gating)
 	if !measurable {
-		if code != 0 {
-			return "", "", code
-		}
-		return tree, said, 0
+		return said, code
 	}
 	wait, waitError := waitSetting(performanceWaitVariable, os.Getenv(performanceWaitVariable), performanceWaitDefault)
 	if waitError != nil {
 		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", waitError)
-		return "", "", 2
+		return "", 2
 	}
 	started := time.Now()
 	output, unavailable, runError := measureOnShackler(worktree, gating, wait)
-	return landMeasurement(worktree, gating, tree, mainCommit, performanceTaken{output: output,
-		unavailable: unavailable, runError: runError, started: started})
+	_, measured, measureCode := landMeasurement(gating, mainCommit, readPerformanceBaseline(), performanceTaken{
+		output: output, unavailable: unavailable, runError: runError, started: started})
+	return measured, measureCode
 }
 
 // cohereToMeasure says whether gating's tree has a cohere to measure, a command/cohere. A tree without one comes with
@@ -495,72 +507,78 @@ type performanceTaken struct {
 	mainBinary  string
 }
 
-// landMeasurement is the rest of measurePerformance once a road has measured gating: the tree that lands, tree with the
-// performance file written from what the script said and its note against main's at mainCommit, the sentence said of
-// it, and an exit code, 0 unless it refused the landing, said. When the script said the binary it built is main's,
-// mainBinary, main's file stays as it is, and the sentence says so.
+// landMeasurement is the rest of measurePerformance once a road has measured gating, whose first parent is parent:
+// the record of what the script said, its note read against baseline, the sentence said of it, and an exit code, 0
+// unless it refused the landing, said. A measurement that records no numbers, since the script said the binary it
+// built is the baseline's, mainBinary, or since its box wasn't quiet, is a skipped record, its sentence saying why.
 func landMeasurement(
-	worktree string,
 	gating string,
-	tree string,
-	mainCommit string,
+	parent string,
+	baseline performanceBaseline,
 	taken performanceTaken,
-) (string, string, int) {
+) (performanceFile, string, int) {
 	if taken.unavailable != "" {
 		fmt.Fprintf(streams.Errors, "cohere-dev: no measurement from %s, and nothing lands unmeasured: %s\n",
 			performanceBox, taken.unavailable)
-		return "", "", 1
+		return performanceFile{}, "", 1
 	}
-	refused := func(problem string) (string, string, int) {
+	refused := func(problem string) (performanceFile, string, int) {
 		fmt.Fprintf(streams.Errors, "cohere-dev: %s's measurement refused the landing, and nothing lands unmeasured: "+
 			"%s\n", performanceBox, problem)
-		return "", "", 1
+		return performanceFile{}, "", 1
 	}
 	if taken.mainBinary != "" {
-		same, problem := sameBinaryAsMain(taken.output, gating, taken.mainBinary, taken.runError)
+		same, platform, problem := sameBinaryAsMain(taken.output, gating, taken.mainBinary, taken.runError)
 		if problem != "" {
 			return refused(problem)
 		}
 		if same {
-			return keepMainsPerformance(worktree, tree, mainCommit, fmt.Sprintf(
-				"Not measured: %s built %s in %s, the same binary as main's (sha256 %s), so not measured, and main's "+
-					"%s stays.", performanceBox, shortCommit(gating), time.Since(taken.started).Round(time.Second),
-				taken.mainBinary[:min(12, len(taken.mainBinary))], performanceFileName))
+			// The script stops once it has said its binary, before it reads her machine or her Go, so the record
+			// names her and the build alone.
+			record := performanceFile{
+				Schema:     performanceSchema,
+				Commit:     gating,
+				Parent:     parent,
+				MeasuredAt: time.Now().UTC().Format(time.RFC3339),
+				Skipped: fmt.Sprintf("the same binary as %s's record (sha256 %s)",
+					shortCommit(baseline.record.Commit), taken.mainBinary[:min(12, len(taken.mainBinary))]),
+				Machine: performanceMachine{Name: performanceBox},
+				Tools:   performanceTools{Cohere: performanceBuilt(gating, platform), Binary: taken.mainBinary},
+				Against: baselineAgainst(baseline),
+			}
+			said := fmt.Sprintf("Not measured: %s built %s in %s, %s, so not measured.", performanceBox,
+				shortCommit(gating), time.Since(taken.started).Round(time.Second), record.Skipped)
+			fmt.Fprintf(streams.Errors, "cohere-dev: %s\n", said)
+			return record, said, 0
 		}
 	}
 	measurement, problem := readPerformance(taken.output, gating, taken.runError)
 	if problem != "" {
 		return refused(problem)
 	}
-	if busy := performanceBusy(measurement); busy != "" {
-		return keepMainsPerformance(worktree, tree, mainCommit, fmt.Sprintf(
-			"Not measured: %s wasn't quiet, %s, so %s's numbers are recorded nowhere, main's %s stays, and a later "+
-				"landing measures.", performanceBox, busy, shortCommit(gating), performanceFileName))
+	record := performanceFileOf(measurement, gating, parent, time.Now())
+	record.Against = baselineAgainst(baseline)
+	if busy := performanceBusy(record.Machine); busy != "" {
+		// A loaded box's numbers are its load's as much as cohere's, so the record keeps her machine and her load,
+		// which say why, and none of the numbers, and never says she was held quiet.
+		record.Measured, record.Checks, record.Machine.HeldQuiet = false, nil, false
+		record.Skipped = performanceBox + " wasn't quiet, " + busy
+		said := fmt.Sprintf("Not measured: %s, so %s's record holds no numbers, and a later landing measures.",
+			record.Skipped, shortCommit(gating))
+		fmt.Fprintf(streams.Errors, "cohere-dev: %s\n", said)
+		return record, said, 0
 	}
 	fmt.Fprintf(streams.Errors, "cohere-dev: %s measured %s in %s: %s\n", performanceBox, shortCommit(gating),
 		time.Since(taken.started).Round(time.Second), strings.Join(measurement.phases, ", "))
-	current := performanceFileOf(measurement, gating, time.Now())
-	previous, found, unread := readPreviousPerformance(worktree, mainCommit)
-	current.Note = performanceNote(current, previous, found, unread)
-	contents, renderError := renderPerformance(current)
-	if renderError != nil {
-		fmt.Fprintf(streams.Errors, "cohere-dev: writing %s: %v\n", performanceFileName, renderError)
-		return "", "", 1
-	}
-	measured, spliceError := spliceIntoTree(worktree, tree, performanceFileName, contents)
-	if spliceError != nil {
-		fmt.Fprintf(streams.Errors, "cohere-dev: writing %s into the landing's tree: %v\n", performanceFileName,
-			spliceError)
-		return "", "", 1
-	}
-	return measured, fmt.Sprintf("Measured on %s for %s: %s.", performanceBox, performanceFileName, current.Note), 0
+	record.Note = performanceNote(record, baseline)
+	return record, fmt.Sprintf("Measured on %s: %s.", performanceBox, record.Note), 0
 }
 
 // sameBinaryAsMain reads whether the script, handed mainBinary, said the binary it built at commit is main's
-// (performanceSameBinaryMarker), and stopped there. A script that said so of another commit or another digest, or
-// said so and then ended badly, is why it refuses the landing instead.
-func sameBinaryAsMain(output []byte, commit string, mainBinary string, runError error) (bool, string) {
-	tested, binary, same := "", "", false
+// (performanceSameBinaryMarker), and stopped there, and the platform it said it tested on. A script that said so of
+// another commit or another digest, or said so and then ended badly, is why it refuses the landing instead.
+func sameBinaryAsMain(output []byte, commit string, mainBinary string, runError error) (bool, string, string) {
+	tested, platform, binary, same := "", "", "", false
 	scanner := bufio.NewScanner(bytes.NewReader(output))
 	scanner.Buffer(make([]byte, 0, 64*1024), 16*1024*1024)
 	for scanner.Scan() {
@@ -569,7 +587,7 @@ func sameBinaryAsMain(output []byte, commit string, mainBinary string, runError 
 			same = true
 		}
 		if rest, found := strings.CutPrefix(line, performanceMarker+"tested "); found {
-			tested, _, _ = strings.Cut(rest, " on ")
+			tested, platform, _ = strings.Cut(rest, " on ")
 		}
 		if rest, found := strings.CutPrefix(line, performanceMarker+"binary "); found {
 			binary = strings.TrimSpace(rest)
@@ -577,15 +595,15 @@ func sameBinaryAsMain(output []byte, commit string, mainBinary string, runError 
 	}
 	switch {
 	case !same:
-		return false, ""
+		return false, "", ""
 	case runError != nil:
-		return false, fmt.Sprintf("%s said the binary is main's, and then ended %s (%s)", performanceBox,
+		return false, "", fmt.Sprintf("%s said the binary is main's, and then ended %s (%s)", performanceBox,
 			describeEnd(runError), lastWords(output, describeEnd(runError)))
 	case tested != commit || binary != mainBinary:
-		return false, fmt.Sprintf("%s said the binary is main's, having built %q at %q, and main's is %s at %s",
+		return false, "", fmt.Sprintf("%s said the binary is main's, having built %q at %q, and main's is %s at %s",
 			performanceBox, binary, tested, mainBinary, shortCommit(commit))
 	}
-	return true, ""
+	return true, strings.TrimSpace(platform), ""
 }
 
 // performanceQuietShare is the share of a box's cores her one-minute load may reach, before and after the measurement,
@@ -594,58 +612,29 @@ func sameBinaryAsMain(output []byte, commit string, mainBinary string, runError 
 // over fifteen minutes), both held, and J-ge4cc9w's cold deeafbf4 read 3280 ms against the record's 2050.
 const performanceQuietShare = 0.25
 
-// performanceBusy is why measurement's box wasn't quiet, empty when she was: her one-minute load before or after over
-// performanceQuietShare of her cores. A loaded box's numbers are its load's as much as cohere's, so they are recorded
-// nowhere, never as main's (system_cohere's ruling, #6ex523f).
-func performanceBusy(measurement performanceMeasurement) string {
-	bound := performanceQuietShare * float64(measurement.cores)
-	before, after := measurement.loadBefore[0], measurement.loadAfter[0]
+// performanceBusy is why machine wasn't quiet, empty when she was: her one-minute load before or after over
+// performanceQuietShare of her cores. A loaded box's numbers are its load's as much as cohere's, so no record holds
+// them, never as main's (system_cohere's ruling, #6ex523f). It reads a measurement's machine before its record keeps
+// any numbers, and a baseline's as its record says it, so a baseline taken on a loaded box, as the seed a7867bf3 was
+// at 12.57 on 16 cores, is never compared against nor its binary trusted. A machine whose record says no load before
+// and after, or no cores, can't be read as quiet, so that is why.
+func performanceBusy(machine performanceMachine) string {
+	if machine.Cores <= 0 || len(machine.LoadBefore) == 0 || len(machine.LoadAfter) == 0 {
+		return "her record says no one-minute load before and after or no cores, so she can't be read as quiet"
+	}
+	bound := performanceQuietShare * float64(machine.Cores)
+	before, after := machine.LoadBefore[0], machine.LoadAfter[0]
 	if before <= bound && after <= bound {
 		return ""
 	}
 	return fmt.Sprintf("her one-minute load %.2f before and %.2f after on %d cores, where a quiet box stays at or "+
-		"under %.2f", before, after, measurement.cores, bound)
-}
-
-// keepMainsPerformance is the landing's tree when gating measured nothing it records, because it builds main's binary
-// or its box wasn't quiet: tree with main's performance file at mainCommit, byte for byte, and said, the sentence the
-// landing says of it.
-func keepMainsPerformance(worktree string, tree string, mainCommit string, said string) (string, string, int) {
-	// A main with no file yet has none to keep, so the tree lands as it is, still with no file.
-	mode, treeModeError := treeMode(worktree, mainCommit, performanceFileName)
-	if treeModeError != nil {
-		fmt.Fprintf(streams.Errors, "cohere-dev: reading whether main holds %s: %v\n", performanceFileName,
-			treeModeError)
-		return "", "", 1
-	}
-	if mode == "" {
-		fmt.Fprintf(streams.Errors, "cohere-dev: %s\n", said)
-		return tree, said, 0
-	}
-	reading := exec.Command("git", "cat-file", "blob", mainCommit+":"+performanceFileName)
-	reading.Dir = worktree
-	var readingErrors bytes.Buffer
-	reading.Stderr = &readingErrors
-	contents, readError := reading.Output()
-	if readError != nil {
-		fmt.Fprintf(streams.Errors, "cohere-dev: reading main's %s to keep it: %v: %s\n", performanceFileName,
-			readError, strings.TrimSpace(readingErrors.String()))
-		return "", "", 1
-	}
-	kept, spliceError := spliceIntoTree(worktree, tree, performanceFileName, contents)
-	if spliceError != nil {
-		fmt.Fprintf(streams.Errors, "cohere-dev: keeping main's %s in the landing's tree: %v\n", performanceFileName,
-			spliceError)
-		return "", "", 1
-	}
-	fmt.Fprintf(streams.Errors, "cohere-dev: %s\n", said)
-	return kept, said, 0
+		"under %.2f", before, after, machine.Cores, bound)
 }
 
 // measure runs the measurement a landing makes, alone, at the commit its arguments name (the worktree's head unless
-// one is given), and prints the file it would write with what each phase cost, landing nothing: for reading what the
+// one is given), and prints the record it would write with what each phase cost, landing nothing: for reading what the
 // measurement costs, and for proving a change to it on the real box before it gates a landing. It waits for Shackler
-// as a landing does.
+// as a landing does, and reads its note against the baseline performanceBaselineVariable holds, as a landing does.
 func measure(arguments []string) int {
 	worktree, worktreeError := landWorktree()
 	if worktreeError != nil {
@@ -683,14 +672,15 @@ func measure(arguments []string) int {
 	}
 	fmt.Fprintf(streams.Errors, "cohere-dev: %s measured %s in %s: %s\n", performanceBox, shortCommit(commit),
 		time.Since(started).Round(time.Second), strings.Join(measurement.phases, ", "))
-	current := performanceFileOf(measurement, commit, time.Now())
-	// Ignored: a main that can't be read compares with nothing, which the note says.
-	mainCommit, _ := gitOutput(worktree, "rev-parse", "main")
-	previous, found, unread := readPreviousPerformance(worktree, mainCommit)
-	current.Note = performanceNote(current, previous, found, unread)
+	// Ignored: a root commit has no first parent, and its record names none.
+	parent, _ := gitOutput(worktree, "rev-parse", "--verify", "--quiet", commit+"^1")
+	current := performanceFileOf(measurement, commit, parent, time.Now())
+	baseline := readPerformanceBaseline()
+	current.Against = baselineAgainst(baseline)
+	current.Note = performanceNote(current, baseline)
 	contents, renderError := renderPerformance(current)
 	if renderError != nil {
-		fmt.Fprintf(streams.Errors, "cohere-dev: writing %s: %v\n", performanceFileName, renderError)
+		fmt.Fprintf(streams.Errors, "cohere-dev: writing the record: %v\n", renderError)
 		return 1
 	}
 	fmt.Fprint(streams.Output, string(contents))
@@ -807,7 +797,7 @@ func readPerformance(output []byte, commit string, runError error) (performanceM
 		case "phase":
 			name, milliseconds, _ := strings.Cut(rest, " ")
 			// Ignored: a phase that doesn't read is said as 0s, since the phases are for reading what costs what, and
-			// no number of the file comes from them.
+			// no number of the record comes from them.
 			spent, _ := strconv.ParseInt(milliseconds, 10, 64)
 			phase := fmt.Sprintf("%s %.1fs", name, float64(spent)/1000)
 			if name == "build" && measurement.buildCache != "" {
@@ -985,8 +975,14 @@ func spreadOf(values []int64) performanceSpread {
 	return performanceSpread{Median: median, Minimum: sorted[0], Maximum: sorted[len(sorted)-1]}
 }
 
-// performanceFileOf is the file a measurement of commit writes, measured at measuredAt, its note not yet written.
-func performanceFileOf(measurement performanceMeasurement, commit string, measuredAt time.Time) performanceFile {
+// performanceFileOf is the record a measurement of commit, whose first parent is parent, makes, measured at
+// measuredAt, its note and the baseline it is read against not yet written.
+func performanceFileOf(
+	measurement performanceMeasurement,
+	commit string,
+	parent string,
+	measuredAt time.Time,
+) performanceFile {
 	areas := map[string]int64{}
 	for _, stamp := range measurement.timeline.Stamps {
 		_, taken := areas[stamp.Label]
@@ -998,7 +994,9 @@ func performanceFileOf(measurement performanceMeasurement, commit string, measur
 	return performanceFile{
 		Schema:     performanceSchema,
 		Commit:     commit,
+		Parent:     parent,
 		MeasuredAt: measuredAt.UTC().Format(time.RFC3339),
+		Measured:   true,
 		Machine: performanceMachine{
 			Name:       performanceBox,
 			Cpu:        measurement.cpu,
@@ -1008,12 +1006,11 @@ func performanceFileOf(measurement performanceMeasurement, commit string, measur
 			HeldQuiet:  true,
 		},
 		Tools: performanceTools{
-			Cohere: shortCommit(commit) + " " + performanceBuild + ", " + measurement.platform +
-				", on a cache the box kept",
+			Cohere: performanceBuilt(commit, measurement.platform),
 			Go:     measurement.goVersion,
 			Binary: measurement.binary,
 		},
-		Checks: performanceChecks{
+		Checks: &performanceChecks{
 			Rounds: performanceRounds{
 				Cold:     performanceColdRounds,
 				Deeafbf4: performanceReferenceRounds,
@@ -1034,50 +1031,113 @@ func performanceFileOf(measurement performanceMeasurement, commit string, measur
 	}
 }
 
-// readPreviousPerformance is main's Performance.jsonc at mainCommit, read: found is false when main holds none, as
-// before the first measured landing, and unread names why one main holds didn't read.
-func readPreviousPerformance(worktree string, mainCommit string) (performanceFile, bool, string) {
-	mode, treeModeError := treeMode(worktree, mainCommit, performanceFileName)
-	if treeModeError != nil {
-		return performanceFile{}, true, treeModeError.Error()
-	}
-	if mode == "" {
-		return performanceFile{}, false, ""
-	}
-	contents, gitOutputError := gitOutput(worktree, "show", mainCommit+":"+performanceFileName)
-	if gitOutputError != nil {
-		return performanceFile{}, true, gitOutputError.Error()
-	}
-	previous := performanceFile{}
-	if decodeError := json.Unmarshal([]byte(performanceBody(contents)), &previous); decodeError != nil {
-		return performanceFile{}, true, decodeError.Error()
-	}
-	return previous, true, ""
+// performanceBuilt is how a record's tools say the binary of commit was built, on platform.
+func performanceBuilt(commit string, platform string) string {
+	return shortCommit(commit) + " " + performanceBuild + ", " + platform + ", on a cache the box kept"
 }
 
-// performanceBody is the file's contents without the comment lines that open it, which JSON doesn't read.
-func performanceBody(contents string) string {
-	lines := strings.Split(contents, "\n")
-	for len(lines) > 0 && strings.HasPrefix(strings.TrimSpace(lines[0]), "//") {
-		lines = lines[1:]
-	}
-	return strings.Join(lines, "\n")
+// performanceBaseline is the record a measurement is read against, main's last landed record, as
+// performanceBaselineVariable held it: found is false when it held none, and unread names why one it held didn't
+// read.
+type performanceBaseline struct {
+	record performanceFile
+	found  bool
+	unread string
 }
 
-// performanceNote is the file's one line on how current compares with previous, main's file before it: level or moved
-// per row, by wall and by user time. With no previous it says so, and when previous didn't read, it names why. When
-// previous was measured on another machine, by another build or in another shape, that is its line, never a
-// comparison. A row whose files or findings checked differ from previous's same row is its own line, never compared,
-// since a row that checked less would read faster. A previous file that records no checked counts, as those written
-// before rows recorded them, is said once, and its times compared as they always were.
-func performanceNote(current performanceFile, previous performanceFile, found bool, unread string) string {
+// readPerformanceBaseline reads the baseline performanceBaselineVariable holds. A value that isn't base64 or whose
+// bytes aren't a record is unread, never fatal, since a landing's numbers stand without a comparison, and the note says
+// why it compares with nothing. JSON that parses is still no record unless it names a whole commit and is of
+// performanceSchema: `{}` and `null` parse, and would otherwise read as a record of nothing at no commit.
+func readPerformanceBaseline() performanceBaseline {
+	setting := strings.TrimSpace(os.Getenv(performanceBaselineVariable))
+	if setting == "" {
+		return performanceBaseline{}
+	}
+	contents, decodeError := base64.StdEncoding.DecodeString(setting)
+	if decodeError != nil {
+		return performanceBaseline{found: true, unread: "not base64: " + decodeError.Error()}
+	}
+	record := performanceFile{}
+	if unmarshalError := json.Unmarshal(contents, &record); unmarshalError != nil {
+		return performanceBaseline{found: true, unread: unmarshalError.Error()}
+	}
+	if !fullCommit.MatchString(record.Commit) {
+		return performanceBaseline{found: true, unread: "it names no commit"}
+	}
+	if record.Schema != performanceSchema {
+		return performanceBaseline{found: true, unread: fmt.Sprintf("it is schema %d, not %d",
+			record.Schema, performanceSchema)}
+	}
+	return performanceBaseline{record: record, found: true}
+}
+
+// baselineBinary is the sha256 of the binary baseline's record measured, which the integrate job hands its script so
+// a merge that builds it again times nothing, or empty when the record can't stand for that binary's numbers: one
+// that didn't read, measured nothing (a skipped record keeps its own binary, so trusting it would leave that binary
+// with no numbers anywhere), was taken on a box that wasn't quiet, or on another box than performanceBox, whose numbers
+// are never Shackler's.
+func baselineBinary(baseline performanceBaseline) string {
+	record := baseline.record
+	if baselineAgainst(baseline) == "" || record.Checks == nil || performanceBusy(record.Machine) != "" ||
+		record.Machine.Name != performanceBox || !sha256Pattern.MatchString(record.Tools.Binary) {
+		return ""
+	}
+	return record.Tools.Binary
+}
+
+// baselineAgainst is the commit of baseline's record, which a record read against it names as against, empty when
+// there was no baseline or it didn't read.
+func baselineAgainst(baseline performanceBaseline) string {
+	if !baseline.found || baseline.unread != "" {
+		return ""
+	}
+	return baseline.record.Commit
+}
+
+// performanceNote is the record's one line on how current compares with baseline, main's last landed record: level or
+// moved per row, by wall and by user time. With no baseline it says none was handed, and when the baseline didn't read,
+// it names why. A baseline in another shape is its line first, since another schema may name its numbers otherwise and
+// so read as none. A baseline that measured nothing, a skipped record, has nothing to compare, and one taken on a box
+// that wasn't quiet holds her load's numbers as much as cohere's: each is its line. When the baseline was measured on
+// another machine or by another build, that is its line, never a comparison. A row whose files or findings checked
+// differ from the baseline's same row is its own line, never compared, since a row that checked less would read faster.
+// A baseline that records no checked counts, as those written before rows recorded them, is said once, and its times
+// compared as they always were.
+func performanceNote(current performanceFile, baseline performanceBaseline) string {
+	previous := baseline.record
 	switch {
-	case !found:
-		return "the first measurement, so nothing to compare"
-	case unread != "":
-		return "main's " + performanceFileName + " didn't read (" + unread + "), so nothing is compared"
+	case !baseline.found:
+		return "no baseline was handed (" + performanceBaselineVariable + " unset), so nothing is compared"
+	case baseline.unread != "":
+		return "the baseline record didn't read (" + baseline.unread + "), so nothing is compared"
+	case current.Checks == nil:
+		return "nothing measured, so nothing is compared"
 	}
 	against := shortCommit(previous.Commit)
+	if previous.Schema != current.Schema ||
+		(previous.Checks != nil && previous.Checks.Rounds != current.Checks.Rounds) {
+		shape := fmt.Sprintf("schema %d", previous.Schema)
+		if previous.Checks != nil {
+			shape += fmt.Sprintf(", rounds %d/%d/%d", previous.Checks.Rounds.Cold, previous.Checks.Rounds.Deeafbf4,
+				previous.Checks.Rounds.Warm)
+		}
+		return fmt.Sprintf("main's at %s was measured in another shape (%s), so not compared", against, shape)
+	}
+	if previous.Checks == nil {
+		skipped := ""
+		if previous.Skipped != "" {
+			skipped = " (" + previous.Skipped + ")"
+		}
+		return fmt.Sprintf("main's record at %s measured nothing%s, so nothing is compared", against, skipped)
+	}
+	if busy := performanceBusy(previous.Machine); busy != "" {
+		return fmt.Sprintf(
+			"main's record at %s was measured on a box its record doesn't show as quiet (%s), so nothing is compared",
+			against,
+			busy,
+		)
+	}
 	if machine, before := machineNamed(current.Machine), machineNamed(previous.Machine); machine != before {
 		return fmt.Sprintf("measured on %s, and main's at %s on %s: another machine, so not compared", machine,
 			against, before)
@@ -1085,11 +1145,6 @@ func performanceNote(current performanceFile, previous performanceFile, found bo
 	if build, before := buildNamed(current.Tools), buildNamed(previous.Tools); build != before {
 		return fmt.Sprintf("built as %s, and main's at %s as %s: another build, so not compared", build, against,
 			before)
-	}
-	if previous.Schema != current.Schema || previous.Checks.Rounds != current.Checks.Rounds {
-		return fmt.Sprintf("main's at %s was measured in another shape (schema %d, rounds %d/%d/%d), so not compared",
-			against, previous.Schema, previous.Checks.Rounds.Cold, previous.Checks.Rounds.Deeafbf4,
-			previous.Checks.Rounds.Warm)
 	}
 	// The same binary as main's ran: this landing changed nothing cohere compiles, so every difference is the
 	// box's own drift between two measurements of one program, which the note says rather than calling it slower.
@@ -1101,7 +1156,7 @@ func performanceNote(current performanceFile, previous performanceFile, found bo
 	rows := []string{}
 	uncounted := false
 	for _, row := range performanceRows {
-		now, before := row.row(current), row.row(previous)
+		now, before := row.row(current.Checks), row.row(previous.Checks)
 		if before.Checked == nil {
 			uncounted = true
 		} else if now.Checked != nil && *now.Checked != *before.Checked {
@@ -1114,7 +1169,7 @@ func performanceNote(current performanceFile, previous performanceFile, found bo
 			compared(now.User, before.User))
 	}
 	if uncounted {
-		rows = append([]string{"main's file records no checked counts"}, rows...)
+		rows = append([]string{"main's record holds no checked counts"}, rows...)
 	}
 	if sameBinary {
 		return "against " + against + ", the same binary (sha256 " + current.Tools.Binary[:12] + "), so no change " +
@@ -1126,9 +1181,9 @@ func performanceNote(current performanceFile, previous performanceFile, found bo
 // spreadCompared says how now compares with before: level while their ranges overlap, and moved, up or down by how
 // much of before's median, once they don't.
 //
-// The file is awareness, never a gate on speed (Kirk, Nov 21: "It's ok if we need to add cool shit and slow down total
-// time, we are just aware of the change"), so a change reads as a plain fact, slower or faster by so much with the
-// ranges apart, and nothing refuses or holds a landing for it.
+// The record is awareness, never a gate on speed (Kirk, Nov 21: "It's ok if we need to add cool shit and slow down
+// total time, we are just aware of the change"), so a change reads as a plain fact, slower or faster by so much with
+// the ranges apart, and nothing refuses or holds a landing for it.
 func spreadCompared(now performanceSpread, before performanceSpread) string {
 	figures := fmt.Sprintf("%d ms, was %d", now.Median, before.Median)
 	if now.Minimum <= before.Maximum && before.Minimum <= now.Maximum {
@@ -1177,58 +1232,11 @@ func buildNamed(tools performanceTools) string {
 	return how + " with " + tools.Go
 }
 
-// renderPerformance is the file's bytes: its header, then its body in the house format. No printer reads .jsonc, so
-// the body is printed as the JSON it is.
+// renderPerformance is the record's bytes, its JSON in the house format.
 func renderPerformance(file performanceFile) ([]byte, error) {
 	body, marshalError := json.Marshal(file)
 	if marshalError != nil {
 		return nil, marshalError
 	}
-	formatted, formatError := native.FormatHouse(strings.TrimSuffix(performanceFileName, "c"), body)
-	if formatError != nil {
-		return nil, formatError
-	}
-	return append([]byte(performanceHeader), formatted...), nil
-}
-
-// spliceIntoTree is tree with the file name at its root holding contents: the bytes hashed as a blob, and the tree
-// written from an index of its own that reads tree and adds the blob, so no working tree and no other index moves.
-func spliceIntoTree(worktree string, tree string, name string, contents []byte) (string, error) {
-	hashing := exec.Command("git", "hash-object", "-w", "--stdin")
-	hashing.Dir, hashing.Stdin = worktree, bytes.NewReader(contents)
-	var hashingErrors bytes.Buffer
-	hashing.Stderr = &hashingErrors
-	blob, hashError := hashing.Output()
-	if hashError != nil {
-		return "", fmt.Errorf("git hash-object: %w: %s", hashError, strings.TrimSpace(hashingErrors.String()))
-	}
-	directory, directoryError := os.MkdirTemp("", "cohere-dev-performance-")
-	if directoryError != nil {
-		return "", directoryError
-	}
-	defer func() {
-		if removeError := os.RemoveAll(directory); removeError != nil {
-			fmt.Fprintf(streams.Errors, "cohere-dev: the landing's scratch index %s stays: %v\n", directory,
-				removeError)
-		}
-	}()
-	index := filepath.Join(directory, "index")
-	withIndex := func(arguments ...string) (string, error) {
-		command := exec.Command("git", arguments...)
-		command.Dir, command.Env = worktree, append(os.Environ(), "GIT_INDEX_FILE="+index)
-		output, outputError := command.CombinedOutput()
-		if outputError != nil {
-			return "", fmt.Errorf("git %s: %w: %s", strings.Join(arguments, " "), outputError,
-				strings.TrimSpace(string(output)))
-		}
-		return strings.TrimSpace(string(output)), nil
-	}
-	if _, readError := withIndex("read-tree", tree); readError != nil {
-		return "", readError
-	}
-	if _, updateError := withIndex("update-index", "--add", "--cacheinfo",
-		"100644,"+strings.TrimSpace(string(blob))+","+name); updateError != nil {
-		return "", updateError
-	}
-	return withIndex("write-tree")
+	return native.FormatHouse(performanceRecordName, body)
 }
