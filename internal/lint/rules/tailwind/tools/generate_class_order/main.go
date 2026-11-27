@@ -61,7 +61,7 @@ func main() {
 	systems := flag.String(
 		"systems",
 		"",
-		"path to a JSON array of {name, path} naming the design systems to measure, each path a file or a corpus spelling such as ahra:app/_theme/styles/theme.css (default: systems.json next to this command)",
+		"path to a JSON array of {name, path} naming the design systems to measure, each path a stylesheet, absolute or relative to the working directory (default: systems.json next to this command, which names the public and planted themes relative to the repository root)",
 	)
 	output := flag.String(
 		"output",

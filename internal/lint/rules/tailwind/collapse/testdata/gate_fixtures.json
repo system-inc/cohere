@@ -1637,21 +1637,21 @@
       }
     },
     {
-      "literal": "background--2/50 not-a-real-class-xyz",
+      "literal": "wash--2/50 not-a-real-class-xyz",
       "classes": [
-        "background--2/50",
+        "wash--2/50",
         "not-a-real-class-xyz"
       ],
       "engineCollapses": [],
       "bucketKeys": {
-        "background--2/50": "||2/2/50",
+        "wash--2/50": "||2/2/50",
         "not-a-real-class-xyz": "unparsed:not-a-real-class-xyz"
       },
       "parsedCandidates": {
-        "background--2/50": [
+        "wash--2/50": [
           {
             "Kind": "Functional",
-            "Root": "background-",
+            "Root": "wash-",
             "Value": {
               "Kind": "Named",
               "Value": "2",
@@ -1664,11 +1664,11 @@
         "not-a-real-class-xyz": []
       },
       "declaredValues": {
-        "background--2/50": [],
+        "wash--2/50": [],
         "not-a-real-class-xyz": []
       },
       "declaredProperties": {
-        "background--2/50": [],
+        "wash--2/50": [],
         "not-a-real-class-xyz": []
       }
     }
