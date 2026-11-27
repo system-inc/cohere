@@ -57,6 +57,13 @@ func handedOn(
 	rules []rule.Rule,
 ) []string {
 	test.Helper()
+	// The walks run as many at once as there are processors (check.Run's NewWalks), so on one they can never run two
+	// at once, and the test says so at once rather than after a hand-on's ten seconds: only a real loss of
+	// concurrency then reaches the wait's end.
+	if processors := runtime.GOMAXPROCS(0); processors < 2 {
+		test.Fatalf("the walks of the packages no action reached run one at a time on %d processor, so this run "+
+			"can't drive two at once", processors)
+	}
 	var lock sync.Mutex
 	var handed []string
 	neverStarted := 0
