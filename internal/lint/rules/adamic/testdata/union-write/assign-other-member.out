@@ -1,0 +1,3 @@
+source 72c4912cd76f87cf33e6f4a822304dfa8e34d63f06924b37998a973851c904fb
+exit 1
+stderr TypeError: counter.value.toUpperCase is not a function

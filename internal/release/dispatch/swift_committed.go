@@ -70,15 +70,6 @@ func resolveCommittedSwiftBinary(paths Paths, commit string, toolchain string, c
 		return binaryPath, false, nil
 	}
 
-	worktree := paths.SwiftSourceWorktree()
-	if checkOutWorktreeError := checkOutWorktree(
-		paths.ModuleDirectory,
-		worktree,
-		commit,
-	); checkOutWorktreeError != nil {
-		return "", false, checkOutWorktreeError
-	}
-
 	// Built to a temporary name and renamed only once proven, so a concurrent run never execs a binary
 	// that failed its proof.
 	temporary := binaryPath + fmt.Sprintf(".partial-%d", os.Getpid())
@@ -86,15 +77,33 @@ func resolveCommittedSwiftBinary(paths Paths, commit string, toolchain string, c
 	// failure path is removed by the prune once its writer has been gone for the hour.
 	defer os.Remove(temporary)
 
-	// Nothing stated about the tree: the manifest reads git in a worktree nobody edits, and the proof below
-	// checks what it read.
-	if buildSwiftProductError := buildSwiftProduct(
-		filepath.Join(worktree, "swift_language"),
-		paths.SwiftCommittedBuildDirectory(),
-		temporary,
-		nil,
-	); buildSwiftProductError != nil {
-		return "", false, buildSwiftProductError
+	// A shared binary is taken to the temporary name a build would write, so it is proven the same way: its sum
+	// says its bytes are the ones a fill put there, and the proof that they report the clean tree a committed
+	// build must have. Taken, it needs no worktree.
+	taken, takeSharedSwiftEngineError := takeSharedSwiftEngine(binaryPath, temporary)
+	if takeSharedSwiftEngineError != nil {
+		return "", false, takeSharedSwiftEngineError
+	}
+	if !taken {
+		worktree := paths.SwiftSourceWorktree()
+		if checkOutWorktreeError := checkOutWorktree(
+			paths.ModuleDirectory,
+			worktree,
+			commit,
+		); checkOutWorktreeError != nil {
+			return "", false, checkOutWorktreeError
+		}
+
+		// Nothing stated about the tree: the manifest reads git in a worktree nobody edits, and the proof below
+		// checks what it read.
+		if buildSwiftProductError := buildSwiftProduct(
+			filepath.Join(worktree, "swift_language"),
+			paths.SwiftCommittedBuildDirectory(),
+			temporary,
+			nil,
+		); buildSwiftProductError != nil {
+			return "", false, buildSwiftProductError
+		}
 	}
 	if proveCommittedSwiftBinaryError := proveCommittedSwiftBinary(
 		temporary,
@@ -105,6 +114,12 @@ func resolveCommittedSwiftBinary(paths Paths, commit string, toolchain string, c
 	}
 	if renameError := os.Rename(temporary, binaryPath); renameError != nil {
 		return "", false, fmt.Errorf("moving the built cohere-swift into the cache: %w", renameError)
+	}
+	if taken {
+		return binaryPath, false, nil
+	}
+	if fillSwiftEngineLayerError := fillSwiftEngineLayer(binaryPath); fillSwiftEngineLayerError != nil {
+		return "", false, fillSwiftEngineLayerError
 	}
 	return binaryPath, true, nil
 }
@@ -124,6 +139,7 @@ func committedSwiftPackageHash(paths Paths, commit string, toolchain string) (st
 	fmt.Fprintf(digest, "kind\x00%s\x00", snapshotTag)
 	fmt.Fprintf(digest, "toolchain\x00%s\x00", toolchain)
 	fmt.Fprintf(digest, "platform\x00%s/%s\x00", runtime.GOOS, runtime.GOARCH)
+	fmt.Fprintf(digest, "configuration\x00%s\x00", swiftBuildIdentity())
 	for index, input := range swiftPackageInputs {
 		fmt.Fprintf(digest, "input\x00%s\x00%s\x00", input, objects[index])
 	}

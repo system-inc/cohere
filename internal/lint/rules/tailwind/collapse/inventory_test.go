@@ -84,17 +84,17 @@ var tablesExemptFromTheInventory = map[string]bool{
 //	FrameworkStaticDeclarations    890   staticUtility calls
 //	FrameworkFunctionalUtilities    33   functionalUtility registrations
 //	FrameworkMultiDeclarationUtilities
-//	                               152   functionalUtility registrations
-//	VariantOrder                   145   the order numbers those registrations sort at
+//	                               154   functionalUtility registrations
+//	VariantOrder                   143   the order numbers those registrations sort at
 //	FrameworkNamespaces             14   the theme namespaces a root consumes, all Tailwind's own
 //	baseReadings                   374   readings of Tailwind's own utilities, held by the differential
 //	baseStatics                    869   readings of Tailwind's own statics, same
-//	GapRootDescriptions             57   how each closure-registered root resolves a value, read
+//	GapRootDescriptions             55   how each closure-registered root resolves a value, read
 //	                                     from utilities.ts at the tag. Tailwind's own registration
-//	                                     data, in the same sense as the 185 in the two tables above:
-//	                                     these 57 are registered as bare closures rather than through
+//	                                     data, in the same sense as the 187 in the two tables above:
+//	                                     these 55 are registered as bare closures rather than through
 //	                                     `functionalUtility`, so the shape had to be written out
-//	                                     instead of extracted, and gaproots_test.go holds all 57
+//	                                     instead of extracted, and gaproots_test.go holds all 55
 //	                                     against `candidatesToCss` on a live design system.
 //	valueOperators                   6   the operators the arbitrary-value printer unspaces, the
 //	                                     literal set in `printArbitraryValue` at 4.3.3

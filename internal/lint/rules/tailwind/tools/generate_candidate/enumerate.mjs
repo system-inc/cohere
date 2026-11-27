@@ -22,9 +22,8 @@
  * they come from this repository's `@theme` and `@utility` blocks as much as from the framework.
  *
  * Capturing the answers alongside the readings is what makes the Go test a test of the parser
- * rather than a test of a stubbed table someone hand-typed. The port is handed the same 1,201
- * utility roots and 88 variant roots the engine had, so a disagreement is a parser defect and can
- * be nothing else.
+ * rather than a test of a stubbed table someone hand-typed. The port is handed the same utility
+ * and variant roots the engine had, so a disagreement is a parser defect and can be nothing else.
  *
  * # Why the public API, not a bundle probe
  *
@@ -657,13 +656,20 @@ const failures = [];
  * assumed: a control run against an empty theme passed a `>= 500` assertion comfortably, which is
  * how this check was found to be worthless in its first form.
  *
- * What actually discriminates is the delta. The repository's own `@utility` blocks and `@theme`
- * breakpoints contribute roots the framework alone never registers, so a handful of them are named
- * here as markers. If the theme graph fails to load, these disappear and the capture stops rather
- * than quietly describing framework defaults while claiming to describe this repository.
+ * What actually discriminates is the delta. The repository's own `@utility` blocks, `@custom-variant`
+ * blocks and `@theme` breakpoints contribute roots the framework alone never registers, so a handful
+ * of them are named here as markers. If the theme graph fails to load, these disappear and the
+ * capture stops rather than quietly describing framework defaults while claiming to describe this
+ * repository.
+ *
+ * They name the planted theme's, collapse/testdata/planted_repository/styles, which is what the
+ * committed fixture is captured on: utilities from its utilities.css, including `wash-`, the root of
+ * the dashed scale `wash--*`, and variants from its variants.css and its two breakpoints, `tablet`
+ * and `desk`. The framework's own `sm` to `2xl` are not markers, since a theme importing nothing
+ * registers them too. Capturing another theme means naming its markers here.
  */
-const repositoryUtilityMarkers = ['scrollbar-hide', 'prose', 'fade-in', 'slide-in-from-top'];
-const repositoryVariantMarkers = ['sm', 'md', 'lg', 'xl', '2xl'];
+const repositoryUtilityMarkers = ['card-frame', 'scroll-quiet', 'halo-on', 'wash-', 'stack', 'cluster', 'tint'];
+const repositoryVariantMarkers = ['compact', 'pressed', 'pointer-fine', 'tablet', 'desk'];
 
 if(Object.keys(utilityRoots).length < 500) {
     failures.push(`only ${Object.keys(utilityRoots).length} utility roots; even the framework defaults are missing`);

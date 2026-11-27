@@ -152,6 +152,15 @@ var FrameworkMultiDeclarationUtilities = map[string]FrameworkMultiDeclarationUti
 		BareValue:         BareValueSpacingMultiplier,
 		RefusesEmptyValue: true,
 	},
+	// `block` and `inline` share a name with the static `display` utilities, which answer the bare
+	// class: `spacingUtility` passes no default, so the functional root refuses an empty value.
+	"block": {
+		Reading:           Reading{Order: nil, Count: 1},
+		ThemeKeys:         []string{"--spacing"},
+		SupportsFractions: true,
+		BareValue:         BareValueSpacingMultiplier,
+		RefusesEmptyValue: true,
+	},
 	"blur": {
 		Reading:         Reading{Order: []int{330, 339}, Count: 2},
 		ThemeKeys:       []string{"--blur"},
@@ -391,6 +400,13 @@ var FrameworkMultiDeclarationUtilities = map[string]FrameworkMultiDeclarationUti
 		Reading:           Reading{Order: []int{6}, Count: 1},
 		ThemeKeys:         []string{"--inset", "--spacing"},
 		SupportsNegative:  true,
+		SupportsFractions: true,
+		BareValue:         BareValueSpacingMultiplier,
+		RefusesEmptyValue: true,
+	},
+	"inline": {
+		Reading:           Reading{Order: nil, Count: 1},
+		ThemeKeys:         []string{"--spacing", "--container"},
 		SupportsFractions: true,
 		BareValue:         BareValueSpacingMultiplier,
 		RefusesEmptyValue: true,

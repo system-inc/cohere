@@ -74,15 +74,17 @@ const (
 )
 
 // macBoxTemporaryBlock makes gatetemp, the tests' temporary directory: a new one each run on a gate box, under the
-// account's `TMPDIR`, and with integrateCache set, one path every integrate job, inside the kept cache, made empty
-// first. go test's cache keys a test on the `TMPDIR` it read, which t.TempDir reads, so a directory named anew each job
-// would miss every package that makes one. Never a fixed /tmp: an integrate job in Shackler's sandbox may write its own
-// tmp and its kept cache, and /tmp refused it (J-7dhfcty). The integrate job is serial (integrate_job_run.go), so no
-// two runs share the path.
-const macBoxTemporaryBlock = `if [ -n "$integrateCache" ]; then
-  gatetemp="$integrateCache/temporary"
+// account's `TMPDIR`, and in an integrate job one path every job, made empty first: inside the kept cache when one is
+// kept, else under the script's base, which the integrate kind's fixed home holds at one path (#e94a6r4). go test's
+// cache keys a test on the `TMPDIR` it read, which t.TempDir reads, so a directory named anew each job misses every
+// package that makes one: J-5j0jbp5, on the runner's cache with no kept one, replayed 73 of 438. Never a fixed /tmp:
+// an integrate job in Shackler's sandbox may write its own tmp and its kept cache, and /tmp refused it (J-7dhfcty). The
+// integrate job is serial (integrate_job_run.go), so no two runs share the path.
+const macBoxTemporaryBlock = `if [ -n "$integrateCache" ] || [ -n "$integrateJob" ]; then
+  gatehome="${integrateCache:-$base}"
+  gatetemp="$gatehome/temporary"
   { chmod -R u+w "$gatetemp" 2>/dev/null || true; rm -rf "$gatetemp"; } || refuse "$gatetemp couldn't be emptied"
-  mkdir -p "$integrateCache" && mkdir -m 700 "$gatetemp" || refuse "$gatetemp couldn't be made"
+  mkdir -p "$gatehome" && mkdir -m 700 "$gatetemp" || refuse "$gatetemp couldn't be made"
 else
   gatetemp=$(mktemp -d "${TMPDIR:-/tmp}/cohere-gate.XXXXXX") || refuse "no temporary directory could be made"
 fi
@@ -152,8 +154,8 @@ if [ -n "$pin" ]; then
   git -C tree/TypeScript checkout -q --detach --force "$pin"
 fi
 rm -f "$safe"; trap - EXIT
-# The tests' temporary directory, made anew under the account's TMPDIR, or one path inside the integrate job's kept
-# cache, and never under a fixed /tmp, which an integrate job in Shackler's sandbox may not write (J-7dhfcty).
+# The tests' temporary directory, made anew under the account's TMPDIR, or one path every integrate job, and never
+# under a fixed /tmp, which an integrate job in Shackler's sandbox may not write (J-7dhfcty).
 ` + macBoxTemporaryBlock + `trap 'chmod -R u+w "$gatetemp" 2>/dev/null; rm -rf "$gatetemp"' EXIT
 export TMPDIR="$gatetemp"
 cd tree

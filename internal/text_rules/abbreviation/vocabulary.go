@@ -1,6 +1,7 @@
 package abbreviation
 
 import (
+	"maps"
 	"slices"
 	"strings"
 )
@@ -82,6 +83,21 @@ func (vocabulary *Vocabulary) allowedSegmentHolds(name string, abbreviation stri
 	return false
 }
 
+// abbreviations is every entry's abbreviation, whatever forms it is judged in, sorted and each once.
+func (vocabulary *Vocabulary) abbreviations() []string {
+	abbreviations := map[string]bool{}
+	for name := range vocabulary.WholeByName {
+		abbreviations[name] = true
+	}
+	for _, entries := range [][]*Entry{vocabulary.EarlyPrefixes, vocabulary.LatePrefixes, vocabulary.Suffixes,
+		vocabulary.Segments} {
+		for _, entry := range entries {
+			abbreviations[entry.Abbreviation] = true
+		}
+	}
+	return slices.Sorted(maps.Keys(abbreviations))
+}
+
 // everySegmentIsKeywordTerm reports whether each place the word stands as a segment of the name, as the boundary and
 // camel patterns read it, opens one of its keyword term's spellings, so `isVarDeclaration` holds nothing to report
 // and `VarDeclarationForThemeVar` still does. It is asked only once a pattern has matched, so there is a segment.
@@ -144,7 +160,8 @@ func isAsciiLowercase(character byte) bool {
 // Every name a language judges meets every entry, and nearly every name matches none, so each form is tested first
 // as the literal text its pattern holds, and only a name that passes costs a regular expression run. A literal test
 // that fails is a pattern that could not have matched, so the findings are the ones the patterns alone gave
-// (#300qvxj), and find_equivalence_test.go holds them to that over every name in this repository and the ahra tree.
+// (#300qvxj), and find_equivalence_test.go holds them to that over every name SyntheticNames and SyntheticCleanNames
+// generate from the vocabulary.
 // The prefix forms are not walked at all: the one entry a name could begin with is looked up (prefixEntry), which
 // prefix_index_test.go holds to the walk it replaced (#fex6s0v).
 func (vocabulary *Vocabulary) Find(name string) (Finding, bool) {

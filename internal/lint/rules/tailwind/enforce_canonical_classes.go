@@ -103,7 +103,10 @@ type EnforceCanonicalClassesOptions struct {
 //
 // Two classes only merge when everything except their root already agrees: their variants, their
 // importance, and their value. `px-4 py-4` becomes `p-4`, but `px-4 py-2` collapses to nothing and
-// so does `px-4 sm:py-4`. Getting that wrong in the permissive direction reports correct code.
+// so does `px-4 sm:py-4`. Getting that wrong in the permissive direction reports correct code. A value
+// agrees when the two spell it alike, or, as upstream decides it, when the pair and the shorthand compile
+// alike: `w-rail h-14` is `size-14` on a theme whose rail is 3.5rem, and the shorthand is spelled as the
+// listed class upstream takes first, `size-14` for `w-rail h-rail` too (#sbb2hke).
 //
 // No fix, deliberately. The collapse is mechanical but the rewrite is not: the replacement has to
 // be spliced into a class list whose order is `enforce-consistent-class-order`'s concern, and a
@@ -163,22 +166,20 @@ var EnforceCanonicalClasses = rule.Rule[EnforceCanonicalClassesOptions]{
 			return nil
 		}
 
+		// Upstream signs every class under the same options it collapses with, so a project that turns
+		// collapse off compares signatures without expanding shorthands.
+		canonicalizer := designSystem.Canonicalizer.WithFeatures(
+			tailwindcollapse.SignatureFeaturesFor(collapse.enabled, collapse.logical),
+		)
+
 		report := func(node *ast.Node) {
 			for _, literal := range reader.ClassLiteralsIn(node) {
 				var merged map[string]bool
 				if collapse.enabled {
-					merged = reportCollapses(ruleContext, literal, ignored, designSystem, collapse)
+					merged = reportCollapses(ruleContext, literal, ignored, designSystem, canonicalizer, collapse)
 				}
-				// Upstream signs every class under the same options it collapses with, so a project that
-				// turns collapse off compares signatures without expanding shorthands.
-				canonicalizer := designSystem.Canonicalizer.WithFeatures(
-					tailwindcollapse.SignatureFeaturesFor(collapse.enabled, collapse.logical),
-				)
 				reportSingles(ruleContext, literal, ignored, designSystem.System, canonicalizer, merged)
 			}
-			canonicalizer := designSystem.Canonicalizer.WithFeatures(
-				tailwindcollapse.SignatureFeaturesFor(collapse.enabled, collapse.logical),
-			)
 			for _, segments := range reader.ClassTemplateSegmentsIn(node) {
 				reportTemplateCanonical(ruleContext, segments, ignored, designSystem, canonicalizer, collapse)
 			}
@@ -203,6 +204,7 @@ func reportCollapses(
 	literal ClassLiteral,
 	ignored []*ignorePattern,
 	designSystem DesignSystemResult,
+	canonicalizer *tailwindcollapse.Canonicalizer,
 	collapse canonicalCollapseOptions,
 ) map[string]bool {
 	collapses, reported := collapsesIn(
@@ -210,6 +212,7 @@ func reportCollapses(
 		ignored,
 		ruleContext.PatternTimedOut,
 		designSystem,
+		canonicalizer,
 		collapse,
 	)
 	for _, found := range collapses {
@@ -230,11 +233,18 @@ type canonicalCollapse struct {
 // Applied repeatedly, because collapses compose: `mt-1 mb-1 ml-1 mr-1` becomes `m-1` only through
 // `mt+mb => my`, then `ml+mr => mx`, then `my+mx => m`. Verified against Tailwind, which produces
 // the same single finding for the four-class case.
+//
+// Upstream runs each class through its single-class passes before it collapses any, and this merges the
+// classes as written. Measured on #sbb2hke's grid, the two orders reach the same collapse here, because
+// a pair whose values are spelled apart is compared by signature in mergeOnce and its shorthand spelled
+// by CollapseSpelling: `w-[1rem] h-[1rem]` is `size-4` either way. The one pair that differed,
+// `-ml-[3px] -mr-[3px]`, is one where upstream's own answer depends on what it was asked before.
 func collapsesIn(
 	classes []string,
 	ignored []*ignorePattern,
 	overrun esregexp.Overrun,
 	designSystem DesignSystemResult,
+	canonicalizer *tailwindcollapse.Canonicalizer,
 	collapse canonicalCollapseOptions,
 ) ([]canonicalCollapse, map[string]bool) {
 	if len(classes) < 2 {
@@ -258,7 +268,7 @@ func collapsesIn(
 	// real chain, which is the three steps of `m-1` plus one to notice there is nothing left.
 	const maximumPasses = 6
 	for pass := 0; pass < maximumPasses; pass++ {
-		inputs, output, didMerge := mergeOnce(remaining, designSystem, collapse)
+		inputs, output, didMerge := mergeOnce(remaining, designSystem, canonicalizer, collapse)
 		if !didMerge {
 			return collapses, reported
 		}
@@ -311,7 +321,8 @@ func reportTemplateCanonical(
 		var merged map[string]bool
 		if collapse.enabled {
 			var collapses []canonicalCollapse
-			collapses, merged = collapsesIn(run.Texts(), ignored, ruleContext.PatternTimedOut, designSystem, collapse)
+			collapses, merged = collapsesIn(
+				run.Texts(), ignored, ruleContext.PatternTimedOut, designSystem, canonicalizer, collapse)
 			for _, found := range collapses {
 				ruleContext.ReportRange(run.Range, messageCanonicalCollapse(found.inputs, found.output))
 			}
@@ -423,10 +434,16 @@ type canonicalCollapseOptions struct {
 	logical bool
 }
 
-// mergeOnce finds the first mergeable pair and returns what it becomes.
+// mergeOnce finds the first mergeable pair and returns what it becomes, spelled as upstream spells it.
+//
+// The family table names the shorthand root, and the root swapped in prints the class upstream's
+// collapse would reach by swapping roots, `size-rail` for `w-rail h-rail`. Upstream takes a listed class
+// that signs alike before that one, `size-14`, so the swap is handed to CollapseSpelling, which keeps it
+// only when no listed class signs alike or it cannot tell which one upstream takes.
 func mergeOnce(
 	classes []string,
 	designSystem DesignSystemResult,
+	canonicalizer *tailwindcollapse.Canonicalizer,
 	collapse canonicalCollapseOptions,
 ) ([]string, string, bool) {
 	parsed := make([]candidateParts, 0, len(classes))
@@ -442,9 +459,9 @@ func mergeOnce(
 		for rightIndex := leftIndex + 1; rightIndex < len(parsed); rightIndex++ {
 			left, right := parsed[leftIndex], parsed[rightIndex]
 
-			// Everything except the root must already agree. This is the precondition the whole
-			// rule rests on, and relaxing it reports `px-4 py-2` and `px-4 sm:py-4`, both correct.
-			if left.mergeKey() != right.mergeKey() {
+			// Variants and importance must already agree, since upstream collapses only within a group
+			// sharing both. Relaxing it reports `px-4 sm:py-4`, which is correct code.
+			if left.groupKey() != right.groupKey() {
 				continue
 			}
 
@@ -453,11 +470,49 @@ func mergeOnce(
 				continue
 			}
 
-			return []string{left.ClassName, right.ClassName}, rebuildClass(left, outputRoot), true
+			// Signed as upstream signs a group, with the variants and importance the two share taken off.
+			inputs := []string{bareClass(left, left.Root), bareClass(right, right.Root)}
+			swapped := bareClass(left, outputRoot)
+			// The value must agree too, and where the two spell it alike the family says the pair merges.
+			// Elsewhere only the signatures can say, as upstream's collapse decides it by them and not by
+			// the value's name (#sbb2hke). A family is a fact about functional roots, so a static read as
+			// one, `w-px`, merges only where the shorthand compiles to what the pair does: `size-px` does,
+			// and `w-screen h-screen` has no `size-screen` to merge into. Two spellings of one value merge
+			// the same way, `w-rail h-14` into `size-14`, while `px-4 py-2` signs as no `p-*` and stays.
+			if left.Value != right.Value || left.FirstReadingStatic || right.FirstReadingStatic {
+				swaps := []string{swapped}
+				if left.Value != right.Value {
+					swaps = append(swaps, bareClass(right, outputRoot))
+				}
+				swapped = ""
+				for _, swap := range swaps {
+					if canonicalizer.CollapsesTo(inputs, swap) {
+						swapped = swap
+						break
+					}
+				}
+				if swapped == "" {
+					continue
+				}
+			}
+
+			output := left.Prefix + canonicalizer.CollapseSpelling(inputs, swapped)
+			if left.Important {
+				output += "!"
+			}
+			return []string{left.ClassName, right.ClassName}, output, true
 		}
 	}
 
 	return nil, "", false
+}
+
+// bareClass is a class rebuilt around root with no variants and no importance, the utility upstream's
+// collapse signs.
+func bareClass(parts candidateParts, root string) string {
+	parts.Prefix = ""
+	parts.Important = false
+	return rebuildClass(parts, root)
 }
 
 // collapseOutputFor looks up two roots in the generated table, in either order.

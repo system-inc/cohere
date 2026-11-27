@@ -28,8 +28,8 @@ type cssParserCorpus struct {
 	// by name. A false here would mean the corpus was captured from something unverified.
 	ParseResolvedByIdentity bool `json:"parseResolvedByIdentity"`
 
-	// The counts the exit criterion asks to be reported, measured by Tailwind over the real
-	// stylesheets rather than by this port.
+	// The counts the exit criterion asks to be reported, measured by Tailwind over the whole
+	// stylesheets in testdata/cssparser_corpus rather than by this port.
 	StylesheetCount    int `json:"stylesheetCount"`
 	ThemeEntryCount    int `json:"themeEntryCount"`
 	UtilityBlockCount  int `json:"utilityBlockCount"`
@@ -292,22 +292,52 @@ func TestParseCssCustomPropertyWhitespaceIsRaw(test *testing.T) {
 	}
 }
 
-// TestParseCssReadsRealStylesheets states the exit criterion as a test: the port reproduces what
-// Tailwind sees across a real repository's theme and its whole @import graph.
+// TestParseCssReadsWholeStylesheets states the exit criterion as a test: the port reproduces what
+// Tailwind sees across a project's theme and its whole @import graph, here the made-up product
+// whose stylesheets are written in testdata/cssparser_corpus.
 //
 // The counts are Tailwind's, recorded at generation time, and are recomputed here from this
 // port's own trees. Asserting they agree is what makes "it parsed without erroring" mean something.
-func TestParseCssReadsRealStylesheets(test *testing.T) {
+// They are also pinned to what the corpus holds (four files: 65 @theme entries in tokens.css and
+// 4 in motion.css, 10 @utility blocks in utilities.css and 4 in motion.css, 2 @custom-variant
+// rules in app.css), because a fixture regenerated without `-stylesheets` records zeros, and zeros
+// agree with an empty walk.
+func TestParseCssReadsWholeStylesheets(test *testing.T) {
 	test.Parallel()
 	corpus := loadCssParserCorpus(test)
+
+	const corpusStylesheets = 4
+	const corpusThemeEntries = 69
+	const corpusUtilityBlocks = 14
+	const corpusCustomVariants = 2
+	if corpus.StylesheetCount != corpusStylesheets || corpus.ThemeEntryCount != corpusThemeEntries ||
+		corpus.UtilityBlockCount != corpusUtilityBlocks || corpus.CustomVariantCount != corpusCustomVariants {
+		test.Errorf(
+			"fixture records %d stylesheets, %d @theme entries, %d @utility blocks, %d @custom-variant rules; "+
+				"the corpus holds %d, %d, %d, %d",
+			corpus.StylesheetCount, corpus.ThemeEntryCount, corpus.UtilityBlockCount, corpus.CustomVariantCount,
+			corpusStylesheets, corpusThemeEntries, corpusUtilityBlocks, corpusCustomVariants,
+		)
+	}
 
 	stylesheets, themeEntries, utilityBlocks, customVariants := 0, 0, 0, 0
 
 	for _, testCase := range corpus.Cases {
-		if testCase.Source != "repository" {
+		if testCase.Source != "stylesheet" {
 			continue
 		}
 		stylesheets++
+
+		// The fixture carries its own copy of each input; reading the file as well keeps an edit to
+		// a corpus stylesheet from passing against a tree captured before the edit.
+		path := filepath.Join("testdata", testCase.Name)
+		onDisk, readError := os.ReadFile(path)
+		if readError != nil {
+			test.Fatalf("read %s: %v", path, readError)
+		}
+		if string(onDisk) != testCase.Input {
+			test.Errorf("%s differs from the input the fixture recorded; regenerate the fixture", path)
+		}
 
 		nodes, parseCssError := ParseCss(testCase.Input)
 		if parseCssError != nil {
@@ -348,7 +378,7 @@ func TestParseCssReadsRealStylesheets(test *testing.T) {
 	}
 
 	test.Logf(
-		"across %d real stylesheets: %d @theme entries, %d @utility blocks, %d @custom-variant rules, each matching Tailwind",
+		"across %d whole stylesheets: %d @theme entries, %d @utility blocks, %d @custom-variant rules, each matching Tailwind",
 		stylesheets, themeEntries, utilityBlocks, customVariants,
 	)
 }

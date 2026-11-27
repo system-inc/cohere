@@ -10,10 +10,11 @@
 // Usage:
 //
 //	go run ./internal/lint/rules/tailwind/tools/generate_class_literals \
-//	    [-packages <directory or corpus spelling>] [-check]
+//	    -packages <directory> [-check]
 //
 // Run from the repository root. -packages names where eslint, the plugin and typescript-eslint's
-// parser resolve, the ahra corpus by default.
+// parser resolve, and is required, as -package-root is for the siblings: cohere installs none of the
+// three, so there is no directory of its own to default to.
 //
 // # -check
 //
@@ -37,11 +38,17 @@ import (
 func main() {
 	packages := flag.String(
 		"packages",
-		"ahra:.",
-		"a directory, or a corpus spelling, where eslint, eslint-plugin-better-tailwindcss and @typescript-eslint/parser resolve",
+		"",
+		"a directory where eslint, eslint-plugin-better-tailwindcss and @typescript-eslint/parser resolve",
 	)
 	check := flag.Bool("check", false, "regenerate and fail if a committed file disagrees")
 	flag.Parse()
+
+	if *packages == "" {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
+		fmt.Fprintln(os.Stderr, "-packages is required")
+		os.Exit(2)
+	}
 
 	toolDirectory, toolDirectoryError := toolDirectory()
 	if toolDirectoryError != nil {

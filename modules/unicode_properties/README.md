@@ -49,7 +49,49 @@ Binary properties come from the ECMAScript allowlist, rather than every UCD
 binary property. Changes_When_NFKC_Casefolded comes from normalization data.
 The generator's `-inventory` flag emits its canonical intervals and aliases as JSON.
 
+## Node's answers
+
+Node's RegExp is what the tables and esregexp's property escapes are held to, and
+the tests never start Node: they read its answers, recorded by
+
+```sh
+go run ./internal/lint/ecmascript/regexp/tools/record_node_answers
+```
+
+run from cohere's root with a Node whose `process.versions.unicode` is the tables'
+version (`-check` regenerates and fails if a committed file disagrees). Nothing runs
+it automatically. The committed recordings, in `internal/lint/ecmascript/regexp/testdata`,
+were made with Node v24.14.1 on Unicode 17.0, and each names the Node and the command
+in its header. Regenerate them whenever the tables change.
+
+`node_property_members.txt` holds, for each of the 1,715 accepted spellings, Node's
+answers for a sample of 10 to 27 code points: both ends of the code point domain,
+both sides of each surrogate boundary, the micro sign and Greek mu; both edges of
+the first, middle and last intervals and the code point just outside each; every
+member of up to two case-fold groups the property splits, or else one it holds
+whole; and two code points hashed from the spelling, independent of the table. Any
+holds every code point, so it has no non-member to ask about. Each code point keeps
+three answers: `\p` under `u`, `\p` under `iu`, and `\P` under `iu`. The recorder asks
+Node all 12 profiles (p/P, outside/inside/negated class, u/iu) and refuses to write
+unless the other nine follow from those three, as ECMAScript says they must.
+
+`TestUnicodePropertiesMatchNode` reads it. It requires the recorded spellings to be the
+generated names and the independently pinned accepted-name fixture, then for each spelling
+checks the table's membership against the `\p` under `u` answer, and each of the 12
+compiled profiles against the answer the three imply: 33,408 code points and 400,896
+compiled-match comparisons. The whole regexp package's tests run in about a second.
+
+`node_property_syntax.json` holds the 24 syntax fixtures, which the recorder defines, the
+18 subjects, and for each fixture whether Node compiles it and what it matches.
+`TestUnicodePropertySyntaxMatchesNode` replays it through the public Compile/Test API:
+acceptance for all 24, and 216 match comparisons for the 12 Node accepts.
+
 ## Task #7zm085y inventory and failure controls
+
+This section records how the tables were first verified. Its runs used the Node
+differential tests of that time, `TestUnicodePropertiesNode` and
+`TestUnicodePropertySyntaxNode`, which started Node on every run; task #3jt7qa6
+replaced them with the recordings and tests described under "Node's answers".
 
 Baseline compiler: `839b0cdf364baa36372fa893a4edeb54410524ca`.
 Provisioned Go: go1.27.1, `/workspace/adamic-tools/go/bin/go`.
@@ -124,19 +166,19 @@ only Node supplied the expected membership. The tables were restored after every
 
 All eight mutants/plants were removed before final verification.
 
-### Differential coverage
+### Differential coverage at the time
 
-Node alone decides membership. For every accepted spelling the test probes every
+Node alone decided membership. For every accepted spelling the test probed every
 interval's start, end and immediate neighbors, all case-fold group members, both
 ends of the code point domain, surrogate boundaries, Greek mu and the micro sign.
-Each runs with p/P, outside/inside/negated classes, and u/iu: 20,580 patterns and
+Each ran with p/P, outside/inside/negated classes, and u/iu: 20,580 patterns and
 64,403,724 membership comparisons. MatchRunes also permits lone surrogate probes;
-the 24 syntax fixtures use the public Compile/Test API on 18 subjects.
+the 24 syntax fixtures used the public Compile/Test API on 18 subjects.
 
 The syntax fixtures cover strict aliases, invalid range endpoints, trailing dashes,
 mixed built-in/property classes, modifier groups, quantifiers, escaped backslashes,
-and Annex B identity escapes. The final syntax run makes 216 membership comparisons
-and checks acceptance for all 24 fixtures. The freshness test compares regenerated
+and Annex B identity escapes. The final syntax run made 216 membership comparisons
+and checked acceptance for all 24 fixtures. The freshness test compares regenerated
 Go source byte for byte. Node and Go Unicode versions must match the pinned tables.
 
 One failure found while implementing this: regexp2 canonicalizes a class after
@@ -160,19 +202,3 @@ writing ranges, preserving set-atom identity until range syntax has been checked
 No whole-module tests, landing, or Adamic consumer changes were performed. The
 branch goes to cohere's origin for @system_cohere_lint's review. After landing,
 Adamic's library should consume this package at the landed SHA and remove its copy.
-
-## Parallel-policy follow-up
-
-`go test ./internal/testpolicy -run TestEveryCohereTestRunsInParallel` failed
-before the scheduling fix with five violations across 1,144 test files, all in
-properties_test.go. The three independent top-level tests now call t.Parallel()
-as their first statement. Both subtest loops have a directly preceding
-"Not parallel:" comment because they update counts the parent logs after the loop.
-Both t.Run sites in regexp_test.go already called t.Parallel() first.
-
-After the fix, the same gate command passed (one test, zero violations).
-`go test ./internal/lint/ecmascript/regexp -v` passed all 13 top-level tests,
-including 1,715 property subtests and 24 syntax fixtures, with 64,403,940
-membership comparisons. `go vet ./internal/lint/ecmascript/regexp` passed
-(one package, zero diagnostics), and `gofmt -l internal/lint/ecmascript/regexp/properties_test.go`
-listed zero files. No tests or runtime behavior were added in this follow-up.

@@ -1,0 +1,3 @@
+source b335f69fe2ba0caa1028587e605f49862d99bb4c4fa7c8a4a77fdc114de7b007
+exit 1
+stderr TypeError: counter.value.toFixed is not a function

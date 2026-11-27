@@ -1,11 +1,13 @@
 // Command generate_css_parser captures parse trees from the real Tailwind CSS parser, so that
-// the Go port in internal/lint/rules/tailwind/collapse/cssparser.go is tested against measurements rather than against
+// the Go port in internal/lint/rules/tailwind/collapse/css_parser.go is tested against measurements rather than against
 // a reading of the TypeScript source.
 //
 // Usage:
 //
 //	go run ./internal/lint/rules/tailwind/tools/generate_css_parser \
 //	    -package-root <tailwindcss package> [-stylesheets <corpus.json>] [-output <file.json>] [-check]
+//
+// Run it from the repository root, where both path defaults resolve.
 //
 // The distinction this tool enforces is the one generate_data_type and generate_syntax_tree enforce,
 // and for this component it lands on the custom-property branch. A `--foo` declaration keeps the
@@ -15,9 +17,12 @@
 // interior whitespace collapsed to single spaces: plausible on inspection, wrong on every real
 // theme entry, and invisible without a measured fixture.
 //
-// `-stylesheets` names a JSON array of `{name, path}` so the corpus carries a real repository's
-// theme and its whole @import graph, which is what the exit criterion asks for. Without it only the
-// synthetic branch-coverage cases are captured.
+// `-stylesheets` names a JSON array of `{name, path}`, each path relative to the array's own file,
+// so the corpus also carries whole stylesheets: a made-up product's entry file, its @import graph,
+// a long @theme block and its @utility and @keyframes files, all written in cohere under
+// collapse/testdata/cssparser_corpus, which is the default. Constructed one-branch inputs miss what
+// those files reach, such as an empty block closing at the top level. Passing an empty value
+// captures only the synthetic branch-coverage cases.
 //
 // `-check` regenerates and fails when the committed fixture disagrees, which is what makes a
 // Tailwind upgrade that changes parsing show up as a failing gate instead of a silent behavior
@@ -37,6 +42,10 @@ import (
 	"path/filepath"
 )
 
+// collapseTestdata is where the parser test reads its fixture and corpus, relative to the
+// repository root.
+var collapseTestdata = filepath.Join("internal", "lint", "rules", "tailwind", "collapse", "testdata")
+
 func main() {
 	packageRoot := flag.String(
 		"package-root",
@@ -45,12 +54,12 @@ func main() {
 	)
 	stylesheets := flag.String(
 		"stylesheets",
-		"",
-		"path to a JSON array of {name, path} naming real stylesheets to include",
+		filepath.Join(collapseTestdata, "cssparser_corpus", "stylesheets.json"),
+		"path to a JSON array of {name, path} naming whole stylesheets to include; empty for none",
 	)
 	output := flag.String(
 		"output",
-		filepath.Join("internal", "tailwind", "testdata", "cssparser_fixtures.json"),
+		filepath.Join(collapseTestdata, "cssparser_fixtures.json"),
 		"where to write the fixture",
 	)
 	check := flag.Bool("check", false, "regenerate and fail if the committed fixture disagrees")
@@ -113,7 +122,7 @@ func main() {
 	fmt.Fprintf(
 		os.Stderr,
 		"wrote %s: tailwind %s, parse() located by identity as %s, %d parse cases and %d error cases; "+
-			"across %d real stylesheets Tailwind saw %d @theme entries, %d @utility blocks, %d @custom-variant rules\n",
+			"across %d whole stylesheets Tailwind saw %d @theme entries, %d @utility blocks, %d @custom-variant rules\n",
 		*output,
 		summary.TailwindVersion,
 		summary.ParseExportName,

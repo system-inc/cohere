@@ -3,6 +3,9 @@ package high_level_intermediate_representation
 import (
 	"testing"
 
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/lint/testing"
 	"github.com/system-inc/cohere/modules/mutation_aliasing"
 )
 
@@ -384,5 +387,90 @@ func TestHoistableConflictsAreReportedNotSwallowed(test *testing.T) {
 	if after.Conflicts() != 0 {
 		test.Errorf("%d conflicting access types on ordinary input; upstream raises on any of these",
 			after.Conflicts())
+	}
+}
+
+// TestHoistableDistributionOverAMixedModule pins the shape over a whole module, through the production pipeline.
+//
+// TestHoistableCorpusDistribution read 150 files of Structure, a private repository, at a fixed commit, so it went
+// with the corpus. The fixtures above each hold one shape; this holds a module written to mix them, the components
+// and hooks of testdata/lowering/Dashboard.tsx, whose nested property reads and closures give the analysis paths to
+// deepen and roots to keep. Every function is run through the same stages the deleted test ran, with a real checker.
+//
+// The counts are exact for the reason that test gave: each mutation of this analysis moves a different count by a
+// small amount, a gain in `deep` is the over-approximating direction, and only an exact count sees either. The module
+// is fixed, so a move here is the analysis moving.
+func TestHoistableDistributionOverAMixedModule(test *testing.T) {
+	test.Parallel()
+
+	fileName := "/repository/source/Dashboard.tsx"
+	deep, flat, notConverged, maximumIterations, conflicts, functions := 0, 0, 0, 0, 0, 0
+	probe := rule.Rule[rule.NoOptions]{
+		Name:             "hoistable-mixed-module",
+		NeedsTypeChecker: true,
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+			return rule.Listeners{
+				ast.KindSourceFile: func(node *ast.Node) {
+					if ruleContext.TypeChecker == nil {
+						test.Fatal("the typed harness handed this probe a nil checker, so every count below would " +
+							"be a fact about the harness rather than the code")
+					}
+					forEachFunctionLike(node, func(functionNode *ast.Node) {
+						function := Lower(functionNode, ruleContext.TypeChecker)
+						if function == nil {
+							return
+						}
+						functions++
+						Construct(function)
+						OutlineFunctions(function)
+						InferReactive(function, ruleContext.TypeChecker)
+						DropManualMemoization(function)
+						if InlineImmediatelyInvokedFunctionExpressionsIncludingMemoCallbacks(function) > 0 {
+							MergeConsecutiveBlocks(function)
+						}
+						EliminateDeadCode(function)
+						ranges := InferMutableRanges(function)
+						set := FindDisjointMutableValuesWithRanges(function, ranges)
+						scopes := AssignReactiveScopesWithSets(function, ranges, set)
+						aligned, merged := AlignThenMergeReactiveScopes(function, scopes)
+						identity := MergedScopeIdentity{Aligned: aligned, Merged: merged}
+						BuildReactiveScopeTerminals(function, scopes, identity)
+
+						if analysis := analyseHoistableLoads(function, scopes, identity, ranges, nil); analysis != nil {
+							if !analysis.Converged() {
+								notConverged++
+							}
+							maximumIterations = max(maximumIterations, analysis.Iterations())
+						}
+						after := CollectScopeDependenciesWithHoistable(function, scopes, identity, ranges)
+						conflicts += after.Conflicts()
+						for _, scope := range after.Ids() {
+							for _, dependency := range after.DependenciesOf(scope) {
+								if len(dependency.Path) > 0 {
+									deep++
+								} else {
+									flat++
+								}
+							}
+						}
+					})
+				},
+			}
+		},
+	}
+	rule_testing.RunTypedFiles(test, probe, map[string]string{fileName: readMixedModule(test)}, fileName)
+
+	if functions != 11 {
+		test.Errorf("the probe lowered %d functions, want 11; the walk is not reaching the module", functions)
+	}
+	if notConverged != 0 {
+		test.Errorf("%d functions failed to converge inside %d iterations", notConverged, hoistableIterationCap)
+	}
+	if conflicts != 0 {
+		test.Errorf("%d conflicting access types, want 0; upstream raises on any", conflicts)
+	}
+	if deep != 9 || flat != 51 || maximumIterations != 2 {
+		test.Errorf("got %d deep and %d flat dependencies in at most %d iterations, want 9, 51 and 2; a gain in "+
+			"`deep` is the over-approximating direction unless an oracle says otherwise", deep, flat, maximumIterations)
 	}
 }

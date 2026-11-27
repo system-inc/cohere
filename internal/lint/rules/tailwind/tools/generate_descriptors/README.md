@@ -27,23 +27,33 @@ end-to-end control, so a rename upstream is caught rather than silently changing
 
 ## The result
 
-Measured on Tailwind 4.3.3 against `~/Projects/ahra` and `~/Projects/connected/www-connected-app`.
-Both repos produce the same numbers and the **same exception set, class for class**, and that
-agreement is weaker evidence than it reads as: both vendor the Structure submodule and import its
-`global.css`, so the two stylesheets are byte-identical and the two systems contribute the same 35
-utility roots and 325 theme keys. Two design systems that cannot differ cannot detect a table that
-varies, which is the trap `a0f8635` documented for the invariance claims. The independent control
-is `generate_descriptor_base/testdata/independent_theme.css`.
+Measured on Tailwind 4.3.3 against the public theme, `collapse/testdata/public_theme/theme.css`,
+with `--resolve-root` naming an installed tailwindcss and `--no-corpus`, since the theme has no
+source tree to scan:
 
-| population                               | measured                 | agreed          | exceptions |
-| ---------------------------------------- | ------------------------ | --------------- | ---------- |
-| registry (`getClassList()`)              | 37,643 / 37,795          | 37,625 / 37,777 | 18         |
-| — of which this repo's own               | 35 roots, 325 theme keys |                 |            |
-| corpus (classes the repo writes)         | 1,233 / 971              | 1,233 / 970     | 0 / 1      |
-| modifier classes (sampled)               | 40,110 / 40,325          | all             | 0          |
-| arbitrary sweep (327 roots x 527 shapes) | 132,203                  | 132,199         | 4          |
+```
+node internal/lint/rules/tailwind/tools/generate_descriptors/extract.mjs \
+    internal/lint/rules/tailwind/collapse/testdata/public_theme/theme.css \
+    --resolve-root <directory holding node_modules/tailwindcss> --no-corpus \
+    [--json internal/lint/rules/tailwind/collapse/testdata/descriptor_table_public.json]
+```
 
-**The model holds.** The exceptions are two named mechanisms, both understood, both countable.
+The `--json` it writes is the committed `descriptor_table_public.json`, byte for byte. The public
+theme was written in this repository to carry the shapes a real design system has: `@utility`
+blocks resolving several declarations per value, roots declared both statically and functionally,
+dashed numbered scales, statics declaring only a custom property or only nested rules. The
+independent control, `generate_descriptor_base/testdata/independent_theme.css`, shares none of its
+blocks, and both run clean on the controls below.
+
+| population                               | measured                  | agreed  | exceptions |
+| ---------------------------------------- | ------------------------- | ------- | ---------- |
+| registry (`getClassList()`)              | 23,740                    | 23,735  | 5          |
+| of which the theme's own                 | 16 roots, 37 theme keys   |         |            |
+| corpus (classes a repository writes)     | skipped, no source tree   |         |            |
+| modifier classes (sampled)               | 45,559                    | all     | 0          |
+| arbitrary sweep (328 roots x 527 shapes) | 135,085 of 172,856 probes | 135,076 | 9          |
+
+**The model holds.** The exceptions are three named mechanisms, all understood, all countable.
 
 ## The descriptor, as measured
 
@@ -66,31 +76,36 @@ reading source:
 4. **A type can earn its place on one axis and carry no information on another.** `color` does not
    discriminate `text-shadow` unmodified and is exactly what discriminates it under a modifier.
 
-## The two real exceptions
+## The exceptions
 
-**18 registry classes: per-declaration resolve-or-drop in repo `@utility` blocks.** All of the form
-`<animation-root>-translate-full`, from `libraries/structure/source/theme/styles/animations.css`:
+**5 registry classes: per-declaration resolve-or-drop in repository `@utility` blocks.** All of the
+form `<motion-root>-translate-full`, from the public theme's `motion.css`: `appear`, `swell`,
+`-swell`, `drift-up` and `drift-inline`.
 
 ```css
-@utility slide-in-from-top-* {
-    --enter-translate-y: calc(--value(integer) * var(--spacing) * -1);
-    --enter-translate-y: calc(--value(--percentage-*, --percentage-translate-*) * -100%);
+@utility drift-up-* {
+    --drift-y: calc(--value(integer) * var(--spacing) * -1);
+    --drift-y: calc(--value(--percentage-*, --percentage-translate-*) * -100%);
     ...
 }
 ```
 
-`50` is both an integer and a `--percentage-*` key, so two declarations survive and it reads `[]#2`.
-`4` is only an integer, `translate-full` only a `--percentage-translate-*` key: one declaration each,
-`[]#1`. **Arity is the count of surviving declarations, and a value can satisfy several resolution
-paths at once**, so it is not a function of any single data type. This is exactly the mechanism
-`03-utilities-wall.md` section 4 predicted, confirmed at scale, and it is why the `@utility`
-evaluator (task #4f04x54) has to model each declaration as independently resolvable. It is not a
-defect in the descriptor model; it is the boundary of what the model covers.
+Each declaration resolves `--value()` its own way and is dropped when its way fails, so a value
+reads as many declarations as it satisfies. `translate-full`, a key of two namespaces at once,
+satisfies a different set than the values the descriptor groups it with: `drift-up-translate-full`
+reads `[]#1` where the descriptor predicts `[]#2`, and `drift-inline-translate-full`, whose
+declarations sit under two `:dir()` branches, reads `[]#2` against `[]#4`. **Arity is the count of surviving
+declarations, and a value can satisfy several resolution paths at once**, so it is not a function
+of any single data type. This is exactly the mechanism `03-utilities-wall.md` section 4 predicted,
+and it is why the `@utility` evaluator (task #4f04x54) has to model each declaration as
+independently resolvable. It is not a defect in the descriptor model; it is the boundary of what
+the model covers.
 
-**4 sweep probes: an upstream shadow quirk on `[16/9]` plus an arbitrary modifier.** `shadow-[16/9]`
-reads `[315,316]#2` and `shadow-[16/9]/[var(--a)]` reads `#4` rather than `#3`. The shadow handler
-splits the arbitrary value on `/` looking for a color slot, and on a ratio it mangles it and emits an
-extra `@supports` block:
+**4 sweep probes: an upstream shadow quirk on `[16/9]` plus an arbitrary modifier.**
+`shadow-[16/9]/[var(--a)]` reads `#4` rather than `#3`, and `drop-shadow`, `inset-shadow` and
+`text-shadow` each read one more than predicted the same way. The shadow handler splits the
+arbitrary value on `/` looking for a color slot, and on a ratio it mangles it and emits an extra
+`@supports` block:
 
 ```css
 --tw-shadow: 16var (--tw-shadow-color, /) 9;
@@ -99,10 +114,17 @@ extra `@supports` block:
 Garbage CSS from an upstream code path triggered by a `/` in the value, not by a data type. Four
 probes, all `<shadow-root>-[16/9]/[<arbitrary>]`, none of which any registry contains.
 
+**5 sweep probes: `max-w-screen` with a breakpoint name.** `max-w-screen-sm` through
+`max-w-screen-2xl` read `[46]#1` and the descriptor predicts no reading. `max-w-screen` is one of
+the roots `getClassList()` never lists (see `extract.mjs`), so the registry gives the descriptor no
+bare value it is written with, and a bare theme name the descriptor has never seen predicts null. A
+gap in what the registry advertises, not a data type the model misreads; a registry that advertised
+`max-w-screen-sm` would close it.
+
 ## Controls, because a clean sweep is what a broken sweep looks like
 
 - **Planted dirty descriptor.** One root's readings are shifted by one and replayed against real
-  registry traffic. All 616 / 619 probes must fail, and `proven: true` reports that they did. A check
+  registry traffic. All 352 probes on the public theme must fail, and `proven: true` reports that they did. A check
   that has never returned a positive has not been shown to be able to.
 - **Volume assertions.** Registry above 20,000, roots above 200, sweep above 100,000 probes,
   property order above 300 entries, corpus above 100 classes, planted control proven. Below any of
@@ -110,50 +132,53 @@ probes, all `<shadow-root>-[16/9]/[<arbitrary>]`, none of which any registry con
 
 - **Own-contribution assertion**, because every floor above is cleared by bare Tailwind. This
   README claimed a stylesheet importing nothing "reports 3,487 classes and exits non-zero". It does
-  not: `@import "tailwindcss" source(none);` reports **23,286 registry classes, 301 functional
+  not: `@import "tailwindcss" source(none);` reports **23,286 registry classes, 315 functional
   roots and six figures of sweep probes**, and passed all six assertions. Tailwind registers its
   built-in roots from JavaScript rather than from CSS, so the population is real and the volumes
   are met while the `@utility` and `@theme` content that makes a design system per-repository is
   entirely absent. The same defect was found independently in the candidate parser (`a219c8f`).
 
-    The check is the delta against a bare install built through the same borrowed Tailwind: **35
-    utility roots and 325 theme keys** are ahra's own, and a system contributing zero of both is
-    refused by name. It is counted rather than named, because a hardcoded canary (`fade-in` on ahra,
-    `brand-hover` on connected) is the same baked-in assumption it exists to catch. The floor is 1,
-    since two roots is a real design system and a floor tuned to ahra's 35 would refuse one.
+    The check is the delta against a bare install built through the same borrowed Tailwind: **16
+    utility roots and 37 theme keys** are the public theme's own, and a system contributing zero of
+    both is refused by name. It is counted rather than named, because a hardcoded canary (one
+    theme's `surface-card`, say) is the same baked-in assumption it exists to catch. The floor is 1,
+    since two roots is a real design system and a floor tuned to one theme's count would refuse one.
 
-    | design system                              | registry | own roots | own keys | exit  |
-    | ------------------------------------------ | -------- | --------- | -------- | ----- |
-    | ahra / connected                           | 37,641   | 35        | 325      | 0     |
-    | `independent_theme.css` (borrowed install) | 23,391   | 2         | 4        | 0     |
-    | `@import "tailwindcss" source(none);`      | 23,286   | 0         | 0        | **4** |
-    | real import that silently fails to resolve | 23,286   | 0         | 0        | **4** |
+    | design system                                | registry | own roots | own keys | exit  |
+    | -------------------------------------------- | -------- | --------- | -------- | ----- |
+    | public theme (`collapse/testdata`)           | 23,740   | 16        | 37       | 0     |
+    | `independent_theme.css` (borrowed install)   | 23,391   | 2         | 4        | 0     |
+    | `@import "tailwindcss" source(none);`        | 23,286   | 0         | 0        | **4** |
+    | the same, importing a file that is not there | 23,286   | 0         | 0        | **4** |
 
     The last row is the one that matters: `loadStylesheet` swallows a missing `@import` and returns
     empty content, so a broken graph produces a full-looking design system that met every volume
-    floor. Registry size cannot separate these — the fixture passes 105 classes _below_ the bare
-    install that fails — so provenance is the only thing that does.
+    floor. Registry size cannot separate these, since the independent theme passes with only 105
+    classes more than the bare install that fails, so provenance is the only thing that does.
 
 - **Nulls reported, never scored.** A class returning no reading is not an agreement. The registry
-  has none by construction, which is why the corpus is scanned separately: that is the population the
-  documented figure came from, and it holds 11 of 1,244 on ahra (`group`, `text-dark-4/70`,
-  `shadow--3`) and 84 of 1,055 on connected.
-- **Public-API cross-check.** Every pair of a 3,137-class sample, sorted by the predicted reading and
-  by `getClassOrder`: 7 mismatches out of 4,856,848 pairs on ahra, 0 on connected, and all 7 are
-  `fade-in-translate-full`, already a known exception. This control found its own bug first: an
+  has none by construction, which is why a corpus is scanned separately when there is one: the
+  classes a repository writes are where nulls live (`group`, a colour the theme does not declare, a
+  dashed key the scale lacks). The public theme has no source tree, so `--no-corpus` reports the scan
+  as skipped rather than as a zero, and its nulls are the sweep's 37,769 and the modifiers' 45.
+- **Public-API cross-check.** Every pair of a 3,392-class sample, sorted by the predicted reading and
+  by `getClassOrder`: 0 mismatches out of 5,694,013 pairs on the public theme. On a consumer theme
+  the same control once found 7, all one known `*-translate-full` exception. This control found its own bug first: an
   empty order sorts last, not first, and getting that backwards reported 365,174 mismatches while the
   model was fine.
 
 ## What Phase 3 consumes
 
-`--json` writes `{roots: [...], statics: {...}}`, **465 KB** as raw JSON on both repos. That is the
-uncompacted diagnostic shape, not the generated Go: it stores a full `{order, count}` per bucket per
-root across all three modifier states, and most of those are duplicates of the root's fallback. The
+`--json` writes `{roots: [...], statics: {...}}`, **532 KB** as raw JSON on the public theme. That
+is the uncompacted diagnostic shape, not the generated Go: it stores a full `{order, count}` per
+bucket per root across all three modifier states, and most of those are duplicates of the root's fallback. The
 Go table interns readings and drops buckets equal to the fallback.
 
-The table is **not** checked in. It is per-repo by construction, since `readingByNamespace` is keyed on
-this repo's `@theme`, and a checked-in table would bake one repo's tokens into a file claiming to
-describe Tailwind, which is the bug that exists today in `internal/tailwind`'s generated tables.
+The table is **not** checked in as a description of Tailwind. It is per-repo by construction, since
+`readingByNamespace` is keyed on the theme's `@theme`, and a table shipped as framework data would
+bake one repo's tokens into a file claiming to describe Tailwind, which is the bug that existed in
+`internal/tailwind`'s generated tables. The public theme's is committed as test data,
+`collapse/testdata/descriptor_table_public.json`, under a name that says whose it is.
 
 ## Notes for whoever picks this up
 

@@ -59,7 +59,7 @@ import (
 // machine's load. So it sits far above what any real match takes. `Base`
 // against `XBaseY` crossed the one second this used to be in a `-race` run on a
 // busy box (#s4dy4e0), by regexp2's stale clock rather than by the match (see
-// overranSpuriously). With that handled, the same match settled in under a
+// untilSettled). With that handled, the same match settled in under a
 // millisecond under -race, 128 at once, and ten seconds is over ten thousand
 // times that. A pattern still running after it is pathological, and the caller
 // names it as a gap.
@@ -224,13 +224,7 @@ func (exp *RegExp) TestOrError(text string) (bool, error) {
 	if exp == nil || exp.re == nil {
 		return false, nil
 	}
-	began := time.Now()
-	for {
-		matched, matchStringError := exp.re.MatchString(text)
-		if !exp.overranSpuriously(matchStringError, began) {
-			return matched, matchStringError
-		}
-	}
+	return untilSettled(exp.re.MatchTimeout, time.Now, func() (bool, error) { return exp.re.MatchString(text) })
 }
 
 // ExecOrError is TestOrError for a caller that needs where the first match is
@@ -240,18 +234,18 @@ func (exp *RegExp) ExecOrError(text string) (*regexp2.Match, error) {
 	if exp == nil || exp.re == nil {
 		return nil, nil
 	}
-	began := time.Now()
-	for {
-		match, findStringMatchError := exp.re.FindStringMatch(text)
-		if !exp.overranSpuriously(findStringMatchError, began) {
-			return match, findStringMatchError
-		}
-	}
+	return untilSettled(exp.re.MatchTimeout, time.Now, func() (*regexp2.Match, error) {
+		return exp.re.FindStringMatch(text)
+	})
 }
 
-// overranSpuriously reports whether regexp2 said a match ran into its timeout
-// when it has not run that long, after yielding so the next attempt meets a
-// clock that has moved.
+// untilSettled asks attempt, one regexp2 match, until its answer stands: an
+// answer, or regexp2 saying the match ran into its timeout once bound has truly
+// passed since the first attempt began, measured on now. Outside a test now is
+// time.Now; a test hands a clock of its own, so it can show a stale clock
+// without stopping regexp2's and waiting for it to go idle. An overrun said
+// before then is asked again, after yielding so the next attempt meets a clock
+// that has moved.
 //
 // regexp2 reads its deadline off a clock a background goroutine ticks every
 // tenth of a second, and two ways that clock runs behind hand a match a
@@ -267,12 +261,19 @@ func (exp *RegExp) ExecOrError(text string) (*regexp2.Match, error) {
 // clock cut the first attempt short.
 //
 // regexp2's only error from a match is its timeout, so any error is read as one.
-func (exp *RegExp) overranSpuriously(matchError error, began time.Time) bool {
-	if matchError == nil || time.Since(began) >= exp.re.MatchTimeout {
-		return false
+func untilSettled[Answer any](
+	bound time.Duration,
+	now func() time.Time,
+	attempt func() (Answer, error),
+) (Answer, error) {
+	began := now()
+	for {
+		answer, attemptError := attempt()
+		if attemptError == nil || now().Sub(began) >= bound {
+			return answer, attemptError
+		}
+		runtime.Gosched()
 	}
-	runtime.Gosched()
-	return true
 }
 
 // overran tells overrun, when there is one, that this pattern ran past its bound.
