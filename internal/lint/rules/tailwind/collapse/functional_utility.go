@@ -90,8 +90,8 @@ type FunctionalUtilityDescription struct {
 	AcceptsModifierOnArbitrary bool
 	// Arms are the additional resolution paths a root tries, in the order it tries them.
 	//
-	// Empty for the 185 roots registered through `functionalUtility`, which consult one namespace
-	// list and are fully described by the fields above. The 57 roots in frameworkgaphandlers.go are
+	// Empty for the 187 roots registered through `functionalUtility`, which consult one namespace
+	// list and are fully described by the fields above. The 55 roots in frameworkgaphandlers.go are
 	// registered as bare closures instead, and a closure can consult several namespace lists in
 	// sequence with different bare-value behaviour on each.
 	//
@@ -101,7 +101,7 @@ type FunctionalUtilityDescription struct {
 	// arms differ in more than their keys: the width arm refuses a modifier and the colour arm
 	// accepts one.
 	//
-	// Tried after `ThemeKeys` rather than instead of it, so a root can have both and the 185 keep
+	// Tried after `ThemeKeys` rather than instead of it, so a root can have both and the 187 keep
 	// resolving exactly as they did. A root with arms and no `ThemeKeys` starts at its first arm,
 	// which is what every gap root does.
 	Arms []FunctionalUtilityArm
@@ -306,7 +306,7 @@ func resolveNamedValue(
 	// The arms, in the order the closure tries them.
 	//
 	// After everything above rather than instead of it, so a root carrying no arms resolves exactly
-	// as it did before this field existed and the 185 registered through `functionalUtility` cannot
+	// as it did before this field existed and the 187 registered through `functionalUtility` cannot
 	// move. A gap root carries no `ThemeKeys` and no bare handler of its own, so it falls straight
 	// through to here.
 	for index := range description.Arms {

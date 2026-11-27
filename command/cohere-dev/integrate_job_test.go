@@ -3,9 +3,10 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"os"
 	"os/exec"
@@ -16,39 +17,45 @@ import (
 	"strings"
 	"testing"
 
+	release "github.com/system-inc/cohere/internal/release/packaging"
 	"github.com/system-inc/cohere/internal/testing/executable_testing"
 	"github.com/system-inc/cohere/internal/testing/needs"
 	"github.com/system-inc/cohere/internal/testing/own_go_cache"
 )
 
-// integrateJobFixture is an integrate job ready to judge a merge in a mirror: a candidate, worktree a's head, bringing
-// a module with one package and a command/cohere, so there is a cohere to measure; the mirror, a bare repository the
-// merge is put in; the job's own tree, a directory with no history; go stood in for by one that records each call and
-// lists the module's packages; cohere on the tree by a clean run, keeping its arguments one a line in cohereArguments;
-// bash, for the integrate job's two scripts, by integrateJobShell, answering from replies; and the integrate job's git
-// by gitStandIn, in a directory whose name a shell has to quote, which records each call in gitCalls and runs the
-// test's own git.
+// integrateJobFixture is an integrate job ready to judge a merge in its history: a candidate, worktree a's head,
+// bringing a module with one package and a command/cohere, so there is a cohere to measure; the history, a directory
+// holding cohere.git, a bare repository whose `HEAD` is refs/heads/merge, the merge is put in, as Loom's runner lays
+// it (#tbtmxpd), though whole where the runner's is shallow at main; the house's mirrors, an empty directory the job
+// reads in place of the house's; the job's own tree, a directory with no history; go stood in for by one that records
+// each call and lists the module's packages; cohere on the tree by a clean run, keeping its arguments one a line in
+// cohereArguments and the laid Swift set it was named in cohereSwiftResolved; bash, for the integrate job's two
+// scripts, by integrateJobShell, answering from replies; and the integrate job's git by gitStandIn, in a directory
+// whose name a shell has to quote, which records each call in gitCalls and runs the test's own git.
 type integrateJobFixture struct {
 	*landFixture
 	replies    string
 	goCalls    string
 	gitStandIn string
 	gitCalls   string
-	// cohereArguments is what cohere on the tree was handed, one a line.
-	cohereArguments string
-	home            string
-	mirror          string
-	job             string
+	// cohereArguments is what cohere on the tree was handed, one a line, and cohereSwiftResolved the laid Swift set
+	// release.SwiftResolvedVariable named for it.
+	cohereArguments     string
+	cohereSwiftResolved string
+	home                string
+	history             string
+	house               string
+	job                 string
 }
 
 // integrateJobShell stands in for bash in the integrate job's scripts. It keeps the script it was handed in
 // `<kind>.script` and its arguments, one a line, in `<kind>.arguments`, the kind `measure` for performanceScript and
-// `tests` for macBoxScript, writes each kind to `calls`, and keeps the setting of needs.SwiftUnlaidVariable it ran
-// under in `<kind>.swift`. It prints `<kind>.run`, `COMMIT` the commit it was handed, and exits `<kind>.exit`; with no
-// `tests.run` it prints where its modules came from, as an integrate job's gate says it, then a passing run of every
-// package it was handed, but `tests.fails`, which fails, with `tests.cached`'s package replayed `(cached)`, and then,
-// unless one failed, a passing -race run of each race token's package. With `tests.grows` it writes an entry at the
-// path it names, as a run that compiles grows the cache.
+// `tests` for macBoxScript, writes each kind to `calls`, and keeps the laid Swift set release.SwiftResolvedVariable
+// named for it in `<kind>.swift`. It prints `<kind>.run`, `COMMIT` the commit it was handed, and exits `<kind>.exit`;
+// with no `tests.run` it prints where its modules came from, as an integrate job's gate says it, then a passing run of
+// every package it was handed, but `tests.fails`, which fails, with `tests.cached`'s package replayed `(cached)`, and
+// then, unless one failed, a passing -race run of each race token's package. With `tests.grows` it writes an entry at
+// the path it names, as a run that compiles grows the cache.
 const integrateJobShell = `#!/bin/sh
 replies="$INTEGRATE_JOB_REPLIES"
 staged="$replies/stdin.$$"
@@ -58,7 +65,7 @@ mv "$staged" "$replies/$kind.script"
 shift 2
 printf '%s\n' "$@" > "$replies/$kind.arguments"
 echo "$kind" >> "$replies/calls"
-printf '%s' "${` + needs.SwiftUnlaidVariable + `:-}" > "$replies/$kind.swift"
+printf '%s' "${` + release.SwiftResolvedVariable + `:-}" > "$replies/$kind.swift"
 commit="$1"
 if [ -e "$replies/$kind.run" ]; then
   sed "s/COMMIT/$commit/g" "$replies/$kind.run"
@@ -96,7 +103,7 @@ done
 func newIntegrateJobFixture(test *testing.T) *integrateJobFixture {
 	test.Helper()
 	fixture := &integrateJobFixture{landFixture: newLandFixture(test), replies: test.TempDir(), home: test.TempDir(),
-		mirror: filepath.Join(test.TempDir(), "cohere.git"), job: test.TempDir()}
+		history: filepath.Join(test.TempDir(), "history"), house: test.TempDir(), job: test.TempDir()}
 	stand := test.TempDir()
 	fixture.goCalls = filepath.Join(stand, "go-calls")
 	// go records each call with the proxy and the checksum database it ran under, lists the module's packages, and runs
@@ -114,8 +121,10 @@ func newIntegrateJobFixture(test *testing.T) *integrateJobFixture {
 	}
 	cohere := filepath.Join(stand, "cohere")
 	fixture.cohereArguments = filepath.Join(stand, "cohere-arguments")
+	fixture.cohereSwiftResolved = filepath.Join(stand, "cohere-swift-resolved")
 	if writeError := executable_testing.WriteFile(cohere, []byte("#!/bin/sh\nprintf '%s\\n' \"$@\" > "+
-		shellQuoted(fixture.cohereArguments)+"\necho '"+performanceCleanSummary+"'\n"), 0o755); writeError != nil {
+		shellQuoted(fixture.cohereArguments)+"\nprintf '%s' \"${"+release.SwiftResolvedVariable+":-}\" > "+
+		shellQuoted(fixture.cohereSwiftResolved)+"\necho '"+performanceCleanSummary+"'\n"), 0o755); writeError != nil {
 		test.Fatal(writeError)
 	}
 	testGit, lookError := exec.LookPath("git")
@@ -131,10 +140,13 @@ func newIntegrateJobFixture(test *testing.T) *integrateJobFixture {
 		shellQuoted(fixture.gitCalls)+"\nexec "+shellQuoted(testGit)+" \"$@\"\n"), 0o755); writeError != nil {
 		test.Fatal(writeError)
 	}
-	fixture.environment = append(fixture.environment, "HOME="+fixture.home, integrateJobShellVariable+"="+shell,
+	// A laid Swift set the test itself runs under, as in an integrate job, is never the fixture's: each test names its
+	// own.
+	fixture.environment = append(release.WithoutVariable(fixture.environment, release.SwiftResolvedVariable),
+		"HOME="+fixture.home, integrateJobShellVariable+"="+shell,
 		"INTEGRATE_JOB_REPLIES="+fixture.replies, "INTEGRATE_JOB_PLATFORM="+runtime.GOOS+"/"+runtime.GOARCH,
-		gateCohereVariable+"="+cohere, integrateJobMirrorVariable+"="+fixture.mirror,
-		integrateJobGitVariable+"="+fixture.gitStandIn)
+		gateCohereVariable+"="+cohere, integrateJobHistoryVariable+"="+fixture.history,
+		integrateJobHouseMirrorsVariable+"="+fixture.house, integrateJobGitVariable+"="+fixture.gitStandIn)
 	worktree := fixture.worktree("a")
 	writeFixtureFile(test, filepath.Join(worktree, "go.mod"), "module example.com/fixture\n\ngo 1.27\n")
 	writeFixtureFile(test, filepath.Join(worktree, "alpha", "alpha_test.go"),
@@ -142,35 +154,32 @@ func newIntegrateJobFixture(test *testing.T) *integrateJobFixture {
 	writeFixtureFile(test, filepath.Join(worktree, "command", "cohere", "main.go"), "package main\n\nfunc main() {}\n")
 	fixture.git(worktree, "add", ".")
 	fixture.git(worktree, "commit", "-q", "-m", fixtureSubject("a module with a cohere"))
-	fixture.git(fixture.repository, "init", "-q", "--bare", fixture.mirror)
+	fixture.git(fixture.repository, "init", "-q", "--bare", fixture.historyRepository())
+	fixture.git(fixture.historyRepository(), "symbolic-ref", "HEAD", "refs/heads/merge")
 	return fixture
 }
 
-// merged makes the merge Loom makes, of worktree a's head onto main, puts it in the mirror with main and the candidate,
-// and returns it.
+// historyRepository is the history's cohere.git.
+func (fixture *integrateJobFixture) historyRepository() string {
+	return filepath.Join(fixture.history, "cohere.git")
+}
+
+// merged makes the merge Loom makes, of worktree a's head onto main, puts it in the history at refs/heads/merge, as
+// Loom's runner lays it before the job runs, and returns it.
 func (fixture *integrateJobFixture) merged() string {
 	fixture.test.Helper()
-	merge := fixture.unmirroredMerge()
-	fixture.mirrorMerge(merge)
+	merge := fixture.mergedOntoMain()
+	fixture.git(fixture.repository, "push", "-q", fixture.historyRepository(), merge+":refs/heads/merge")
 	return merge
 }
 
-// unmirroredMerge makes the merge Loom makes, of worktree a's head onto main, and puts only main in the mirror, as a
-// job that starts before Loom's bridge has carried its merge finds it.
-func (fixture *integrateJobFixture) unmirroredMerge() string {
+// mergedOntoMain makes the merge Loom makes, of worktree a's head onto main, and puts it nowhere.
+func (fixture *integrateJobFixture) mergedOntoMain() string {
 	fixture.test.Helper()
 	candidate := fixture.git(fixture.worktree("a"), "rev-parse", "HEAD")
 	tree := strings.Fields(fixture.git(fixture.repository, "merge-tree", "--write-tree", "main", candidate))[0]
-	merge := fixture.git(fixture.repository, "commit-tree", tree, "-p", "main", "-p", candidate, "-m",
+	return fixture.git(fixture.repository, "commit-tree", tree, "-p", "main", "-p", candidate, "-m",
 		"Merge a onto main")
-	fixture.git(fixture.repository, "push", "-q", fixture.mirror, "main:refs/heads/main")
-	return merge
-}
-
-// mirrorMerge puts merge in the mirror, as Loom's bridge carries it there.
-func (fixture *integrateJobFixture) mirrorMerge(merge string) {
-	fixture.test.Helper()
-	fixture.git(fixture.repository, "push", "-q", fixture.mirror, merge+":refs/heads/merge")
 }
 
 // reply writes what the stand-in bash answers from file in the replies directory.
@@ -205,13 +214,20 @@ func (fixture *integrateJobFixture) fill(environment ...string) integrateJobRan 
 }
 
 // landedMain makes the merge Loom makes, of worktree a's head onto main, moves main to it, as a landing does, and puts
-// that main in the mirror, as the bridge carries it, so a fill runs at a main whose tip is a landing. It returns it.
+// that main in the history, as Loom's runner lays a cold fill's own commit there, so a fill runs at a main whose tip is
+// a landing. It returns it.
 func (fixture *integrateJobFixture) landedMain() string {
 	fixture.test.Helper()
-	merge := fixture.unmirroredMerge()
+	merge := fixture.mergedOntoMain()
 	fixture.git(fixture.repository, "update-ref", "refs/heads/main", merge)
-	fixture.git(fixture.repository, "push", "-q", fixture.mirror, "main:refs/heads/main")
+	fixture.historyHolds(merge)
 	return merge
+}
+
+// historyHolds puts commit in the history at refs/heads/merge, where Loom's runner lays what a job judges.
+func (fixture *integrateJobFixture) historyHolds(commit string) {
+	fixture.test.Helper()
+	fixture.git(fixture.repository, "push", "-q", "--force", fixture.historyRepository(), commit+":refs/heads/merge")
 }
 
 // runJob runs integrate-job with arguments in the job's own tree, which has no history, at main unless environment
@@ -307,7 +323,7 @@ func (fixture *integrateJobFixture) rebuilt(merge string, said landingSaid) stri
 
 // A merge whose candidate is clean would integrate (#etpnnw1, #hnbb5vr): measured first, on a script handed no binary
 // of main's since main holds no performance file, then tested, then checked, all on the merge's tree laid from the
-// mirror. Nothing is committed or pushed: the last lines are the performance file, the tested tree, which the finisher
+// history. Nothing is committed or pushed: the last lines are the performance file, the tested tree, which the finisher
 // rebuilds from the merge and that file to the same hash, and the landing's message, `Land #<task>: <what>` with the
 // gate's account, the measurement's note and every step's seconds, then `integrated <tree>`. With
 // COHERE_INTEGRATE_CACHE set the tests' script keeps the integrate job's cache, and unset it keeps the gate box's none;
@@ -372,18 +388,10 @@ func TestAnIntegrateJobPassesAMergeAndSaysItsLanding(test *testing.T) {
 				strings.Contains(script, "\n"+integrateJobLine+"\n") {
 				test.Errorf("the tests' script doesn't say it is the integrate job's:\n%.600s", script)
 			}
-			// The tests skip what builds cohere-swift, which can't be built in an integrate job's sandbox, and cohere
-			// on the tree checks every language and format but Swift.
-			if unlaid := string(readMaybeMissing(test, filepath.Join(fixture.replies, "tests.swift"))); unlaid !=
-				needs.SwiftUnlaidSetting {
-				test.Errorf("the tests ran with %s=%q, want %q", needs.SwiftUnlaidVariable, unlaid,
-					needs.SwiftUnlaidSetting)
-			}
-			checked := string(readMaybeMissing(test, fixture.cohereArguments))
-			if checked != strings.Join(integrateJobCohereArguments, "\n")+"\n" || strings.Contains(checked, "swift") ||
-				!strings.Contains(checked, "--languages\ngo,typescript\n") {
-				test.Errorf("cohere on the tree was handed %q, want every language but swift:\n%s",
-					integrateJobCohereArguments, checked)
+			// cohere on the tree runs as the gate's does, every language, Swift among them.
+			if checked := string(readMaybeMissing(test, fixture.cohereArguments)); checked !=
+				strings.Join(gateCohereArguments, "\n")+"\n" {
+				test.Errorf("cohere on the tree was handed %q, want the gate's %q", checked, gateCohereArguments)
 			}
 			// The measurement runs as the integrate job's, so it reads the module set Loom laid for the job.
 			measuring := string(readMaybeMissing(test, filepath.Join(fixture.replies, "measure.script")))
@@ -440,7 +448,7 @@ func TestAnIntegrateJobPassesAMergeAndSaysItsLanding(test *testing.T) {
 				", go vet, cohere on the tree, 0 findings and no gaps.",
 				"Measured on Shackler for " + performanceFileName + ": the first measurement, so nothing to compare.",
 				"Steps: preflight ",
-				"0 findings and no gaps. " + needs.SwiftUnlaid + ".\n",
+				"0 findings and no gaps.\n",
 			} {
 				if !strings.Contains(said.message, want) {
 					test.Errorf("the landing's message lacks %q:\n%s", want, said.message)
@@ -507,15 +515,13 @@ func TestAnIntegrateJobRefusesARedTestNamingIt(test *testing.T) {
 	}
 }
 
-// A merge that changes what only Swift's checks judge refuses in the preflight, before anything is laid, measured or
-// tested (#5wj23dd): cohere-swift can't be built in an integrate job's sandbox, so nothing there would check the
-// change, and the refusal says so as the skips and the account do (needs.SwiftUnlaid). The Swift package and the Swift
-// files of command/cohere and release's dispatch and packaging are each refused, named.
-func TestAnIntegrateJobRefusesAMergeChangingWhatOnlySwiftChecks(test *testing.T) {
+// A merge that changes Swift's own paths, the Swift package and the Swift files of command/cohere and release's
+// dispatch and packaging, passes the preflight to be laid like any other (#je1r32a): its Swift is judged by the tests
+// that build cohere-swift from the laid set, as every change's is.
+func TestAnIntegrateJobLaysAMergeChangingSwiftsOwnPaths(test *testing.T) {
 	test.Parallel()
 	for _, changed := range []string{"swift_language/Package.swift", "command/cohere/swift_binary.go",
-		"internal/release/dispatch/swift.go", "internal/release/dispatch/swift_tree_state_test.go",
-		"internal/release/packaging/swift_package.go"} {
+		"internal/release/dispatch/swift.go", "internal/release/packaging/swift_package.go"} {
 		test.Run(changed, func(test *testing.T) {
 			test.Parallel()
 			fixture := newIntegrateJobFixture(test)
@@ -523,45 +529,114 @@ func TestAnIntegrateJobRefusesAMergeChangingWhatOnlySwiftChecks(test *testing.T)
 			writeFixtureFile(test, filepath.Join(worktree, filepath.FromSlash(changed)), "// a Swift change\n")
 			fixture.git(worktree, "add", ".")
 			fixture.git(worktree, "commit", "-q", "-m", fixtureSubject("a Swift change"))
+			// The fixture scripts no measurement, so the job stops there: what matters is that it got past the
+			// preflight and laid the merge.
 			ran := fixture.integrateJob(fixture.merged())
-			if ran.exit != 1 || ran.integrated != "" {
-				test.Fatalf("the integrate job exited %d, its last line %q, want 1 and no landing:\n%s", ran.exit,
-					ran.lastLine, ran.errors)
-			}
-			for _, want := range []string{needs.SwiftUnlaid + ", so the merge's change to " + changed,
-				"integrate-job step preflight refused in "} {
-				if !strings.Contains(ran.errors, want) {
-					test.Errorf("the integrate job doesn't say %q:\n%s", want, ran.errors)
-				}
-			}
-			if calls := readMaybeMissing(test, filepath.Join(fixture.replies, "calls")); len(calls) > 0 {
-				test.Errorf("a merge changing %s ran %q", changed, calls)
+			if strings.Contains(ran.errors, "preflight refused") ||
+				!strings.Contains(ran.errors, "integrate-job step lay ") {
+				test.Fatalf("a merge changing %s didn't pass the preflight to be laid:\n%s", changed, ran.errors)
 			}
 		})
 	}
 }
 
-// A merge that changes a file beside the Swift ones, in a package whose Swift files the preflight refuses, isn't
-// refused: the guard names Swift's files, never their packages whole.
-func TestAnIntegrateJobPassesAMergeChangingWhatSwiftDoesNotJudge(test *testing.T) {
+// swiftResolvedFixture is the bytes the fixture's candidate commits as its swiftResolvedFile, and
+// swiftResolvedFixtureSha their sha256, which names the laid set a job looks for.
+const (
+	swiftResolvedFixture    = "{\n  \"pins\" : [ ],\n  \"version\" : 3\n}\n"
+	swiftResolvedFixtureSha = "9766d84082ec78efaad906c00fe34f499624de4a0e84650a870798aa1b20dcad"
+)
+
+// withSwiftPackage commits a swiftResolvedFile, swiftResolvedFixture, on worktree a's head, so what the job judges has
+// a Swift package to build, and returns a root of laid sets, holding the one it names when laid, which the job is
+// pointed at.
+func (fixture *integrateJobFixture) withSwiftPackage(laid bool) string {
+	fixture.test.Helper()
+	worktree := fixture.worktree("a")
+	writeFixtureFile(fixture.test, filepath.Join(worktree, filepath.FromSlash(swiftResolvedFile)), swiftResolvedFixture)
+	fixture.git(worktree, "add", ".")
+	fixture.git(worktree, "commit", "-q", "-m", fixtureSubject("a Swift package"))
+	root := fixture.test.TempDir()
+	if laid {
+		if makeError := os.MkdirAll(filepath.Join(root, swiftResolvedFixtureSha, "scratch", "checkouts"),
+			0o755); makeError != nil {
+			fixture.test.Fatal(makeError)
+		}
+	}
+	fixture.environment = append(fixture.environment, integrateJobSwiftResolvedVariable+"="+root)
+	return root
+}
+
+// An integrate job whose tree holds a Swift package names the set laid for its Package.resolved, by that file's
+// sha256, to every child it starts (#je1r32a): the measurement, the tests' script and cohere on the tree each run with
+// release.SwiftResolvedVariable naming it, so each SwiftPM build of theirs builds offline from it. A fill names it as
+// an integration does, since its tests build cohere-swift too. The fixture's own file is hashed here, so the sha it is
+// laid under is the one the bytes hash to.
+func TestAnIntegrateJobNamesTheLaidSwiftSetToItsChildren(test *testing.T) {
 	test.Parallel()
-	for _, changed := range []string{"command/cohere/discovery.go", "internal/release/dispatch/progress.go",
-		"internal/release/packaging/checksums.go", "internal/release/dispatch/swiftly.go"} {
-		test.Run(changed, func(test *testing.T) {
+	digest := sha256.Sum256([]byte(swiftResolvedFixture))
+	if sha := hex.EncodeToString(digest[:]); sha != swiftResolvedFixtureSha {
+		test.Fatalf("the fixture's %s hashes to %s, and swiftResolvedFixtureSha says %s", swiftResolvedFile, sha,
+			swiftResolvedFixtureSha)
+	}
+	for _, fill := range []bool{false, true} {
+		test.Run(map[bool]string{false: "a merge", true: "a fill"}[fill], func(test *testing.T) {
 			test.Parallel()
 			fixture := newIntegrateJobFixture(test)
-			worktree := fixture.worktree("a")
-			writeFixtureFile(test, filepath.Join(worktree, filepath.FromSlash(changed)), "// a change Go judges\n")
-			fixture.git(worktree, "add", ".")
-			fixture.git(worktree, "commit", "-q", "-m", fixtureSubject("a change Go judges"))
-			// The fixture scripts no measurement, so the job stops there: what matters is that it got past the
-			// preflight and laid the merge.
-			ran := fixture.integrateJob(fixture.merged())
-			if strings.Contains(ran.errors, "preflight refused") || strings.Contains(ran.errors, "can't be judged") ||
-				!strings.Contains(ran.errors, "integrate-job step lay ") {
-				test.Fatalf("a merge changing %s didn't pass the preflight to be laid:\n%s", changed, ran.errors)
+			fixture.reply("measure.run", shacklerSays([]int64{9900, 9700, 9800}))
+			set := filepath.Join(fixture.withSwiftPackage(true), swiftResolvedFixtureSha)
+			children := map[string]string{"the tests' script": filepath.Join(fixture.replies, "tests.swift"),
+				"cohere on the tree": fixture.cohereSwiftResolved}
+			var ran integrateJobRan
+			if fill {
+				fixture.landedMain()
+				ran = fixture.fill()
+			} else {
+				ran = fixture.integrateJob(fixture.merged())
+				children["the measurement"] = filepath.Join(fixture.replies, "measure.swift")
+			}
+			if ran.exit != 0 {
+				test.Fatalf("the job exited %d, its last line %q:\n%s", ran.exit, ran.lastLine, ran.errors)
+			}
+			for child, recorded := range children {
+				if named := string(readMaybeMissing(test, recorded)); named != set {
+					test.Errorf("%s ran with %s=%q, want the laid set %s", child, release.SwiftResolvedVariable, named,
+						set)
+				}
+			}
+			if want := "integrate-job builds cohere-swift from the laid set " +
+				set +
+				"\n"; !strings.Contains(ran.errors,
+				want) {
+				test.Errorf("the job doesn't say %q:\n%s", want, ran.errors)
 			}
 		})
+	}
+}
+
+// An integrate job whose tree's Package.resolved has no set laid for it refuses in the preflight, naming the file's
+// sha256 and the place it looked, as Machines' lay owed and never a red of the merge (#je1r32a), before anything is
+// laid, measured or tested: with no set, SwiftPM would reach for a network the job doesn't have.
+func TestAnIntegrateJobRefusesATreeWithNoLaidSwiftSet(test *testing.T) {
+	test.Parallel()
+	fixture := newIntegrateJobFixture(test)
+	fixture.reply("measure.run", shacklerSays([]int64{9900, 9700, 9800}))
+	root := fixture.withSwiftPackage(false)
+	ran := fixture.integrateJob(fixture.merged())
+	if ran.exit != 1 || ran.integrated != "" {
+		test.Fatalf("the integrate job exited %d, its last line %q, want 1 and no landing:\n%s", ran.exit, ran.lastLine,
+			ran.errors)
+	}
+	for _, want := range []string{"no resolved set of cohere-swift's packages is laid at " +
+		filepath.Join(root, swiftResolvedFixtureSha) + " for the merge's " + swiftResolvedFile + ", sha256 " +
+		swiftResolvedFixtureSha, "Machines' lay owes it (#je1r32a)", "never a red of this merge",
+		"integrate-job step preflight refused in "} {
+		if !strings.Contains(ran.errors, want) {
+			test.Errorf("the integrate job doesn't say %q:\n%s", want, ran.errors)
+		}
+	}
+	if calls := readMaybeMissing(test, filepath.Join(fixture.replies, "calls")); len(calls) > 0 {
+		test.Errorf("a tree with no laid Swift set ran %q", calls)
 	}
 }
 
@@ -628,7 +703,7 @@ func TestAnIntegrateJobWithNoMessageTakesThePullRequestsTitle(test *testing.T) {
 	tree := strings.Fields(fixture.git(fixture.repository, "merge-tree", "--write-tree", "main", candidate))[0]
 	merge := fixture.git(fixture.repository, "commit-tree", tree, "-p", "main", "-p", candidate, "-m",
 		"Merge pull request #7 from system-inc/branch", "-m", "the census train, read whole (#"+fixtureTask+")")
-	fixture.git(fixture.repository, "push", "-q", fixture.mirror, "main:refs/heads/main", merge+":refs/heads/merge")
+	fixture.git(fixture.repository, "push", "-q", fixture.historyRepository(), merge+":refs/heads/merge")
 	job := exec.Command(fixture.wrapper, "integrate-job", "--merge", merge, "--task", fixtureTask)
 	job.Dir = fixture.job
 	job.Env = append(fixture.environment, integrateJobCommitVariable+"="+fixture.git(fixture.repository, "rev-parse",
@@ -645,71 +720,196 @@ func TestAnIntegrateJobWithNoMessageTakesThePullRequestsTitle(test *testing.T) {
 	}
 }
 
-// A merge Loom's bridge never carries to the mirror refuses in the preflight once the job has waited its bound, saying
-// the mirror held no merge, the road's gap and never a red of the merge (Loom's condition 2 on #hq61wfg), and nothing
-// is laid, measured or tested.
-func TestAnIntegrateJobRefusesAMergeThatNeverReachesTheMirror(test *testing.T) {
+// An integrate job with no history to read its merge from refuses before anything is laid, saying so (#tbtmxpd): one
+// whose LOOM_JOB_HISTORY is unset, and one whose history holds no cohere.git. No scratch is made, and no script runs.
+func TestAnIntegrateJobWithNoHistoryRefusesBeforeAnythingIsLaid(test *testing.T) {
+	test.Parallel()
+	for _, row := range []struct {
+		name string
+		// empty names a history directory holding nothing, and unset names none.
+		empty bool
+		want  string
+	}{
+		{name: "unset", want: integrateJobHistoryVariable + " is unset, so nothing is laid"},
+		{name: "a history holding no cohere.git", empty: true, want: "holding cohere.git, so integrate-job has no " +
+			"history to read its merge from, and nothing is laid"},
+	} {
+		test.Run(row.name, func(test *testing.T) {
+			test.Parallel()
+			fixture := newIntegrateJobFixture(test)
+			merge := fixture.merged()
+			named := fixture.environment
+			fixture.environment = make([]string, 0, len(named)+1)
+			for _, variable := range named {
+				if !strings.HasPrefix(variable, integrateJobHistoryVariable+"=") {
+					fixture.environment = append(fixture.environment, variable)
+				}
+			}
+			if row.empty {
+				fixture.environment = append(fixture.environment, integrateJobHistoryVariable+"="+test.TempDir())
+			}
+			ran := fixture.integrateJob(merge)
+			if ran.exit != 1 || ran.integrated != "" {
+				test.Fatalf("the integrate job exited %d, its last line %q, want 1 and no landing:\n%s", ran.exit,
+					ran.lastLine, ran.errors)
+			}
+			if !strings.Contains(ran.errors, row.want) || strings.Contains(ran.errors, "integrate-job step ") {
+				test.Errorf("the integrate job doesn't say %q before any step:\n%s", row.want, ran.errors)
+			}
+			if _, statError := os.Stat(filepath.Join(fixture.home, integrateJobScratch)); !errors.Is(statError,
+				os.ErrNotExist) {
+				test.Errorf("the integrate job laid its scratch with no history (%v)", statError)
+			}
+			if calls := readMaybeMissing(test, filepath.Join(fixture.replies, "calls")); len(calls) > 0 {
+				test.Errorf("an integrate job with no history ran %q", calls)
+			}
+		})
+	}
+}
+
+// A merge its history doesn't hold refuses in the preflight, saying the history holds no such merge, though the
+// house's mirrors hold it: the merge is read from the history alone, so the house's objects, which the job's own
+// cohere.git borrows after the history's for the measurement's deeafbf4 (integrateJobHouseMirrors), never vouch for a
+// merge the runner didn't lay. Nothing is laid, measured or tested.
+func TestAnIntegrateJobRefusesAMergeItsHistoryLacks(test *testing.T) {
 	test.Parallel()
 	fixture := newIntegrateJobFixture(test)
-	merge := fixture.unmirroredMerge()
-	ran := fixture.integrateJob(merge, integrateJobMergeWaitVariable+"=1s")
+	merge := fixture.mergedOntoMain()
+	fixture.git(fixture.repository, "push", "-q", fixture.historyRepository(), "main:refs/heads/main")
+	house := filepath.Join(fixture.house, "cohere.git")
+	fixture.git(fixture.repository, "init", "-q", "--bare", house)
+	fixture.git(fixture.repository, "push", "-q", house, merge+":refs/heads/merge")
+	ran := fixture.integrateJob(merge)
 	if ran.exit != 1 || ran.integrated != "" {
 		test.Fatalf("the integrate job exited %d, its last line %q, want 1 and no landing:\n%s", ran.exit, ran.lastLine,
 			ran.errors)
 	}
-	for _, want := range []string{"integrate-job waits up to 1s for the merge " + shortCommit(merge),
-		fixture.mirror + " held no merge " + merge + " after 1s of waiting", "never a red of this merge",
+	for _, want := range []string{fixture.historyRepository() + " holds no merge " + merge + " of two parents",
 		"integrate-job step preflight refused in "} {
 		if !strings.Contains(ran.errors, want) {
 			test.Errorf("the integrate job doesn't say %q:\n%s", want, ran.errors)
 		}
 	}
 	if calls := readMaybeMissing(test, filepath.Join(fixture.replies, "calls")); len(calls) > 0 {
-		test.Errorf("a merge the mirror never held ran %q", calls)
+		test.Errorf("a merge the history never held ran %q", calls)
+	}
+	alternates := string(readMaybeMissing(test, filepath.Join(fixture.home, integrateJobScratch, "mirrors",
+		"cohere.git", "objects", "info", "alternates")))
+	if want := filepath.Join(fixture.historyRepository(), "objects") + "\n" + filepath.Join(house, "objects") +
+		"\n"; alternates != want {
+		test.Errorf("the job's cohere.git borrows %q, want the history's objects, then the house's: %q", alternates,
+			want)
 	}
 }
 
-// A merge the bridge carries to the mirror while the job waits for it is judged as one that was there from the start:
-// the job says it waits, the merge arrives, and the preflight passes it on to be laid. The merge is carried only once
-// the job has said it waits, so the wait is what let it through.
-func TestAnIntegrateJobWaitsForItsMergeToReachTheMirror(test *testing.T) {
+// The merge's TypeScript is laid at the pin it records (#tbtmxpd): a pin the merge moves from the history's
+// TypeScript.git, which holds it alone, and a pin it doesn't move from the TypeScript the runner laid in the job's own
+// tree at main's pin, whose `.git` is a directory, a file naming one, or a worktree's file whose commondir names its
+// repository. The house's TypeScript mirror is borrowed only when the job's own tree laid none, so here it never is.
+func TestAnIntegrateJobLaysTheMergesTypeScriptPin(test *testing.T) {
+	test.Parallel()
+	for _, row := range []struct {
+		name  string
+		moved bool
+		// laid is the shape of the job's own TypeScript's `.git`: a directory, a file, or a worktree's file.
+		laid string
+	}{
+		{name: "a moved pin, held in the history", moved: true, laid: "directory"},
+		{name: "main's pin, the job's own .git a directory", laid: "directory"},
+		{name: "main's pin, the job's own .git a file", laid: "file"},
+		{name: "main's pin, the job's own .git a worktree's", laid: "worktree"},
+	} {
+		test.Run(row.name, func(test *testing.T) {
+			test.Parallel()
+			fixture := newIntegrateJobFixture(test)
+			if makeError := os.MkdirAll(filepath.Join(fixture.house, "TypeScript.git", "objects"),
+				0o755); makeError != nil {
+				test.Fatal(makeError)
+			}
+			source := filepath.Join(test.TempDir(), "TypeScript")
+			writeFixtureFile(test, filepath.Join(source, "README.md"), "main's TypeScript\n")
+			fixture.git(filepath.Dir(source), "init", "-q", "-b", "main", source)
+			fixture.git(source, "add", ".")
+			fixture.git(source, "commit", "-q", "-m", "main's TypeScript")
+			mainPin := fixture.git(source, "rev-parse", "HEAD")
+			laid := filepath.Join(fixture.job, "TypeScript")
+			switch row.laid {
+			case "directory":
+				fixture.git(fixture.job, "clone", "-q", source, laid)
+			case "file":
+				if makeError := os.MkdirAll(filepath.Join(fixture.job, "modules"), 0o755); makeError != nil {
+					test.Fatal(makeError)
+				}
+				fixture.git(fixture.job, "clone", "-q", "--separate-git-dir", filepath.Join(fixture.job, "modules",
+					"TypeScript"), source, laid)
+				// A submodule's file names its git directory relative to the checkout.
+				writeFixtureFile(test, filepath.Join(laid, ".git"), "gitdir: ../modules/TypeScript\n")
+			case "worktree":
+				fixture.git(source, "worktree", "add", "-q", "--detach", laid, mainPin)
+			}
+			fixture.git(fixture.repository, "update-index", "--add", "--cacheinfo", "160000,"+mainPin+",TypeScript")
+			fixture.git(fixture.repository, "commit", "-q", "-m", fixtureSubject("TypeScript at main's pin"))
+			worktree := fixture.worktree("a")
+			fixture.git(worktree, "rebase", "-q", "main")
+			want := mainPin
+			if row.moved {
+				moved := filepath.Join(test.TempDir(), "moved")
+				writeFixtureFile(test, filepath.Join(moved, "README.md"), "the merge's TypeScript\n")
+				fixture.git(filepath.Dir(moved), "init", "-q", "-b", "main", moved)
+				fixture.git(moved, "add", ".")
+				fixture.git(moved, "commit", "-q", "-m", "the merge's TypeScript")
+				want = fixture.git(moved, "rev-parse", "HEAD")
+				typeScript := filepath.Join(fixture.history, "TypeScript.git")
+				fixture.git(fixture.history, "init", "-q", "--bare", typeScript)
+				fixture.git(moved, "push", "-q", typeScript, "HEAD:refs/heads/main")
+				fixture.git(worktree, "update-index", "--cacheinfo", "160000,"+want+",TypeScript")
+				fixture.git(worktree, "commit", "-q", "-m", fixtureSubject("TypeScript moved"))
+			}
+			// The fixture scripts no measurement, so the job stops there: what matters is that it laid the merge.
+			ran := fixture.integrateJob(fixture.merged())
+			if !strings.Contains(ran.errors, "integrate-job step lay ") ||
+				strings.Contains(ran.errors, "integrate-job step lay refused") {
+				test.Fatalf("the integrate job didn't lay the merge:\n%s", ran.errors)
+			}
+			tree := filepath.Join(fixture.home, integrateJobScratch, "tree")
+			if at := fixture.git(filepath.Join(tree, "TypeScript"), "rev-parse", "HEAD"); at != want {
+				test.Errorf("the merge's TypeScript is at %s, want the pin %s", at, want)
+			}
+			alternates := string(readMaybeMissing(test, filepath.Join(fixture.home, integrateJobScratch, "mirrors",
+				"TypeScript.git", "objects", "info", "alternates")))
+			if strings.Contains(alternates, fixture.house) {
+				test.Errorf("the job's TypeScript.git borrows the house's with its own laid:\n%s", alternates)
+			}
+		})
+	}
+}
+
+// The history's shallow file, where its commits stop (Machines' layout on #tbtmxpd), is carried into the job's own
+// cohere.git, which borrows the history's objects, so the tests step's fetch of the merge stops where the history does;
+// and a history with none leaves the kept repository with none, whatever an earlier job left there.
+func TestAnIntegrateJobCarriesItsHistorysShallowFile(test *testing.T) {
 	test.Parallel()
 	fixture := newIntegrateJobFixture(test)
-	merge := fixture.unmirroredMerge()
-	job := exec.Command(fixture.wrapper, "integrate-job", "--merge", merge, "--task", fixtureTask, "--message",
-		"a module measured and gated")
-	job.Dir = fixture.job
-	job.Env = append(append(fixture.environment, integrateJobCommitVariable+"="+fixture.git(fixture.repository,
-		"rev-parse", "main")), integrateJobMergeWaitVariable+"=10m")
-	errorOutput, pipeError := job.StderrPipe()
-	if pipeError != nil {
-		test.Fatal(pipeError)
+	fixture.reply("measure.run", shacklerSays([]int64{9900, 9700, 9800}))
+	merge := fixture.merged()
+	main := fixture.git(fixture.repository, "rev-parse", "main")
+	shallow := filepath.Join(fixture.historyRepository(), "shallow")
+	writeFixtureFile(test, shallow, main+"\n")
+	carried := filepath.Join(fixture.home, integrateJobScratch, "mirrors", "cohere.git", "shallow")
+	if ran := fixture.integrateJob(merge); ran.exit != 0 {
+		test.Fatalf("the integrate job exited %d:\n%s", ran.exit, ran.errors)
 	}
-	if startError := job.Start(); startError != nil {
-		test.Fatal(startError)
+	if said := string(readMaybeMissing(test, carried)); said != main+"\n" {
+		test.Errorf("the job's cohere.git holds the shallow file %q, want the history's %q", said, main+"\n")
 	}
-	var said strings.Builder
-	lines := bufio.NewScanner(errorOutput)
-	carried := false
-	for lines.Scan() {
-		said.WriteString(lines.Text() + "\n")
-		if !carried && strings.Contains(lines.Text(), "integrate-job waits up to 10m0s for the merge") {
-			fixture.mirrorMerge(merge)
-			carried = true
-		}
+	if removeError := os.Remove(shallow); removeError != nil {
+		test.Fatal(removeError)
 	}
-	if scanError := lines.Err(); scanError != nil {
-		test.Fatal(scanError)
+	if ran := fixture.integrateJob(merge); ran.exit != 0 {
+		test.Fatalf("the integrate job exited %d the second time:\n%s", ran.exit, ran.errors)
 	}
-	// Ignored: the fixture scripts no measurement, so the job ends there, and what it said is what's read.
-	_ = job.Wait()
-	if !carried {
-		test.Fatalf("the integrate job never said it waits for its merge:\n%s", said.String())
-	}
-	// The fixture scripts no measurement, so the job stops there: what matters is that it got past the preflight and
-	// laid the merge.
-	if strings.Contains(said.String(), "held no merge") || !strings.Contains(said.String(), "integrate-job step lay ") {
-		test.Errorf("a merge carried while the job waited wasn't laid:\n%s", said.String())
+	if _, statError := os.Stat(carried); !errors.Is(statError, os.ErrNotExist) {
+		test.Errorf("a history with no shallow file left the job's cohere.git with one: %v", statError)
 	}
 }
 
@@ -858,9 +1058,10 @@ func TestTheIntegrateJobsCacheIsKeptAndDropsCountOne(test *testing.T) {
 }
 
 // The tests' temporary directory on a gate Mac, macBoxTemporaryBlock run for real with bash: a new one each run under
-// the account's `TMPDIR`, while with integrateCache set it is one path each run inside the kept cache, emptied first,
-// so go test's cache, which keys a test on the `TMPDIR` it read, replays across integrate jobs. Neither is ever under
-// /tmp, which an integrate job in Shackler's sandbox may not write (J-7dhfcty).
+// the account's `TMPDIR`, while in an integrate job it is one path each run, emptied first, inside the kept cache when
+// one is kept and under the script's base when the runner's cache serves the job, so go test's cache, which keys a
+// test on the `TMPDIR` it read, replays across integrate jobs (J-5j0jbp5 replayed 73 of 438 with a new one each job).
+// None is ever under /tmp, which an integrate job in Shackler's sandbox may not write (J-7dhfcty).
 func TestTheIntegrateJobsTemporaryDirectoryIsOnePath(test *testing.T) {
 	test.Parallel()
 	needs.Tool(test, "bash", "the gate's script is a bash script")
@@ -868,12 +1069,17 @@ func TestTheIntegrateJobsTemporaryDirectoryIsOnePath(test *testing.T) {
 		test.Errorf("the block names a fixed path under /tmp:\n%s", macBoxTemporaryBlock)
 	}
 	temporary, kept := test.TempDir(), filepath.Join(test.TempDir(), "integrate cache")
-	run := func(integrateCache string) string {
+	base := filepath.Join(test.TempDir(), "scratch base")
+	run := func(integrateCache string, integrateJob string) string {
 		test.Helper()
 		bash := exec.Command("bash", "-s")
 		bash.Env = append(os.Environ(), "TMPDIR="+temporary)
 		bash.Stdin = strings.NewReader("set -euo pipefail\nrefuse() { echo \"refused $*\"; exit 1; }\nintegrateCache=" +
 			shellQuoted(integrateCache) +
+			"\nintegrateJob=" +
+			integrateJob +
+			"\nbase=" +
+			shellQuoted(base) +
 			"\n" +
 			macBoxTemporaryBlock +
 			"touch \"$gatetemp/left\"\necho \"$gatetemp\"\n")
@@ -883,7 +1089,7 @@ func TestTheIntegrateJobsTemporaryDirectoryIsOnePath(test *testing.T) {
 		}
 		return strings.TrimSpace(string(output))
 	}
-	first, second := run(kept), run(kept)
+	first, second := run(kept, "1"), run(kept, "1")
 	if first != second || first != filepath.Join(kept, "temporary") {
 		test.Errorf("with a kept cache the runs' temporary directories are %s and %s, want %s", first, second,
 			filepath.Join(kept, "temporary"))
@@ -891,16 +1097,23 @@ func TestTheIntegrateJobsTemporaryDirectoryIsOnePath(test *testing.T) {
 	if entries := listMaybeMissing(test, second); len(entries) != 1 {
 		test.Errorf("the second run found %d entries in its temporary directory, want only its own", len(entries))
 	}
-	if cold, again := run(""), run(""); cold == again || !strings.HasPrefix(cold, temporary+"/cohere-gate.") {
+	if runner, again := run("", "1"), run("", "1"); runner != again || runner != filepath.Join(base, "temporary") {
+		test.Errorf("on the runner's cache the integrate jobs' temporary directories are %s and %s, want %s", runner,
+			again, filepath.Join(base, "temporary"))
+	} else if entries := listMaybeMissing(test, again); len(entries) != 1 {
+		test.Errorf("on the runner's cache the second job found %d entries in its temporary directory, want only its"+
+			" own", len(entries))
+	}
+	if cold, again := run("", ""), run("", ""); cold == again || !strings.HasPrefix(cold, temporary+"/cohere-gate.") {
 		test.Errorf("without a kept cache the runs' temporary directories are %s and %s, want a new one each under %s",
 			cold, again, temporary)
 	}
 }
 
-// The integrate job's mirrors, read by macBoxScript run for real with bash: a merge held only in the cohere mirror, and
-// its TypeScript pin held only in the TypeScript mirror beside it, are fetched through the integrate job's borrowing
-// mirrors and checked out in the scratch tree, nothing copied, before the script reaches sharedBoxGate, which here
-// finds no toolchain.
+// The integrate job's mirrors, read by macBoxScript run for real with bash: a merge held only in the history's
+// cohere.git, and its TypeScript pin held only in the history's TypeScript.git beside it, are fetched through the
+// integrate job's borrowing mirrors and checked out in the scratch tree, nothing copied, before the script reaches
+// sharedBoxGate, which here finds no toolchain.
 func TestTheIntegrateJobsMirrorsHoldTheMergeAndItsPin(test *testing.T) {
 	test.Parallel()
 	needs.Tool(test, "bash", "the gate's script is a bash script")
@@ -918,16 +1131,17 @@ func TestTheIntegrateJobsMirrorsHoldTheMergeAndItsPin(test *testing.T) {
 		}
 		return strings.TrimSpace(string(output))
 	}
-	// The house's mirrors: TypeScript's, holding the pin, and cohere's, holding a merge that records it.
-	house := filepath.Join(directory, "house")
+	// The history, as Loom's runner lays it: TypeScript.git, holding the pin, and cohere.git, holding a merge that
+	// records it.
+	history := filepath.Join(directory, "history")
 	source := filepath.Join(directory, "TypeScript")
 	writeFixtureFile(test, filepath.Join(source, "README.md"), "TypeScript\n")
 	git(directory, "init", "-q", "-b", "main", source)
 	git(source, "add", ".")
 	git(source, "commit", "-q", "-m", "TypeScript")
 	pin := git(source, "rev-parse", "HEAD")
-	git(directory, "init", "-q", "--bare", filepath.Join(house, "TypeScript.git"))
-	git(source, "push", "-q", filepath.Join(house, "TypeScript.git"), "HEAD:refs/heads/main")
+	git(directory, "init", "-q", "--bare", filepath.Join(history, "TypeScript.git"))
+	git(source, "push", "-q", filepath.Join(history, "TypeScript.git"), "HEAD:refs/heads/main")
 	checkout := filepath.Join(directory, "checkout")
 	writeFixtureFile(test, filepath.Join(checkout, "go.mod"), "module example.com/module\n\ngo 1.27\n")
 	git(directory, "init", "-q", "-b", "main", checkout)
@@ -935,13 +1149,13 @@ func TestTheIntegrateJobsMirrorsHoldTheMergeAndItsPin(test *testing.T) {
 	git(checkout, "update-index", "--add", "--cacheinfo", "160000,"+pin+",TypeScript")
 	git(checkout, "commit", "-q", "-m", "main")
 	merge := git(checkout, "commit-tree", "-p", "HEAD", "-m", "the merge", git(checkout, "rev-parse", "HEAD^{tree}"))
-	git(directory, "init", "-q", "--bare", filepath.Join(house, "cohere.git"))
-	git(checkout, "push", "-q", filepath.Join(house, "cohere.git"), merge+":refs/heads/merge")
+	git(directory, "init", "-q", "--bare", filepath.Join(history, "cohere.git"))
+	git(checkout, "push", "-q", filepath.Join(history, "cohere.git"), merge+":refs/heads/merge")
 	mirrors := filepath.Join(directory, "home", integrateJobScratch, "mirrors")
 	for range 2 {
 		// Laid again, as the next job lays them, they are kept and borrow anew.
-		if layError := layIntegrateJobMirrors(filepath.Join(house, "cohere.git", "objects"), mirrors,
-			[]string{filepath.Join(house, "TypeScript.git", "objects")}); layError != nil {
+		if layError := layIntegrateJobMirrors(mirrors, []string{filepath.Join(history, "cohere.git", "objects")},
+			[]string{filepath.Join(history, "TypeScript.git", "objects")}); layError != nil {
 			test.Fatal(layError)
 		}
 	}
@@ -1037,6 +1251,36 @@ func TestAnIntegrateJobsAccountLinesParse(test *testing.T) {
 	}
 }
 
+// On the runner's declared Go cache (#e94a6r4), with no kept one, the account says it was the runner's, its layer and
+// its program, and the layer's size before and after with the entries it gained, never the empty per-job sentence:
+// J-k20kexn's fill ran on the runner's cache and its account said the cache was empty and removed.
+func TestAnIntegrateJobsAccountNamesTheRunnersCache(test *testing.T) {
+	test.Parallel()
+	fixture := newIntegrateJobFixture(test)
+	fixture.reply("measure.run", shacklerSays([]int64{9900, 9700, 9800}))
+	layer := test.TempDir()
+	writeFixtureFile(test, filepath.Join(layer, "kept-entry"), "entry\n")
+	fixture.reply("tests.grows", filepath.Join(layer, "new-entry"))
+	program := "loom-job-runner gocacheprog shared layer"
+	ran := fixture.integrateJob(fixture.merged(), append(own_go_cache.Environment(nil, layer),
+		"GOCACHEPROG="+program)...)
+	if ran.exit != 0 {
+		test.Fatalf("the integrate job exited %d:\n%s", ran.exit, ran.errors)
+	}
+	for _, want := range []string{
+		integrateJobMarker + "build cache the runner's declared Go cache, its layer " + layer + " and its program " +
+			program + "\n",
+		integrateJobMarker + "build cache gained 1 entries",
+	} {
+		if !strings.Contains(ran.errors, want) {
+			test.Errorf("the account doesn't say %q:\n%s", want, ran.errors)
+		}
+	}
+	if strings.Contains(ran.errors, "an empty per-job cache") {
+		test.Errorf("the account on the runner's cache says the empty per-job one:\n%s", ran.errors)
+	}
+}
+
 // accountSteps are the names of the steps an integrate job's account says, in order: each `step <name> ...` line's
 // name, a box step's `box`.
 func accountSteps(errors string) []string {
@@ -1120,6 +1364,27 @@ func TestAFillRunsNoMeasurement(test *testing.T) {
 	}
 }
 
+// A fill judges main's own tip, which changes nothing of its own, so it isolates no rule's fixtures, and its account
+// says so once, even with the isolation test in its tree and its history shallow at the tip, as Loom's runner lays a
+// fill's: there the tip has no first parent, and reading one refused every fill's checks (J-kexdjp4, #e94a6r4).
+func TestAFillOnAShallowHistoryIsolatesNothingAndSaysSo(test *testing.T) {
+	test.Parallel()
+	fixture := newIntegrateJobFixture(test)
+	// The isolation test's package sits in go_language, a race token's package, which the gate's listing must find.
+	fixture.commitOn(fixture.worktree("a"), map[string]string{unitIsolationFile: "package check\n",
+		"internal/go_language/go_language.go": "package go_language\n"}, "check: the isolation test")
+	tip := fixture.landedMain()
+	writeFixtureFile(test, filepath.Join(fixture.historyRepository(), "shallow"), tip+"\n")
+	ran := fixture.fill()
+	if ran.exit != 0 {
+		test.Fatalf("the fill exited %d, its last line %q:\n%s", ran.exit, ran.lastLine, ran.errors)
+	}
+	want := integrateJobMarker + "isolation skipped: " + fillIsolatesNothing + "\n"
+	if strings.Count(ran.errors, want) != 1 {
+		test.Errorf("the account doesn't say %q once:\n%s", want, ran.errors)
+	}
+}
+
 // A fill's account says the steps an integration's does at the same tree, in the same order, but the measurement
 // (#fnrchck), so the two compare step by step: the lay, the tests and their box's steps, and each check.
 func TestAFillSaysTheStepsAnIntegrationDoes(test *testing.T) {
@@ -1132,7 +1397,7 @@ func TestAFillSaysTheStepsAnIntegrationDoes(test *testing.T) {
 		test.Fatalf("the integration exited %d:\n%s", integrated.exit, integrated.errors)
 	}
 	fixture.git(fixture.repository, "update-ref", "refs/heads/main", merge)
-	fixture.git(fixture.repository, "push", "-q", fixture.mirror, "main:refs/heads/main")
+	fixture.historyHolds(merge)
 	filled := fixture.fill()
 	if filled.exit != 0 {
 		test.Fatalf("the fill exited %d:\n%s", filled.exit, filled.errors)

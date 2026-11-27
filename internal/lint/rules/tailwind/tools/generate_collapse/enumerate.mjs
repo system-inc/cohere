@@ -32,6 +32,7 @@ import * as NodeFileSystem from 'node:fs';
 import * as NodeModule from 'node:module';
 import * as NodePath from 'node:path';
 import * as NodeUrl from 'node:url';
+import { locate } from '../corpus.mjs';
 
 const [, , entryPointArgument, projectRootArgument] = process.argv;
 if(!entryPointArgument) {
@@ -42,8 +43,9 @@ if(!entryPointArgument) {
 const entryPointPath = NodePath.resolve(entryPointArgument);
 
 /*
- * The project root, which is both where reported paths are relative to and where bare specifiers
- * resolve from. That second job is the one it did not have and needed.
+ * The project root, which is where bare specifiers resolve from. Reported paths were relative to it
+ * once, which named the borrowed install's location in the generated header; they are relative to
+ * this repository now, through ../corpus.mjs.
  *
  * Where the CSS lives and where `tailwindcss` resolves from are different questions, and for a
  * repository they have the same answer: its theme.css sits inside the tree that installed Tailwind,
@@ -655,7 +657,9 @@ process.stdout.write(
     JSON.stringify(
         {
             tailwindVersion,
-            entryPoint: NodePath.relative(projectRoot, entryPointPath),
+            // Recorded relative to this repository, as every generator records a path it was given, so the
+            // header names the same file on every machine whatever install the resolve root borrowed.
+            entryPoint: locate(entryPointPath).recorded,
             functionalRoots: roots.length,
             staticUtilities: staticUtilities.size,
             pairsProbed,

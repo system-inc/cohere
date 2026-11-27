@@ -39,6 +39,26 @@ const SwiftBinaryOverrideVariable = "COHERE_SWIFT_BINARY"
 // measured at 225s, and the decisions worth testing are which tree is built and when, not SwiftPM.
 var buildSwiftProduct = buildSwiftProductWithSwiftPm
 
+// swiftBuildConfiguration is every argument of a cohere-swift build that decides what SwiftPM compiles: the
+// configuration, the manifest cache that decides what the manifest reads into the build (see
+// buildSwiftProductWithSwiftPm), and the product. The build passes these and both hashes name them, so a binary
+// built another way is another key, which a cache shared between machines needs (#e94a6r4).
+//
+// The package and scratch paths are left out: they differ per checkout and per job, and a release build carries
+// neither (no checkout path is in a built cohere-swift, read with `strings` on Nov 27). So are the flags of a laid
+// resolved set (release.SwiftResolvedArguments), which decide only where the pinned packages come from, while
+// Package.resolved, which the hashes read, decides which. No target triple is passed, so the target is the
+// toolchain's own, which its `swift --version` names and the hashes hold.
+//
+// A variable, not a constant, only because Go has no constant slices, and so a test can show a new one names a new
+// binary.
+var swiftBuildConfiguration = []string{"-c", "release", "--manifest-cache", "none", "--product", "cohere-swift"}
+
+// swiftBuildIdentity is swiftBuildConfiguration as the one string both hashes hold.
+func swiftBuildIdentity() string {
+	return strings.Join(swiftBuildConfiguration, " ")
+}
+
 // ResolveSwiftBinary returns the path to a cohere-swift binary matching cohere-swift's sources and the
 // installed toolchain, building it when there is none.
 //
@@ -65,6 +85,9 @@ var buildSwiftProduct = buildSwiftProductWithSwiftPm
 // versionOutput is what `swift --version` printed, as SwiftVersionOutput returns it. The caller asks, once per
 // process tree, since every project's run and every language needs the same answer (#nkk91tv).
 //
+// A binary missing from the cache is taken from a shared folder when one names it and vouches for its bytes, and one
+// built here is left in the job's layer for that folder: see SwiftEngineSharedVariable.
+//
 // The returned boolean reports whether a build ran.
 func ResolveSwiftBinary(paths Paths, commit string, contract int, versionOutput string) (string, bool, error) {
 	toolchain, swiftToolchainError := swiftToolchain(versionOutput)
@@ -86,6 +109,13 @@ func ResolveSwiftBinary(paths Paths, commit string, contract int, versionOutput 
 	if _, statError := os.Stat(binaryPath); statError == nil {
 		return binaryPath, false, nil
 	}
+	taken, takeSharedSwiftEngineError := takeSharedSwiftEngine(binaryPath, binaryPath)
+	if takeSharedSwiftEngineError != nil {
+		return "", false, takeSharedSwiftEngineError
+	}
+	if taken {
+		return binaryPath, false, nil
+	}
 
 	if buildSwiftProductError := buildSwiftProduct(
 		paths.SwiftPackageDirectory(),
@@ -94,6 +124,9 @@ func ResolveSwiftBinary(paths Paths, commit string, contract int, versionOutput 
 		[]string{release.SwiftSourceTreeModifiedVariable + "=" + strconv.FormatBool(modified)},
 	); buildSwiftProductError != nil {
 		return "", false, buildSwiftProductError
+	}
+	if fillSwiftEngineLayerError := fillSwiftEngineLayer(binaryPath); fillSwiftEngineLayerError != nil {
+		return "", false, fillSwiftEngineLayerError
 	}
 	return binaryPath, true, nil
 }
@@ -132,7 +165,8 @@ func swiftToolchain(versionOutput string) (string, error) {
 // `Package.swift` and `Package.resolved` pin the package graph, and every file under `Sources/` is
 // compiled in. Tests are left out because they are not in the binary, and `.build` because it is
 // output. Contents are hashed, never times, for the reason Inputs.Compute gives. modified is the tree's
-// state the build is handed, which cohere-swift compiles in and reports (see ResolveSwiftBinary).
+// state the build is handed, which cohere-swift compiles in and reports (see ResolveSwiftBinary). The toolchain,
+// the platform and swiftBuildConfiguration are the rest of what makes the bytes.
 func swiftPackageHash(packageDirectory string, toolchain string, modified bool) (string, error) {
 	files := []string{
 		filepath.Join(packageDirectory, "Package.swift"),
@@ -162,6 +196,7 @@ func swiftPackageHash(packageDirectory string, toolchain string, modified bool) 
 	digest := sha256.New()
 	fmt.Fprintf(digest, "toolchain\x00%s\x00", toolchain)
 	fmt.Fprintf(digest, "platform\x00%s/%s\x00", runtime.GOOS, runtime.GOARCH)
+	fmt.Fprintf(digest, "configuration\x00%s\x00", swiftBuildIdentity())
 	fmt.Fprintf(digest, "sourceTreeModified\x00%t\x00", modified)
 	for _, path := range files {
 		contents, readError := os.ReadFile(path)
@@ -252,6 +287,9 @@ func runBuildToolUntil(command *exec.Cmd, signals <-chan os.Signal) error {
 // Copied rather than linked to SwiftPM's product, because the next build replaces the product in place,
 // and a link would turn every hash-named binary into whichever binary was built last. The copy is
 // installed without replacing a binary already at binaryPath, for the reason copyExecutable gives.
+//
+// With release.SwiftResolvedVariable naming a laid resolved set, as in an integrate job, it builds from that set with
+// no network (release.SwiftResolvedArguments).
 func buildSwiftProductWithSwiftPm(
 	packageDirectory string,
 	scratchDirectory string,
@@ -273,14 +311,17 @@ func buildSwiftProductWithSwiftPm(
 	// file would then say it was built from a clean tree. Measured by @system_cohere_release, whose release
 	// build passes the same flag. A development build states the bit in its environment, which the cache
 	// does key on (measured 2026-11-12), so it is kept for the committed build; it costs about 0.4 s of
-	// manifest evaluation per build, measured on a stand-in package.
-	arguments := []string{
-		"build", "-c", "release",
-		"--package-path", packageDirectory,
-		"--scratch-path", scratchDirectory,
-		"--manifest-cache", "none",
-		"--product", "cohere-swift",
+	// manifest evaluation per build, measured on a stand-in package. It is one of swiftBuildConfiguration, which
+	// the hashes name.
+	arguments := append([]string{"build"}, swiftBuildConfiguration...)
+	arguments = append(arguments, "--package-path", packageDirectory, "--scratch-path", scratchDirectory)
+	// A laid resolved set, when one is named, builds offline, its flags on the build and on its `--show-bin-path`
+	// below alike, so the two name the same build.
+	offline, swiftResolvedArgumentsError := release.SwiftResolvedArguments(scratchDirectory)
+	if swiftResolvedArgumentsError != nil {
+		return swiftResolvedArgumentsError
 	}
+	arguments = append(arguments, offline...)
 	// SwiftPM's own lines stream under --verbose. Otherwise they are kept, so a default run prints cohere's
 	// report alone (#ytqqv8v), and a build that fails quotes their end in its error.
 	// The tree's state comes from the caller alone. One inherited from this process's environment would be a

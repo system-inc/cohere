@@ -213,6 +213,10 @@ func newSwiftFixture(test *testing.T) *swiftFixture {
 	original := buildSwiftProduct
 	buildSwiftProduct = fixture.fakeBuild
 	test.Cleanup(func() { buildSwiftProduct = original })
+	// Emptied, so a job whose runner names a shared folder or a layer, as Loom's integrate job does, neither serves
+	// these tests a binary nor takes one from them. A test of the folders names its own.
+	test.Setenv(SwiftEngineSharedVariable, "")
+	test.Setenv(SwiftEngineLayerVariable, "")
 	return fixture
 }
 
@@ -251,10 +255,18 @@ func (fixture *swiftFixture) fakeBuild(
 		modified,
 		strings.TrimSpace(string(rule)),
 	)
-	if createDirectoryError := os.MkdirAll(filepath.Dir(binaryPath), 0o755); createDirectoryError != nil {
-		return createDirectoryError
+	// The product is written in the scratch path and installed with copyExecutable, as the real build installs
+	// SwiftPM's, so a file already at binaryPath is kept here as it is there.
+	product := filepath.Join(scratchDirectory, "cohere-swift")
+	for _, directory := range []string{scratchDirectory, filepath.Dir(binaryPath)} {
+		if createDirectoryError := os.MkdirAll(directory, 0o755); createDirectoryError != nil {
+			return createDirectoryError
+		}
 	}
-	return executable_testing.WriteFile(binaryPath, []byte(script), 0o755)
+	if writeError := executable_testing.WriteFile(product, []byte(script), 0o755); writeError != nil {
+		return writeError
+	}
+	return copyExecutable(product, binaryPath)
 }
 
 func (fixture *swiftFixture) rule() string {

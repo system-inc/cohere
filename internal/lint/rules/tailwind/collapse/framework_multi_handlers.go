@@ -1,6 +1,6 @@
 // The ported `handle` bodies of the framework's multi-declaration functional utilities.
 //
-// The companion to frameworkhandlers.go, covering the 152 roots whose reading was measured rather
+// The companion to frameworkhandlers.go, covering the 154 roots whose reading was measured rather
 // than derived. Same contract: each root's emitter is the Go form of the `handle` body upstream
 // registers for it at v4.3.3, and the reading is `PropertySort` over what it emits.
 //
@@ -32,7 +32,7 @@
 //
 // # Where the roots come from
 //
-// 147 are registered in `utilities.ts`, some directly and some by a loop over a table of name and
+// 149 are registered in `utilities.ts`, some directly and some by a loop over a table of name and
 // property pairs. Five are not there at all: `flex-grow`, `flex-shrink`, `start`, `end` and
 // `max-w-screen` are registered by `compat/legacy-utilities.ts`, which the earlier scoping did not
 // mention. Each emits a single declaration, and each was read at the tag like the rest rather than
@@ -214,6 +214,7 @@ var frameworkMultiEmitters = map[string]FrameworkEmitter{
 	"auto-cols":        declareProperty("grid-auto-columns"),
 	"auto-rows":        declareProperty("grid-auto-rows"),
 	"basis":            declareProperty("flex-basis"),
+	"block":            declareProperty("block-size"),
 	"bottom":           declareProperty("bottom"),
 	"caret":            declareProperty("caret-color"),
 	"col-span":         declareProperty("grid-column"),
@@ -228,6 +229,7 @@ var frameworkMultiEmitters = map[string]FrameworkEmitter{
 	"grid-rows":        declareProperty("grid-template-rows"),
 	"h":                declareProperty("height"),
 	"indent":           declareProperty("text-indent"),
+	"inline":           declareProperty("inline-size"),
 	"inset":            declareProperty("inset"),
 	"inset-be":         declareProperty("inset-block-end"),
 	"inset-bs":         declareProperty("inset-block-start"),

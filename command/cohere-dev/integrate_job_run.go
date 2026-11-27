@@ -2,33 +2,36 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
 	"regexp"
 	"runtime"
-	"slices"
 	"strings"
 	"time"
 	"unicode"
 
 	"github.com/system-inc/cohere/internal/command_line/streams"
-	"github.com/system-inc/cohere/internal/testing/needs"
+	release "github.com/system-inc/cohere/internal/release/packaging"
 )
 
 // cohere-dev integrate-job: the one command a Loom integrate job runs on Shackler to judge a merge Loom made for main
 // (#etpnnw1, Kirk's design; its units #s50bcnr, a warm cache, #6ex523f, measurement first, and the seam with Loom,
 // #hnbb5vr). It runs in the job's own tree, main's tip laid with no history, so its code is main's, and Loom runs one
 // at a time, so it takes no land lock. It runs one git throughout, the developer tools' own (integrateJobGit), never
-// macOS's shim. It reads the merge from the mirror integrateJobMirrorVariable names, refuses one whose first parent
-// isn't the commit it runs at, and lays the merge's tree under its scratch. Each step says one line with its seconds,
-// and the first refusal stops it:
+// macOS's shim. It reads the merge from the history Loom's runner lays for the job, which integrateJobHistoryVariable
+// names, refuses one whose first parent isn't the commit it runs at, and lays the merge's tree under its scratch. Each
+// step says one line with its seconds, and the first refusal stops it:
 //
-//  1. Preflight: what no gate needs to run for, refused in seconds (integrateJobPreflight).
+//  1. Preflight: the job's own mirrors laid, borrowing the history, and what no gate needs to run for, refused in
+//     seconds (integrateJobPreflight), and the laid resolved set of cohere-swift's packages named for every child
+//     after, so Swift is built and checked here offline (nameSwiftResolved).
 //  2. Lay: the merge's tree and its TypeScript pin under the scratch.
 //  3. Measure: performanceScript run here with bash, before any test, handed main's binary's sha256, so a merge that
 //     builds main's binary keeps main's file and times nothing.
@@ -42,10 +45,10 @@ import (
 // With --fill it judges no merge but the commit it runs at, main's tip itself (#fnrchck, Loom's ruling): the job Loom's
 // runner lets fill the shared Go cache does the same work at main an integration does, so its verdict compares with an
 // integration's at the same tree step by step. Its preflight lays the mirrors, waits for the commit to reach them, and
-// runs only what reads the tree, the gitlinks; what judges a candidate has nothing new to judge (fillPreflight). It
-// lays that commit's tree as a merge's is laid, measures nothing, its account saying so once, runs the tests and the
-// checks as an integration does, and its last line is `filled <tree>`, with no finisher's lines, nothing committed or
-// pushed.
+// runs only what reads the tree, the gitlinks and the laid set; what judges a candidate has nothing new to judge
+// (fillPreflight). It lays that commit's tree as a merge's is laid, measures nothing, its account saying so once, runs
+// the tests and the checks as an integration does, and its last line is `filled <tree>`, with no finisher's lines,
+// nothing committed or pushed.
 
 // integrateJobCacheVariable is the integrate job's kept directory: its Go build and test cache, `gocache`, kept across
 // jobs, and its replay store, `steps`. Unset, the integrate job's tests run on the Go cache its runner declared, with
@@ -61,24 +64,30 @@ const integrateJobShellVariable = "COHERE_DEV_INTEGRATE_JOB_SHELL"
 // job finds it.
 const integrateJobGitVariable = "COHERE_DEV_INTEGRATE_JOB_GIT"
 
-// integrateJobMirrorVariable is the cohere mirror the integrate job reads the merge from, where Loom's bridge puts it;
-// unset, it is integrateJobMirrorDefault. The TypeScript mirror beside it, TypeScript.git, holds every pin.
+// integrateJobHistoryVariable names the directory Loom's runner lays the job's history in before the job runs, root's
+// and read-only to the job (#tbtmxpd, Machines' layout): cohere.git, a bare repository at the merge, shallow at main,
+// holding the merge, the commits it brings, its tree and its first parent's commit; and beside it TypeScript.git, only
+// when the merge moves the TypeScript pin, holding the moved pin. A pin that didn't move is the one the job's own tree
+// laid in its TypeScript (laidTypeScriptObjects). The history is laid before the job starts, so a merge it lacks is
+// refused at once, never waited for.
+const integrateJobHistoryVariable = "LOOM_JOB_HISTORY"
+
+// integrateJobHouseMirrors are the house's mirrors, which the integrate job's own borrow from after the history for one
+// thing alone: the measurement's reference commit, deeafbf4 (performanceReference), and its TypeScript pin, which the
+// history doesn't hold until the runner lays it there at `refs/heads/measure/<sha>` (#tbtmxpd). The merge is never
+// read from them. integrateJobHouseMirrorsVariable names others in their place, for a test.
 const (
-	integrateJobMirrorVariable = "COHERE_INTEGRATE_MIRROR"
-	integrateJobMirrorDefault  = macBoxMirrors + "/cohere.git"
+	integrateJobHouseMirrors         = macBoxMirrors
+	integrateJobHouseMirrorsVariable = "COHERE_DEV_INTEGRATE_JOB_HOUSE_MIRRORS"
 )
 
-// integrateJobMergeWaitVariable shortens, for a test, how long the integrate job waits for its merge to reach the
-// mirror, as a Go duration. Unset, it waits integrateJobMergeWait.
-const integrateJobMergeWaitVariable = "COHERE_DEV_INTEGRATE_JOB_MERGE_WAIT"
-
-// integrateJobMergeWait is how long the integrate job waits for its --merge to appear in the mirror before it refuses:
-// Loom's bridge may carry the merge a minute after the job starts, until the node's start waits on it (#hcae6f4).
-// Loom's condition 2 on #hq61wfg sets it at 5 minutes.
-const integrateJobMergeWait = 5 * time.Minute
-
-// integrateJobMergePoll is how often the integrate job looks for its merge while it waits.
-const integrateJobMergePoll = 5 * time.Second
+// integrateJobSwiftResolvedRoot is where Machines lays the resolved sets of cohere-swift's packages on Shackler, each
+// `<the sha256 of the Package.resolved it was resolved from>`, root's and read-only (#je1r32a), and
+// integrateJobSwiftResolvedVariable names another root in its place, for a test.
+const (
+	integrateJobSwiftResolvedRoot     = "/opt/loom-tools/swiftpm-cohere"
+	integrateJobSwiftResolvedVariable = "COHERE_DEV_INTEGRATE_JOB_SWIFT_RESOLVED"
+)
 
 // integrateJobCommitVariable is the commit the Loom job runs at, which Loom's runner sets in every job's environment.
 // Unset, as in a plain checkout, the commit is the working directory's `HEAD`.
@@ -171,9 +180,11 @@ type integrateJobRun struct {
 	running   string
 	candidate string
 	merge     string
-	// mirror is the cohere mirror the merge is read from, and scratch the integrate job's own: its mirrors, borrowing
-	// the house's, of which repository is cohere's, and tree, the merge's tree laid.
-	mirror     string
+	// history is the directory Loom's runner laid the job's history in (integrateJobHistoryVariable), directory the
+	// job's own working directory, holding the TypeScript its tree laid, and scratch the integrate job's own: its
+	// mirrors, borrowing the history, of which repository is cohere's, and tree, the merge's tree laid.
+	history    string
+	directory  string
 	scratch    string
 	mirrors    string
 	repository string
@@ -219,8 +230,8 @@ func integrateJob(arguments []string) int {
 	}
 	fmt.Fprintf(streams.Errors, "cohere-dev: integrate-job runs the git at %s\n", git)
 	job := &integrateJobRun{options: options, started: time.Now(), merge: options.Merge, git: git,
-		cache:  strings.TrimSpace(os.Getenv(integrateJobCacheVariable)),
-		mirror: settingOr(integrateJobMirrorVariable, integrateJobMirrorDefault)}
+		cache:   strings.TrimSpace(os.Getenv(integrateJobCacheVariable)),
+		history: strings.TrimSpace(os.Getenv(integrateJobHistoryVariable))}
 	if job.cache != "" && !filepath.IsAbs(job.cache) {
 		fmt.Fprintf(
 			streams.Errors,
@@ -230,6 +241,26 @@ func integrateJob(arguments []string) int {
 		)
 		return 2
 	}
+	// The history is refused before anything is laid: with none, the job has no merge of its runner's to judge, and
+	// its mirrors borrow it by its whole path.
+	if job.history == "" {
+		fmt.Fprintf(streams.Errors, "cohere-dev: integrate-job reads its merge from the history Loom's runner lays "+
+			"for the job, and %s is unset, so nothing is laid\n", integrateJobHistoryVariable)
+		return 1
+	}
+	if information, statError := os.Stat(filepath.Join(job.history, "cohere.git", "objects")); !filepath.IsAbs(
+		job.history) || statError != nil || !information.IsDir() {
+		fmt.Fprintf(streams.Errors, "cohere-dev: %s=%q is no directory's whole path holding cohere.git, so "+
+			"integrate-job has no history to read its merge from, and nothing is laid\n", integrateJobHistoryVariable,
+			job.history)
+		return 1
+	}
+	directory, directoryError := os.Getwd()
+	if directoryError != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: reading the integrate job's working directory: %v\n", directoryError)
+		return 1
+	}
+	job.directory = directory
 	job.running = strings.TrimSpace(os.Getenv(integrateJobCommitVariable))
 	if job.running == "" {
 		// Ignored: a working directory with no history has no `HEAD`, which the refusal below says.
@@ -271,18 +302,6 @@ func integrateJob(arguments []string) int {
 				return 1
 			}
 		}
-	}
-	// cohere-swift can't be built in an integrate job's sandbox (needs.SwiftUnlaid), so the tests that build it skip by
-	// name (needs.SwiftLaid), cohere on the tree checks every language but Swift (integrateJobCohereArguments), a merge
-	// that changes what only Swift checks is refused (integrateJobSwiftRefusal), and the landing's account says so.
-	if setError := os.Setenv(needs.SwiftUnlaidVariable, needs.SwiftUnlaidSetting); setError != nil {
-		fmt.Fprintf(
-			streams.Errors,
-			"cohere-dev: setting %s for the integrate job's tests: %v\n",
-			needs.SwiftUnlaidVariable,
-			setError,
-		)
-		return 1
 	}
 	job.scratch = filepath.Join(home, integrateJobScratch)
 	job.mirrors = filepath.Join(job.scratch, "mirrors")
@@ -483,47 +502,6 @@ func (job *integrateJobRun) step(name string, work func() (string, int)) int {
 	return 0
 }
 
-// awaitMerge waits, up to integrateJobMergeWait, for the merge to reach the job's repository, which borrows the mirror,
-// and refuses once it hasn't, saying the mirror held no merge: the bridge's carry is the road's, so the refusal names
-// it and never reads as a red of the merge. A merge already there costs one look. A fill waits so for the commit it
-// runs at, which its words name a commit.
-func (job *integrateJobRun) awaitMerge() int {
-	judged := map[bool]string{false: "merge", true: "commit"}[job.options.Fill]
-	wait := integrateJobMergeWait
-	if setting := strings.TrimSpace(os.Getenv(integrateJobMergeWaitVariable)); setting != "" {
-		parsed, parseError := time.ParseDuration(setting)
-		if parseError != nil || parsed <= 0 {
-			fmt.Fprintf(
-				streams.Errors,
-				"cohere-dev: %s=%q is no positive duration\n",
-				integrateJobMergeWaitVariable,
-				setting,
-			)
-			return 2
-		}
-		wait = parsed
-	}
-	poll := min(integrateJobMergePoll, wait/10)
-	started := time.Now()
-	for said := false; ; said = true {
-		if _, lookError := gitOutput(job.repository, "cat-file", "-e", job.merge+"^{commit}"); lookError == nil {
-			return 0
-		}
-		if time.Since(started) >= wait {
-			fmt.Fprintf(streams.Errors, "cohere-dev: %s held no %s %s after %s of waiting: Loom's bridge hasn't "+
-				"carried it there, which is the road's to fix and never a red of this %s (#hq61wfg)\n", job.mirror,
-				judged, job.merge, wait, judged)
-			return 1
-		}
-		if !said {
-			fmt.Fprintf(streams.Errors, "cohere-dev: integrate-job waits up to %s for the %s %s to reach %s\n", wait,
-				judged, shortCommit(job.merge), job.mirror)
-			streams.Show(streams.Errors)
-		}
-		time.Sleep(poll)
-	}
-}
-
 // integrateJobSeconds is a step's time as its line says it, in seconds to a tenth.
 func integrateJobSeconds(spent time.Duration) string {
 	return fmt.Sprintf("%.1fs", spent.Seconds())
@@ -535,10 +513,12 @@ func (job *integrateJobRun) preflight() (string, int) {
 	if code := job.reachMerge(); code != 0 {
 		return "", code
 	}
-	parents, parentsError := gitOutput(job.repository, "rev-list", "--parents", "-n", "1", job.merge)
+	// The merge's parents are read from the history itself, as reachMerge read the merge.
+	history := filepath.Join(job.history, "cohere.git")
+	parents, parentsError := job.historyGit("rev-list", "--parents", "-n", "1", job.merge)
 	fields := strings.Fields(parents)
 	if parentsError != nil || len(fields) != 3 {
-		fmt.Fprintf(streams.Errors, "cohere-dev: %s holds no merge %s of two parents (%v)\n", job.mirror,
+		fmt.Fprintf(streams.Errors, "cohere-dev: %s holds no merge %s of two parents (%v)\n", history,
 			job.merge, parentsError)
 		return "", 1
 	}
@@ -574,14 +554,8 @@ func (job *integrateJobRun) preflight() (string, int) {
 		fmt.Fprintf(streams.Errors, "cohere-dev: %s\n", refusal)
 		return "", 1
 	}
-	swiftRefusal, swiftError := integrateJobSwiftRefusal(job.repository, job.merge)
-	if swiftError != nil {
-		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", swiftError)
-		return "", 1
-	}
-	if swiftRefusal != "" {
-		fmt.Fprintf(streams.Errors, "cohere-dev: %s\n", swiftRefusal)
-		return "", 1
+	if code := job.nameSwiftResolved(); code != 0 {
+		return "", code
 	}
 	job.commits, job.subject = commits, subject
 	return subject + ", " + shortCommit(job.candidate) + " merged onto main at " + shortCommit(job.running) + " as " +
@@ -590,10 +564,9 @@ func (job *integrateJobRun) preflight() (string, int) {
 
 // fillPreflight is a fill's first step: the commit the job runs at reached in the mirrors as a merge is (reachMerge),
 // and of integrateJobPreflight's checks the one that reads only the tree, its submodules recorded as gitlinks
-// (checkGitlinks). The rest judge a candidate, and a fill has none,
-// main's tip being already landed: the merge's two parents, main holding the candidate (heldByMain), the commits'
-// subjects and their task, the landing's subject and --message, and the Swift guard, which reads what a merge changes
-// against main (integrateJobSwiftRefusal).
+// (checkGitlinks), and the laid set its tests build cohere-swift from (nameSwiftResolved). The rest judge a candidate,
+// and a fill has none, main's tip being already landed: the merge's two parents, main holding the candidate
+// (heldByMain), the commits' subjects and their task, and the landing's subject and --message.
 func (job *integrateJobRun) fillPreflight() (string, int) {
 	if code := job.reachMerge(); code != 0 {
 		return "", code
@@ -602,20 +575,100 @@ func (job *integrateJobRun) fillPreflight() (string, int) {
 		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", checkGitlinksError)
 		return "", 1
 	}
+	if code := job.nameSwiftResolved(); code != 0 {
+		return "", code
+	}
 	return "main at " + shortCommit(job.merge) + ", no candidate to judge", 0
 }
 
-// reachMerge lays the integrate job's mirrors, borrowing the house's, waits for what it judges, the merge or a fill's
-// commit, to reach them (awaitMerge), keeps it on a ref of the job's own, so the tree laid from it is never left
-// dangling, and reads its tree.
+// swiftResolvedFile is the file of a tree whose bytes name the laid resolved set its Swift package builds from.
+const swiftResolvedFile = "swift_language/Package.resolved"
+
+// nameSwiftResolved finds the laid resolved set of cohere-swift's packages for what the job judges, the directory
+// under integrateJobSwiftResolvedRoot named by the sha256 of its swiftResolvedFile, and names it in
+// release.SwiftResolvedVariable for every child the job starts after: the measurement, the tests' script and the
+// checks, cohere on the tree among them. Each SwiftPM build of theirs then builds offline from it
+// (release.SwiftResolvedArguments), which is how Swift is checked in a sandbox with no network. The bytes hashed are
+// the blob, the ones the lay checks out, every text file LF in git and in the tree alike (.gitattributes). A tree with
+// no such file has no Swift package to build, and names none. A set that isn't laid is refused naming the sha: the lay
+// is Machines' to make (#je1r32a), which is the road's to fix and never a red of what the job judges.
+func (job *integrateJobRun) nameSwiftResolved() int {
+	judged := map[bool]string{false: "merge", true: "commit"}[job.options.Fill]
+	// Ignored: a tree with no swiftResolvedFile has no Swift package to build, and the read below says why it failed if
+	// one is there.
+	if blob, _ := gitOutput(job.repository, "rev-parse", "--verify", "--quiet",
+		job.merge+":"+swiftResolvedFile); blob == "" {
+		return 0
+	}
+	// Read whole, never through gitOutput, which trims what it reads, so the hash is of the file's own bytes.
+	reading := exec.Command("git", "cat-file", "blob", job.merge+":"+swiftResolvedFile)
+	reading.Dir = job.repository
+	var readingErrors bytes.Buffer
+	reading.Stderr = &readingErrors
+	contents, readError := reading.Output()
+	if readError != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: reading the %s's %s: %v: %s\n", judged, swiftResolvedFile, readError,
+			strings.TrimSpace(readingErrors.String()))
+		return 1
+	}
+	digest := sha256.Sum256(contents)
+	sha := hex.EncodeToString(digest[:])
+	set := filepath.Join(settingOr(integrateJobSwiftResolvedVariable, integrateJobSwiftResolvedRoot), sha)
+	if information, statError := os.Stat(filepath.Join(set, "scratch", "checkouts")); statError != nil ||
+		!information.IsDir() {
+		fmt.Fprintf(streams.Errors, "cohere-dev: no resolved set of cohere-swift's packages is laid at %s for the "+
+			"%s's %s, sha256 %s, so its Swift can't be built offline here: Machines' lay owes it (#je1r32a), which is "+
+			"the road's to fix and never a red of this %s\n", set, judged, swiftResolvedFile, sha, judged)
+		return 1
+	}
+	if setError := os.Setenv(release.SwiftResolvedVariable, set); setError != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: naming the laid set %s in %s for the integrate job's children: %v\n",
+			set, release.SwiftResolvedVariable, setError)
+		return 1
+	}
+	fmt.Fprintf(streams.Errors, "cohere-dev: integrate-job builds cohere-swift from the laid set %s\n", set)
+	return 0
+}
+
+// reachMerge lays the integrate job's mirrors, borrowing the history Loom's runner laid for the job first
+// (layIntegrateJobMirrors), carries the history's shallow file, refuses unless the history itself holds what it judges,
+// the merge or a fill's commit, keeps it on a ref of the job's own, so the tree laid from it is never left dangling,
+// and reads its tree.
 func (job *integrateJobRun) reachMerge() int {
-	if layError := layIntegrateJobMirrors(filepath.Join(job.mirror, "objects"), job.mirrors,
-		[]string{filepath.Join(filepath.Dir(job.mirror), "TypeScript.git", "objects")}); layError != nil {
+	// TypeScript borrows the history's moved pin and the job's own laid TypeScript, main's pin, and only when the job's
+	// own can't be found the house's mirror, for deeafbf4's pin (integrateJobHouseMirrors).
+	house := settingOr(integrateJobHouseMirrorsVariable, integrateJobHouseMirrors)
+	typeScriptObjects := []string{filepath.Join(job.history, "TypeScript.git", "objects")}
+	laid, laidError := laidTypeScriptObjects(job.directory)
+	if laidError != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: reading the job's own laid TypeScript: %v\n", laidError)
+		return 1
+	}
+	if laid == "" {
+		laid = filepath.Join(house, "TypeScript.git", "objects")
+	}
+	typeScriptObjects = append(typeScriptObjects, laid)
+	if layError := layIntegrateJobMirrors(job.mirrors, []string{filepath.Join(job.history, "cohere.git", "objects"),
+		filepath.Join(house, "cohere.git", "objects")}, typeScriptObjects); layError != nil {
 		fmt.Fprintf(streams.Errors, "cohere-dev: laying the integrate job's mirrors in %s: %v\n", job.mirrors, layError)
 		return 1
 	}
-	if code := job.awaitMerge(); code != 0 {
-		return code
+	if shallowError := carryShallow(filepath.Join(job.history, "cohere.git"), filepath.Join(job.mirrors,
+		"cohere.git")); shallowError != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: carrying the history's shallow file: %v\n", shallowError)
+		return 1
+	}
+	// What it judges is checked in the history itself, never through the job's repository, whose house objects could
+	// vouch for a commit the runner never laid. The history is root's, and git refuses another owner's repository
+	// unless safe.directory names it, as it is named here, symlinks resolved as git resolves the path.
+	if _, lookError := job.historyGit("cat-file", "-e", job.merge+"^{commit}"); lookError != nil {
+		judged := "merge " + job.merge + " of two parents"
+		if job.options.Fill {
+			judged = "commit " + job.merge
+		}
+		fmt.Fprintf(streams.Errors, "cohere-dev: %s holds no %s (%v)\n", filepath.Join(job.history, "cohere.git"),
+			judged, lookError)
+		return 1
 	}
 	if _, updateError := gitOutput(
 		job.repository,
@@ -633,6 +686,17 @@ func (job *integrateJobRun) reachMerge() int {
 	}
 	job.mergeTree = mergeTree
 	return 0
+}
+
+// historyGit runs git in the job's history, its cohere.git, which is root's: git refuses another owner's repository
+// unless safe.directory names it, so it is named for this one call, symlinks resolved as git resolves the path.
+func (job *integrateJobRun) historyGit(arguments ...string) (string, error) {
+	history := filepath.Join(job.history, "cohere.git")
+	trusted := history
+	if resolved, resolveError := filepath.EvalSymlinks(history); resolveError == nil {
+		trusted = resolved
+	}
+	return gitOutput(history, append([]string{"-c", "safe.directory=" + trusted}, arguments...)...)
 }
 
 // integrateJobPreflight is the integrate job's first step, every refusal it can make without a gate, in seconds: what
@@ -752,46 +816,8 @@ func pullRequestTitle(message string, task string) (string, string) {
 	return title, ""
 }
 
-// integrateJobSwiftDirectories are the packages whose Swift files integrateJobSwiftRefusal refuses: command/cohere runs
-// cohere-swift, and release's dispatch and packaging build it.
-var integrateJobSwiftDirectories = []string{
-	"command/cohere/",
-	"internal/release/dispatch/",
-	"internal/release/packaging/",
-}
-
-// integrateJobSwiftRefusal is why the integrate job refuses merge, read from repository, for what it changes against
-// its first parent that only Swift's checks judge, empty when it changes none of it: any path under swift_language/,
-// the Swift package, and the Swift files of the packages that run cohere-swift or build it, swift.go and swift_*.go in
-// integrateJobSwiftDirectories, whose tests that build it skip in an integrate job (needs.SwiftLaid). Until Machines
-// lays Swift on Shackler (#je1r32a) no integrate job checks them, so a change to them is never integrated unchecked.
-// Renames are read as a removal and an addition, so a file moved out of the package is still the package's change.
-func integrateJobSwiftRefusal(repository string, merge string) (string, error) {
-	changed, diffError := gitOutput(repository, "diff", "--name-only", "--no-renames", merge+"^1", merge)
-	if diffError != nil {
-		return "", fmt.Errorf("reading what the merge %s changes: %w", shortCommit(merge), diffError)
-	}
-	swift := []string{}
-	for _, changedPath := range strings.Split(changed, "\n") {
-		directory, name := path.Split(changedPath)
-		swiftFile := (name == "swift.go" || strings.HasPrefix(name, "swift_")) && strings.HasSuffix(name, ".go")
-		if strings.HasPrefix(changedPath, "swift_language/") ||
-			(swiftFile && slices.Contains(integrateJobSwiftDirectories, directory)) {
-			swift = append(swift, changedPath)
-		}
-	}
-	if len(swift) == 0 {
-		return "", nil
-	}
-	return fmt.Sprintf(
-		"%s, so the merge's change to %s can't be judged here, and nothing integrates",
-		needs.SwiftUnlaid,
-		strings.Join(swift, ", "),
-	), nil
-}
-
-// lay checks the merge's tree out under the integrate job's scratch, a worktree of its mirror kept across jobs, with
-// its TypeScript at the pin it records.
+// lay checks the merge's tree out under the integrate job's scratch, a worktree of its own cohere.git, borrowing the
+// history, kept across jobs, with its TypeScript at the pin it records.
 func (job *integrateJobRun) lay() (string, int) {
 	if _, statError := os.Stat(filepath.Join(job.tree, ".git")); statError != nil {
 		// Ignored: a prune with nothing to prune says nothing, and the add below says why it failed if it does.
@@ -825,7 +851,29 @@ func (job *integrateJobRun) lay() (string, int) {
 		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", checkSubmodulesError)
 		return "", 1
 	}
-	return shortCommit(job.merge) + " at " + job.tree, 0
+	// Every tracked file's time is its content's (stampTreeTimes), so a test whose inputs this merge didn't change
+	// replays from the Go cache in a job that laid the tree fresh, as each does (#e94a6r4).
+	stamped := []string{job.tree}
+	if pin != "" {
+		stamped = append(stamped, filepath.Join(job.tree, "TypeScript"))
+	}
+	left := []string{}
+	for _, tree := range stamped {
+		unstamped, stampError := stampTreeTimes(tree)
+		if stampError != nil {
+			fmt.Fprintf(streams.Errors, "cohere-dev: stamping %s's times by content: %v\n", tree, stampError)
+			return "", 1
+		}
+		for _, path := range unstamped {
+			left = append(left, filepath.Join(tree, path))
+		}
+	}
+	said := shortCommit(job.merge) + " at " + job.tree + ", its times by content"
+	if len(left) > 0 {
+		said += fmt.Sprintf(" but for %d that differ from its HEAD, left their own: %s", len(left),
+			strings.Join(left, ", "))
+	}
+	return said, 0
 }
 
 // layTypeScript checks tree's TypeScript out at pin, a worktree of the integrate job's TypeScript mirror kept across
@@ -848,12 +896,33 @@ func layTypeScript(mirror string, tree string, pin string) error {
 	return nil
 }
 
+// carryShallow copies history's shallow file, where its commits stop (Machines' layout on #tbtmxpd), into repository,
+// the job's own cohere.git, which borrows the history's objects: without it a fetch of the merge out of repository
+// walks past the history's end into main's parents, which no object here holds. A history with none leaves repository
+// with none either, so a shallow file an earlier job left in the kept repository never outlives the history it came
+// from.
+func carryShallow(history string, repository string) error {
+	shallow, readError := os.ReadFile(filepath.Join(history, "shallow"))
+	if errors.Is(readError, fs.ErrNotExist) {
+		if removeError := os.Remove(filepath.Join(repository, "shallow")); removeError != nil &&
+			!errors.Is(removeError, fs.ErrNotExist) {
+			return removeError
+		}
+		return nil
+	}
+	if readError != nil {
+		return readError
+	}
+	return os.WriteFile(filepath.Join(repository, "shallow"), shallow, 0o644)
+}
+
 // layIntegrateJobMirrors makes the mirrors the integrate job's scripts read in place of the house's (macBoxMirrors), in
-// directory: cohere.git, a bare repository borrowing cohereObjects, the cohere mirror's, through git's alternates, and
-// TypeScript.git, borrowing each of typeScriptObjects that exists. Nothing is copied. Both are kept across jobs, and
-// each job writes their borrowing anew.
-func layIntegrateJobMirrors(cohereObjects string, directory string, typeScriptObjects []string) error {
-	for name, objects := range map[string][]string{"cohere.git": {cohereObjects}, "TypeScript.git": typeScriptObjects} {
+// directory: cohere.git, a bare repository borrowing each of cohereObjects that exists, in order, through git's
+// alternates, and TypeScript.git, borrowing each of typeScriptObjects that exists. Nothing is copied. Both are kept
+// across jobs, and each job writes their borrowing anew. The history is the job's and read-only to it, so the scripts
+// fetch and lay from these, which the job owns, and never from the history itself.
+func layIntegrateJobMirrors(directory string, cohereObjects []string, typeScriptObjects []string) error {
+	for name, objects := range map[string][]string{"cohere.git": cohereObjects, "TypeScript.git": typeScriptObjects} {
 		repository := filepath.Join(directory, name)
 		if _, statError := os.Stat(filepath.Join(repository, "HEAD")); statError != nil {
 			if makeError := os.MkdirAll(directory, 0o755); makeError != nil {
@@ -870,7 +939,7 @@ func layIntegrateJobMirrors(cohereObjects string, directory string, typeScriptOb
 			}
 		}
 		if name == "cohere.git" && len(existing) == 0 {
-			return fmt.Errorf("there is no cohere mirror at %s", filepath.Dir(cohereObjects))
+			return fmt.Errorf("there are no cohere objects to borrow at %s", strings.Join(cohereObjects, " or "))
 		}
 		alternates := filepath.Join(repository, "objects", "info", "alternates")
 		if makeError := os.MkdirAll(filepath.Dir(alternates), 0o755); makeError != nil {
@@ -885,6 +954,50 @@ func layIntegrateJobMirrors(cohereObjects string, directory string, typeScriptOb
 		}
 	}
 	return nil
+}
+
+// laidTypeScriptObjects is the objects directory of the TypeScript the runner laid in the job's own tree, directory,
+// at main's pin, or empty when it laid none there. Its `.git` is read as git reads it, a directory or a file naming
+// one (`gitdir: <path>`, relative to the checkout), and the common directory a `commondir` names, without running a
+// git there: the checkout may be another account's, which git would refuse as dubious.
+func laidTypeScriptObjects(directory string) (string, error) {
+	checkout := filepath.Join(directory, "TypeScript")
+	dotGit := filepath.Join(checkout, ".git")
+	information, statError := os.Stat(dotGit)
+	if errors.Is(statError, os.ErrNotExist) {
+		return "", nil
+	}
+	if statError != nil {
+		return "", statError
+	}
+	gitDirectory := dotGit
+	if !information.IsDir() {
+		contents, readError := os.ReadFile(dotGit)
+		if readError != nil {
+			return "", readError
+		}
+		named, found := strings.CutPrefix(strings.TrimSpace(string(contents)), "gitdir: ")
+		if !found || named == "" {
+			return "", fmt.Errorf("%s names no git directory", dotGit)
+		}
+		gitDirectory = named
+		if !filepath.IsAbs(gitDirectory) {
+			gitDirectory = filepath.Join(checkout, gitDirectory)
+		}
+	}
+	common := gitDirectory
+	// Ignored: a git directory with no commondir is its own common directory.
+	if named, readError := os.ReadFile(filepath.Join(gitDirectory, "commondir")); readError == nil {
+		common = strings.TrimSpace(string(named))
+		if !filepath.IsAbs(common) {
+			common = filepath.Join(gitDirectory, common)
+		}
+	}
+	objects := filepath.Clean(filepath.Join(common, "objects"))
+	if objectsInformation, objectsError := os.Stat(objects); objectsError != nil || !objectsInformation.IsDir() {
+		return "", fmt.Errorf("%s's git directory holds no objects at %s", checkout, objects)
+	}
+	return objects, nil
 }
 
 // measure measures the merge here, before any test runs (#6ex523f): performanceScript, handed main's binary's sha256
@@ -1048,8 +1161,8 @@ func (job *integrateJobRun) landingLines() (string, error) {
 		}
 		performance = base64.StdEncoding.EncodeToString(contents)
 	}
-	gated := fmt.Sprintf("Gated by cohere-dev integrate-job on %s in %s: %s. %s.", integrateJobBox,
-		time.Since(job.started).Round(time.Second), strings.Join(job.ran, ", "), needs.SwiftUnlaid)
+	gated := fmt.Sprintf("Gated by cohere-dev integrate-job on %s in %s: %s.", integrateJobBox,
+		time.Since(job.started).Round(time.Second), strings.Join(job.ran, ", "))
 	account := gated + "\n\n" + job.measured + "\n\nSteps: " + strings.Join(job.steps, ", ") + "."
 	message := landingMessage(job.subject, "", job.candidate, job.running, job.commits, account, "")
 	fmt.Fprintf(&lines, "%sperformance %s\n", integrateJobMarker, performance)
@@ -1059,6 +1172,14 @@ func (job *integrateJobRun) landingLines() (string, error) {
 	fmt.Fprintf(&lines, "integrated %s\n", job.integratedTree)
 	return lines.String(), nil
 }
+
+// fillIsolatesNothing is why a fill skips the unit isolation, which isolates the rules a merge changes against main,
+// its first parent: a fill judges main's tip itself and changes nothing of its own, and the tip it runs at was
+// isolated when it landed. Loom's runner lays a fill's history shallow at the tip, so the tip has no first parent there
+// to read, and reading one refused every fill's checks (J-kexdjp4, #e94a6r4). A candidate's merge always has its first
+// parent, main, in its history, since the preflight refuses a merge whose first parent isn't the commit the job runs
+// at.
+const fillIsolatesNothing = "a fill judges main's own tip, which changes nothing of its own"
 
 // checks runs the gate's other checks here, each through the gate's own function and in its environment: go vet, the
 // rule CPU budget, the unit isolation of the rules the landing changes, the docs data, replayed when its inputs match a
@@ -1092,6 +1213,10 @@ func (job *integrateJobRun) checks(share func(string) []string) (string, int) {
 			return code, map[bool]string{true: "the rule CPU budget"}[ran]
 		}},
 		{"isolation", func() (int, string) {
+			if job.options.Fill {
+				job.say("isolation skipped: %s", fillIsolatesNothing)
+				return 0, ""
+			}
 			code, ran, said := checkUnitIsolation(job.tree, job.merge,
 				func() []string { return gateEnvironment(share("the unit isolation")) })
 			return code, map[bool]string{true: said}[ran]
@@ -1106,7 +1231,7 @@ func (job *integrateJobRun) checks(share func(string) []string) (string, int) {
 				})
 		}},
 		{"self-check", func() (int, string) {
-			code, ran := checkCohere(job.tree, integrateJobCohereArguments,
+			code, ran := checkCohere(job.tree, gateCohereArguments,
 				func() []string { return gateEnvironment(share("building cohere")) },
 				func() []string { return gateEnvironment(share("cohere on the tree")) })
 			return code, map[bool]string{true: "cohere on the tree, 0 findings and no gaps"}[ran]

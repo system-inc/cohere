@@ -88,17 +88,15 @@ var gapRootResolutionCases = map[string]bool{
 	// present because those two do parse functionally, which is a difference between the four that
 	// is worth having measured rather than assumed.
 
-	// `block`, `inline` and `flex` are deliberately absent. Tailwind compiles all three, and it
-	// compiles them as `staticUtility` registrations rather than through any functional path:
-	// utilities.ts:956 and :958 register `display: block` and `display: inline` directly. The
-	// descriptor extractor probed them as functional roots, which
-	// TestGapRootExemptionsAreExactlyTheStaticCollision already records as the one place these two
-	// registration kinds collide.
+	// The bare `flex` is deliberately absent. Tailwind compiles it as the `staticUtility` at
+	// utilities.ts:973 declaring `display: flex`, and the functional root refuses an empty value,
+	// which TestGapRootExemptionsAreExactlyTheStaticCollision records as the one place the two
+	// registration kinds collide in this slice.
 	//
-	// So a functional description refusing them is correct rather than a gap, and a caller must ask
-	// the static table before this one. Listing them here as `true` would make the description claim
-	// something it does not do, and as `false` would claim Tailwind refuses them, and both are
-	// worse than saying why they are not cases.
+	// So a functional description refusing it is correct rather than a gap, and a caller must ask
+	// the static table before this one. Listing it here as `true` would make the description claim
+	// something it does not do, and as `false` would claim Tailwind refuses it, and both are worse
+	// than saying why it is not a case.
 
 	// The negative spellings, which resolve exactly as their positive roots do.
 	"scale-75": true, "-scale-75": true, "rotate-45": true, "-rotate-45": true,

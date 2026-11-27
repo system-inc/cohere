@@ -1,0 +1,3 @@
+source 004573068e6da50ce74850caaf59acc18a19608f47ea61a848e55fc1758140e9
+exit 1
+stderr TypeError: Cannot read properties of undefined (reading 'toUpperCase')

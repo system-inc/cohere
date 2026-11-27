@@ -270,18 +270,18 @@ func TestSwiftRunRendersEachContractFixture(test *testing.T) {
 			"  not checked for unused imports: 1 files (it has #if, and the index describes only the configuration the build compiled)\n",
 			"  not checked for unused imports: 1 files (the build has not compiled it as it stands)\n",
 			"  never reported: 1 imports (re-exported with @_exported, which is API)\n",
-			// The second rule's section, from a real run on ahraos-presence: its own heading and count, its
-			// items, and its own coverage lines, every skip reason by name.
+			// The second rule's section, written in the shape cohere-swift's records take: its own heading and
+			// count, its items, and its own coverage lines, every skip reason the rule has, each by name.
 			"\n  declarations nothing uses \u2014 2\n",
-			"    /project/Sources/AhraOSPresence/Stage/StagePane+HandTouchProbe.swift:42:13 \u2014 var deepestAt\n",
-			"    /project/Sources/AhraOSPresence/Studio/Panels/VariantsMenuProbe.swift:349:25 \u2014 func after(_:_:)\n",
-			"  looked at 1092 files and 4311 declarations (cohere-swift/correctness-no-unused-declaration)\n",
-			"  not checked for unused declarations: 156 files (it has #if, and the index describes only the configuration the build compiled)\n",
-			"  never reported: 358 declarations (a stored property of a type whose conformances may read every stored property (Codable))\n",
-			"  never reported: 175 declarations (an override or a protocol witness, reached through what it overrides)\n",
-			"  never reported: 23 declarations (reached by the Objective-C runtime (@objc, @IBAction, @IBOutlet, @NSManaged, dynamic))\n",
+			"    /project/Sources/Example/Report.swift:31:18 \u2014 func padded(_:_:)\n",
+			"    /project/Sources/Example/Tally.swift:14:17 \u2014 var lastReset\n",
+			"  looked at 3 files and 41 declarations (cohere-swift/correctness-no-unused-declaration)\n",
+			"  not checked for unused declarations: 1 files (it has #if, and the index describes only the configuration the build compiled)\n",
+			"  never reported: 6 declarations (a stored property of a type whose conformances may read every stored property (Codable))\n",
+			"  never reported: 3 declarations (an override or a protocol witness, reached through what it overrides)\n",
+			"  never reported: 1 declarations (reached by the Objective-C runtime (@objc, @IBAction, @IBOutlet, @NSManaged, dynamic))\n",
 		)
-		forbidLines(test, output, "did not check everything", "Main.swift:1:1 - ", "deepestAt - ")
+		forbidLines(test, output, "did not check everything", "Main.swift:1:1 - ", "lastReset - ")
 		if strings.Index(output, "imports nothing uses") < strings.Index(output, "lint: ") {
 			test.Errorf("the unused report printed before the lint line:\n%s", output)
 		}

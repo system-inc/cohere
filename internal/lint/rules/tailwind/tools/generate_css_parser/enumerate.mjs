@@ -154,9 +154,9 @@ function serializeNode(node) {
 }
 
 /*
- * The corpus. Hand-written stylesheets covering each branch of the character loop, then every real
+ * The corpus. Hand-written stylesheets covering each branch of the character loop, then every whole
  * stylesheet named on the command line, so the suite carries both the constructed edge cases and
- * the actual repository input the exit criterion names.
+ * files shaped like a project's theme, where the branches meet each other in one long input.
  */
 const syntheticCases = [
     ['empty', ''],
@@ -317,12 +317,16 @@ for(const [name, input] of errorInputs) {
 }
 
 /*
- * Real stylesheets. The exit criterion is that the port reproduces what the engine sees for an
- * actual repository's theme and its whole @import graph, not for constructed examples.
+ * Whole stylesheets, written in cohere for a made-up product and kept in
+ * collapse/testdata/cssparser_corpus. They are what a project's theme looks like end to end (an
+ * entry file and its @import graph, a long @theme block, @utility and @keyframes files) rather
+ * than one construct per input, so the port is checked where the branches meet: an empty block
+ * closing at the top level, a comment ending a line inside a value, non-ASCII bytes outside a
+ * string. Each entry's path is read relative to the list itself, so the generator gives the same
+ * corpus from any working directory.
  */
-const realFiles = corpusPathArgument
-    ? JSON.parse(NodeFileSystem.readFileSync(NodePath.resolve(corpusPathArgument), 'utf8'))
-    : [];
+const corpusPath = corpusPathArgument ? NodePath.resolve(corpusPathArgument) : null;
+const corpusFiles = corpusPath ? JSON.parse(NodeFileSystem.readFileSync(corpusPath, 'utf8')) : [];
 
 let themeEntryCount = 0;
 let utilityBlockCount = 0;
@@ -343,11 +347,11 @@ function countAtRules(nodes) {
     }
 }
 
-for(const entry of realFiles) {
-    const content = NodeFileSystem.readFileSync(entry.path, 'utf8');
+for(const entry of corpusFiles) {
+    const content = NodeFileSystem.readFileSync(NodePath.resolve(NodePath.dirname(corpusPath), entry.path), 'utf8');
     const nodes = parse(content).map(serializeNode);
     countAtRules(nodes);
-    cases.push({ name: entry.name, source: 'repository', input: content, nodes });
+    cases.push({ name: entry.name, source: 'stylesheet', input: content, nodes });
 }
 
 process.stdout.write(
@@ -356,7 +360,7 @@ process.stdout.write(
             tailwindVersion: packageJson.version,
             parseExportName,
             parseResolvedByIdentity: true,
-            stylesheetCount: realFiles.length,
+            stylesheetCount: corpusFiles.length,
             themeEntryCount,
             utilityBlockCount,
             customVariantCount,

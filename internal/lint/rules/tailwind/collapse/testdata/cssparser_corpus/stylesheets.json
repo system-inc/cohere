@@ -1,0 +1,6 @@
+[
+  { "name": "cssparser_corpus/app.css", "path": "app.css" },
+  { "name": "cssparser_corpus/tokens.css", "path": "tokens.css" },
+  { "name": "cssparser_corpus/utilities.css", "path": "utilities.css" },
+  { "name": "cssparser_corpus/motion.css", "path": "motion.css" }
+]

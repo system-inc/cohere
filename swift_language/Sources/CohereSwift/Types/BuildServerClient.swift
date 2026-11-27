@@ -42,6 +42,8 @@ final class BuildServerClient {
         var timeouts = Timeouts()
         /* The environment the server's is made from (`environment(inheriting:workingDirectory:)`): this process's, unless a test hands another. */
         var inherited = ProcessInfo.processInfo.environment
+        /* The laid set `COHERE_SWIFT_RESOLVED` names, whose options the server starts with: this process's, unless a test hands another. */
+        var laidResolvedSet = LaidResolvedSet.process
     }
 
     /*
@@ -176,18 +178,13 @@ final class BuildServerClient {
     /* Starts the server. Nothing is asked of it until `initialize`. */
     init(configuration: Configuration) throws(Failure) {
         self.configuration = configuration
-        var arguments = ["swift", "package", "--package-path", configuration.packageRoot.path]
-        arguments += ["--scratch-path", configuration.scratchPath.path]
-        if let triple = configuration.triple {
-            arguments += ["--triple", triple]
+        let arguments: [String]
+        do throws(LaidResolvedSet.Failure) {
+            arguments = try Self.launchArguments(configuration)
         }
-        if let sdk = configuration.sdk {
-            arguments += ["--sdk", sdk]
+        catch {
+            throw Failure(step: .launch, reason: .unusable(error.description))
         }
-        if !configuration.resolutionAllowed {
-            arguments.append("--disable-automatic-resolution")
-        }
-        arguments.append("experimental-build-server")
 
         let inputPipe = Pipe()
         let outputPipe = Pipe()
@@ -218,6 +215,27 @@ final class BuildServerClient {
             throw Failure(step: .launch, reason: .unusable("\(arguments.joined(separator: " ")): \(error)"))
         }
         Self.startReading(outputPipe.fileHandleForReading, into: inbox)
+    }
+
+    /* The command that starts the server, `/usr/bin/env` its runner. Apart from starting it, so a test can read the list. */
+    static func launchArguments(_ configuration: Configuration) throws(LaidResolvedSet.Failure) -> [String] {
+        var arguments = ["swift", "package", "--package-path", configuration.packageRoot.path]
+        arguments += ["--scratch-path", configuration.scratchPath.path]
+        if let triple = configuration.triple {
+            arguments += ["--triple", triple]
+        }
+        if let sdk = configuration.sdk {
+            arguments += ["--sdk", sdk]
+        }
+        if !configuration.resolutionAllowed {
+            arguments.append("--disable-automatic-resolution")
+        }
+        arguments += try configuration.laidResolvedSet.swiftPackageOptions(
+            packageRoot: configuration.packageRoot,
+            scratchPath: configuration.scratchPath,
+        )
+        arguments.append("experimental-build-server")
+        return arguments
     }
 
     /*

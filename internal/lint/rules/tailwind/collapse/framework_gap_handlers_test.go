@@ -6,15 +6,15 @@ import (
 	"testing"
 )
 
-// gapRoots is the 57 roots this slice ports, named rather than derived from the emitter map.
+// gapRoots is the 55 roots this slice ports, named rather than derived from the emitter map.
 //
 // Written out so that a root silently dropped from `gapEmitters` fails rather than shrinking the
 // population this test measures. That failure mode is the one this package keeps finding: a
 // measurement over the wrong population reads exactly like a passing one.
 var gapRoots = []string{
-	"backdrop-filter", "bg", "bg-conic", "bg-radial", "block", "border", "border-b", "border-be",
+	"backdrop-filter", "bg", "bg-conic", "bg-radial", "border", "border-b", "border-be",
 	"border-bs", "border-e", "border-l", "border-r", "border-s", "border-t", "border-x", "border-y",
-	"decoration", "drop-shadow", "duration", "fill", "filter", "flex", "font", "inline",
+	"decoration", "drop-shadow", "duration", "fill", "filter", "flex", "font",
 	"inset-ring", "inset-shadow", "mask", "outline", "ring", "rotate", "scale", "shadow", "stroke",
 	"text", "text-shadow", "transform",
 	"mask-b-from", "mask-b-to", "mask-conic-from", "mask-conic-to", "mask-l-from", "mask-l-to",
@@ -129,39 +129,26 @@ func gapProbesFor(descriptor *Descriptor) []gapProbe {
 // written for `shadow`, `inset-shadow`, `drop-shadow`, `text-shadow`, `text` and `font` were all
 // true of some cell of those roots and true of none of the cells that were being skipped.
 //
-// So the nine that remain are the whole exemption, and they are one fact rather than nine.
+// So the one that remains is the whole exemption.
 //
-// Three roots have a `staticUtility` sharing a name with a functional root or standing where one
-// would be, all three declaring `display`: `staticUtility('block', ...)` at line 956,
-// `staticUtility('inline', ...)` at 958 and `staticUtility('flex', ...)` at 973. The extractor
-// probed all three as functional roots, so their rows record the static utility's reading for the
-// form the static answers.
+// `flex` is a `staticUtility` declaring `display` at utilities.ts:973 and a functional root beside
+// it. The extractor probed the bare class as the functional root, so the row's `Empty` records the
+// static utility's reading, while the functional body refuses an empty value and answers every
+// value form, which is compared like any other root's.
 //
-// `block` and `inline` have no functional registration at all, so all four of their measurable
-// cells record the static and the emitter correctly produces nothing for each. `flex` does have one,
-// which answers every value form and refuses the empty one, so exactly one of its cells is the
-// static's and the rest are compared like any other root's.
+// `block` and `inline` share a name with a `display` static the same way and have a measured row,
+// but they are not gap roots: utilities.ts:1147 and :1150 register them through `spacingUtility`
+// beside `min-inline` and `max-block`, so they are in the multi-declaration slice, and
+// TestBlockAndInlineAreDisplayStaticsAndSizingRoots compares their rows against it.
 //
-// In every case the emitter returning nothing is the correct answer to a question the row is not
-// asking.
-//
-// See TestBlockAndInlineHaveNoFunctionalRegistration, which pins that reading rather than restating
-// it here, and TestGapRootExemptionsAreExactlyTheStaticCollision, which fails if this map grows.
+// TestGapRootExemptionsAreExactlyTheStaticCollision fails if this map grows.
 var gapCellsMeasuredElsewhere = map[string]string{
-	"block.Absent.ByNamespace[@none]":  "no functional registration; the row records the static display utility",
-	"block.Absent.Empty":               "no functional registration; the row records the static display utility",
-	"block.Alpha.ByNamespace[@none]":   "no functional registration; the row records the static display utility",
-	"inline.Absent.ByNamespace[@none]": "no functional registration; the row records the static display utility",
-	"inline.Absent.Empty":              "no functional registration; the row records the static display utility",
-	"inline.Alpha.ByNamespace[@none]":  "no functional registration; the row records the static display utility",
-	"flex.Absent.Empty":                "the functional root refuses an empty value; the row records the static display utility",
-	"block.Absent.Fallback":            "no functional registration; the row records the static display utility",
-	"inline.Absent.Fallback":           "no functional registration; the row records the static display utility",
+	"flex.Absent.Empty": "the functional root refuses an empty value; the row records the static display utility",
 }
 
 // TestGapRootEmittersAgreeWithTheirMeasuredReadings is the acceptance test for this slice.
 //
-// Every one of the 57 roots has a `baseDescriptors` row carrying a measured `{order, count}` per
+// Every one of the 55 roots has a `baseDescriptors` row carrying a measured `{order, count}` per
 // value type, produced by asking Tailwind rather than by reading the source. Every root now also
 // has an emitter transcribed from `utilities.ts`. The two were produced by different means from
 // different sources, so forcing them to agree cell for cell is a real comparison.
@@ -224,9 +211,9 @@ func TestGapRootEmittersAgreeWithTheirMeasuredReadings(test *testing.T) {
 	test.Logf("gap handles: %d roots in this slice, %d cells compared, %d agreed, %d unported, %d disagreed",
 		len(gapRoots), compared, agreed, len(unported), len(disagreements))
 
-	if len(gapRoots) != 57 {
+	if len(gapRoots) != 55 {
 		test.Errorf(
-			"this slice lists %d roots and the assertions below were sized for 57; the population moved",
+			"this slice lists %d roots and the assertions below were sized for 55; the population moved",
 			len(gapRoots),
 		)
 	}
@@ -273,7 +260,7 @@ func TestEveryGapRootHasAnEmitter(test *testing.T) {
 	}
 	sort.Strings(missing)
 	for _, root := range missing {
-		test.Errorf("%s is one of the 57 and has no entry in gapEmitters", root)
+		test.Errorf("%s is one of the 55 and has no entry in gapEmitters", root)
 	}
 
 	// And the reverse. An emitter for a root outside this slice would be a body nothing compares
@@ -285,7 +272,7 @@ func TestEveryGapRootHasAnEmitter(test *testing.T) {
 	for root := range gapEmitters {
 		if !inSlice[root] {
 			test.Errorf(
-				"gapEmitters carries %s, which is not one of the 57 this slice ports and which no test compares",
+				"gapEmitters carries %s, which is not one of the 55 this slice ports and which no test compares",
 				root,
 			)
 		}
@@ -375,48 +362,107 @@ func TestObjectRootAndItsStaticsDeclareDifferentProperties(test *testing.T) {
 	}
 }
 
-// TestBlockAndInlineHaveNoFunctionalRegistration records why two of the 57 emit nothing.
+// TestBlockAndInlineAreDisplayStaticsAndSizingRoots pins both registrations each name carries.
 //
-// `block` and `inline` have a `baseDescriptors` row, which is what put them in this slice, and no
-// functional registration in `utilities.ts` at all: both are `staticUtility` calls declaring
-// `display`. So their row's `Empty` reading is the static utility's, and the value-form readings in
-// it are the extractor probing a root that does not answer.
+// utilities.ts registers `block` and `inline` twice at the v4.3.3 tag: as a `staticUtility`
+// declaring `display` (lines 956 and 958) and as a `spacingUtility` declaring `block-size` and
+// `inline-size` (lines 1147 and 1150), in the same loop as `min-inline` and `max-block`. The port
+// once read only the first, so `inline-72` was reported unknown and every class list holding one was
+// misordered.
 //
-// The emitter returning nil is therefore correct rather than unported, and this test is what keeps
-// that distinction from being read as a gap.
-func TestBlockAndInlineHaveNoFunctionalRegistration(test *testing.T) {
+// The measured `baseDescriptors` row is the independent side. The extractor asked Tailwind for every
+// value form of each root, so the row's value cells are the functional root's reading and its
+// `Empty` is the static's, and the ported table and emitter are held to both.
+func TestBlockAndInlineAreDisplayStaticsAndSizingRoots(test *testing.T) {
 	test.Parallel()
-	for _, root := range []string{"block", "inline"} {
-		emitted := EmitGapRoot(root, UtilityBranch{HasValue: true})
-		if len(emitted) != 0 {
+	for _, registration := range []struct {
+		root      string
+		property  string
+		themeKeys []string
+	}{
+		{root: "block", property: "block-size", themeKeys: []string{"--spacing"}},
+		{root: "inline", property: "inline-size", themeKeys: []string{"--spacing", "--container"}},
+	} {
+		// The static form still reads display, which is what `flex block` conflicting rests on.
+		static, isStatic := FrameworkStaticDeclarations[registration.root]
+		if !isStatic || len(static) != 1 || static[0].Property != "display" {
 			test.Errorf(
-				"%s emitted %s for a value form; it has no functional registration, so a value form compiles to nothing",
-				root,
-				describeDeclarations(emitted),
+				"the static %s declares %v; utilities.ts registers it as a static display", registration.root, static,
 			)
 		}
-		descriptor, found := baseDescriptors[root]
+
+		utility, known := FrameworkMultiDeclarationUtilities[registration.root]
+		if !known {
+			test.Errorf("%s has no functional registration in the port; utilities.ts registers it through "+
+				"spacingUtility declaring %s", registration.root, registration.property)
+			continue
+		}
+		// `spacingUtility`'s own options: the root's namespaces, fractions, the `--spacing`
+		// multiplier for a bare number, no negative, and `defaultValue: null`, which refuses the bare
+		// class and leaves it to the static.
+		if strings.Join(utility.ThemeKeys, " ") != strings.Join(registration.themeKeys, " ") ||
+			!utility.SupportsFractions || utility.BareValue != BareValueSpacingMultiplier ||
+			utility.SupportsNegative || !utility.RefusesEmptyValue {
+			test.Errorf("%s is described as %+v; upstream's spacingUtility passes themeKeys %v, supportsFractions, "+
+				"the spacing multiplier, no negative and a null default", registration.root, utility,
+				registration.themeKeys)
+		}
+
+		emitted := utility.Emit(registration.root, "", ResolvedUtilityValue{Value: "zzsentinel"})
+		if len(emitted) != 1 || emitted[0].Property != registration.property {
+			test.Errorf("%s-72 emits %s; upstream's handle declares %s alone", registration.root,
+				describeDeclarations(emitted), registration.property)
+			continue
+		}
+		reading := Reading(PropertySort(emitted))
+
+		descriptor, found := baseDescriptors[registration.root]
 		if !found {
 			test.Errorf(
-				"%s has no baseDescriptors row, so the collision this test records is no longer observable",
-				root,
+				"%s has no baseDescriptors row, so there is no measurement to hold the port to", registration.root,
 			)
 			continue
 		}
-		if descriptor.Absent.Empty == nil {
-			test.Errorf(
-				"%s has no Empty reading; the row exists because the static utility of the same name has one",
-				root,
-			)
-			continue
-		}
-		// The static utility's own reading, which is what the row's Empty is recording.
-		if position, known := PropertyOrder["display"]; known {
-			empty := *descriptor.Absent.Empty
-			if len(empty.Order) != 1 || empty.Order[0] != position {
-				test.Errorf("%s reads %s for its empty form; this test records that the row is the static display "+
-					"utility's, and it no longer is", root, formatReading(empty))
+		var valueCells int
+		for _, axis := range []struct {
+			name     string
+			readings AxisReadings
+		}{
+			{"Absent", descriptor.Absent},
+			{"Alpha", descriptor.Alpha},
+		} {
+			cells := map[string]Reading{}
+			for namespace, measured := range axis.readings.ByNamespace {
+				cells["ByNamespace["+namespace+"]"] = measured
 			}
+			for dataType, measured := range axis.readings.ByType {
+				cells["ByType["+string(dataType)+"]"] = measured
+			}
+			if axis.readings.Fallback.Count != 0 {
+				cells["Fallback"] = axis.readings.Fallback
+			}
+			for cell, measured := range cells {
+				valueCells++
+				if !readingsEqual(measured, reading) {
+					test.Errorf("%s %s.%s: Tailwind measured %s, the ported %s reads %s", registration.root,
+						axis.name, cell, formatReading(measured), registration.property, formatReading(reading))
+				}
+			}
+		}
+		if valueCells == 0 {
+			test.Errorf("%s's row holds no value cell, so the functional reading was compared against nothing",
+				registration.root)
+		}
+
+		// The row's empty form is the static's reading, since the functional root refuses it.
+		if descriptor.Absent.Empty == nil {
+			test.Errorf("%s has no Empty reading; the static display utility answers the bare class", registration.root)
+			continue
+		}
+		empty := *descriptor.Absent.Empty
+		if position := PropertyOrder["display"]; len(empty.Order) != 1 || empty.Order[0] != position {
+			test.Errorf("%s reads %s for its empty form; the bare class is the static display utility",
+				registration.root, formatReading(empty))
 		}
 	}
 }
@@ -487,21 +533,21 @@ func TestGapRootArbitraryAndNamedCanDiffer(test *testing.T) {
 
 // TestGapRootExemptionsAreExactlyTheStaticCollision pins the size and the shape of the hole.
 //
-// Every exemption in gapCellsMeasuredElsewhere has to be a cell of `block`, `inline` or `flex`, and
-// there have to be nine of them. Both halves matter and they fail differently.
+// Every exemption in gapCellsMeasuredElsewhere has to be a cell of `flex`, and there has to be one of
+// them. Both halves matter and they fail differently.
 //
 // The count catches the map growing. An exemption is the one mechanism in this file that turns a
-// disagreement into a silence, so a seventh entry appearing is a cell that stopped being compared,
+// disagreement into a silence, so a second entry appearing is a cell that stopped being compared,
 // and it should cost somebody a line here rather than passing quietly.
 //
 // The shape catches the map broadening. An earlier version keyed on roots instead of cells, which
 // exempted 47 cells to excuse 7; the other 40 were agreeing all along and were being discarded
-// under a comment saying they could not be compared. Requiring every key to name one cell of one of
-// the three collided roots makes that mistake unrepresentable rather than merely discouraged.
+// under a comment saying they could not be compared. Requiring every key to name one cell of the
+// collided root makes that mistake unrepresentable rather than merely discouraged.
 func TestGapRootExemptionsAreExactlyTheStaticCollision(test *testing.T) {
 	test.Parallel()
-	if len(gapCellsMeasuredElsewhere) != 9 {
-		test.Errorf("gapCellsMeasuredElsewhere holds %d exemptions and this test was written against 9; "+
+	if len(gapCellsMeasuredElsewhere) != 1 {
+		test.Errorf("gapCellsMeasuredElsewhere holds %d exemptions and this test was written against 1; "+
 			"an exemption is the one way a cell stops being compared without failing, so growing the map "+
 			"should cost a line here", len(gapCellsMeasuredElsewhere))
 	}
@@ -512,10 +558,9 @@ func TestGapRootExemptionsAreExactlyTheStaticCollision(test *testing.T) {
 				"comparisons behind 6 real ones", key)
 			continue
 		}
-		if root != "block" && root != "inline" && root != "flex" {
-			test.Errorf("%q exempts a cell of %s; the only rows this port cannot answer belong to block, inline "+
-				"and flex, each of which has a staticUtility declaring display standing where the extractor "+
-				"probed for a functional one", key, root)
+		if root != "flex" {
+			test.Errorf("%q exempts a cell of %s; the only gap row this port cannot answer is flex's, whose "+
+				"staticUtility declaring display stands where the extractor probed for a functional one", key, root)
 		}
 	}
 }
