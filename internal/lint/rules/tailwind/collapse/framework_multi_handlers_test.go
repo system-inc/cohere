@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// TestMultiDeclarationEmittersAgreeWithTheMeasuredReading is the acceptance test for the 152.
+// TestMultiDeclarationEmittersAgreeWithTheMeasuredReading is the acceptance test for the 154.
 //
 // Every row of `FrameworkMultiDeclarationUtilities` carries a `Reading` measured against the shipped
 // Tailwind, and every root now carries an emitter transcribed from `utilities.ts` or, for five of
@@ -54,14 +54,14 @@ func TestMultiDeclarationEmittersAgreeWithTheMeasuredReading(test *testing.T) {
 		len(disagreements),
 	)
 
-	if len(FrameworkMultiDeclarationUtilities) != 152 {
+	if len(FrameworkMultiDeclarationUtilities) != 154 {
 		test.Errorf(
-			"the table holds %d roots and this comparison was written against 152; the population moved and the assertions below were sized for the old one",
+			"the table holds %d roots and this comparison was written against 154; the population moved and the assertions below were sized for the old one",
 			len(FrameworkMultiDeclarationUtilities),
 		)
 	}
-	if agreed != 152 {
-		test.Errorf("%d of 152 roots agreed; the acceptance condition is every root, not a rate", agreed)
+	if agreed != 154 {
+		test.Errorf("%d of 154 roots agreed; the acceptance condition is every root, not a rate", agreed)
 	}
 	for _, root := range unported {
 		test.Errorf("%s is in the table and has no ported handle, so it emits nothing and reads nothing", root)
