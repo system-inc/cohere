@@ -1288,7 +1288,9 @@ func TestAnIntegrateJobsAccountLinesParse(test *testing.T) {
 
 // On the runner's declared Go cache (#e94a6r4), with no kept one, the account says it was the runner's, its layer and
 // its program, and the layer's size before and after with the entries it gained, never the empty per-job sentence:
-// J-k20kexn's fill ran on the runner's cache and its account said the cache was empty and removed.
+// J-k20kexn's fill ran on the runner's cache and its account said the cache was empty and removed. A runner that also
+// names the layer as its shared cache, which no runner should, still has its tests run on the program's layer by the
+// gate script, so the account says that too, never the shared cache (the Go Square's should on #ntrewm3).
 func TestAnIntegrateJobsAccountNamesTheRunnersCache(test *testing.T) {
 	test.Parallel()
 	fixture := newIntegrateJobFixture(test)
@@ -1298,7 +1300,7 @@ func TestAnIntegrateJobsAccountNamesTheRunnersCache(test *testing.T) {
 	fixture.reply("tests.grows", filepath.Join(layer, "new-entry"))
 	program := "loom-job-runner gocacheprog shared layer"
 	ran := fixture.integrateJob(fixture.merged(), append(own_go_cache.Environment(nil, layer),
-		"GOCACHEPROG="+program)...)
+		"GOCACHEPROG="+program, runnerSharedCacheVariable+"="+layer)...)
 	if ran.exit != 0 {
 		test.Fatalf("the integrate job exited %d:\n%s", ran.exit, ran.errors)
 	}
@@ -1313,6 +1315,9 @@ func TestAnIntegrateJobsAccountNamesTheRunnersCache(test *testing.T) {
 	}
 	if strings.Contains(ran.errors, "an empty per-job cache") {
 		test.Errorf("the account on the runner's cache says the empty per-job one:\n%s", ran.errors)
+	}
+	if strings.Contains(ran.errors, "the runner's shared Go cache") {
+		test.Errorf("the account on the program's layer says the shared cache:\n%s", ran.errors)
 	}
 }
 
