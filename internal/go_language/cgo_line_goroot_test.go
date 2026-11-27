@@ -13,6 +13,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/contract"
 	"github.com/system-inc/cohere/internal/go_language/rules"
 	"github.com/system-inc/cohere/internal/testing/go_root"
+	"github.com/system-inc/cohere/internal/testing/own_go_cache"
 )
 
 // cgoStandardFile is the one cgo file of a small cgo package of the standard library, which each fake `GOROOT` has a
@@ -82,7 +83,7 @@ func TestACgoTranslationSharedWithAGoneGorootReadsTheCurrentOne(test *testing.T)
 		test.Fatal(renameError)
 	}
 	first += "-first"
-	test.Setenv("GOCACHE", test.TempDir())
+	own_go_cache.Set(test, test.TempDir())
 	test.Setenv("GOTOOLCHAIN", "local")
 	test.Setenv("CGO_ENABLED", "1")
 	test.Setenv("GOROOT", first)

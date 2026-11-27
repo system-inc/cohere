@@ -615,7 +615,11 @@ func TestThePerformanceScriptMeasuresInItsScratch(test *testing.T) {
 	needs.Platform(test, "darwin", "the script reads a Mac's sysctl and /usr/bin/time -l, and Shackler is one")
 	needs.Tool(test, "bash", "the script is a bash script")
 	directory := test.TempDir()
-	environment := append(withoutModuleCache(os.Environ()), "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null",
+	// The test's own process may run under a runner's Go cache program, which the script reads, so it starts from none
+	// and the row that is the runner's names a stand-in.
+	environment := append(slices.DeleteFunc(withoutModuleCache(os.Environ()), func(entry string) bool {
+		return strings.HasPrefix(entry, "GOCACHEPROG=")
+	}), "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null",
 		"GIT_AUTHOR_NAME=test", "GIT_AUTHOR_EMAIL=test@example.com", "GIT_COMMITTER_NAME=test",
 		"GIT_COMMITTER_EMAIL=test@example.com")
 	git := func(where string, arguments ...string) string {
@@ -775,6 +779,28 @@ func TestThePerformanceScriptMeasuresInItsScratch(test *testing.T) {
 		measurement.cores <= 0 || measurement.cpu == "" {
 		test.Errorf("the measurement read %d phases, cpu %q with %d cores and stamps %+v", len(measurement.phases),
 			measurement.cpu, measurement.cores, measurement.timeline.Stamps)
+	}
+	// The build phase names whose Go cache it built on: the measurement's kept one, or under a runner that declared a
+	// cache program the runner's, which the build is left to use (#e94a6r4).
+	for _, row := range []struct {
+		extra []string
+		cache string
+	}{
+		{cache: "the measurement's kept Go cache"},
+		{extra: []string{"GOCACHEPROG=loom-job-runner gocacheprog"}, cache: "the runner's declared Go cache"},
+	} {
+		phases := measurement.phases
+		if len(row.extra) > 0 {
+			output, underRunner, problem := read(row.extra...)
+			if problem != "" {
+				test.Fatalf("the script's measurement under a runner's cache didn't read: %s\n%s", problem, output)
+			}
+			phases = underRunner.phases
+		}
+		built := slices.IndexFunc(phases, func(phase string) bool { return strings.HasPrefix(phase, "build ") })
+		if built < 0 || !strings.HasSuffix(phases[built], "s on "+row.cache) {
+			test.Errorf("with %q the phases read %q, want the build's on %s", row.extra, phases, row.cache)
+		}
 	}
 
 	for _, tree := range []string{"root", "deeafbf4"} {

@@ -18,6 +18,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/testing/executable_testing"
 	"github.com/system-inc/cohere/internal/testing/needs"
+	"github.com/system-inc/cohere/internal/testing/own_go_cache"
 )
 
 // integrateJobFixture is an integrate job ready to judge a merge in a mirror: a candidate, worktree a's head, bringing
@@ -739,7 +740,9 @@ func TestAnIntegrateJobRefusesAMergeOntoAnotherMain(test *testing.T) {
 // integrate job's, kept cache or none, so set, go mod download and go mod verify read the module set `GOMODCACHE` names
 // with `GOPROXY=off` and `GOSUMDB=off`, and unset, they read Go's default cache, the `GOMODCACHE` named never read.
 // Loom's runner sets no COHERE_INTEGRATE_CACHE, and an integrate job keyed on the kept cache alone went to a proxy it
-// can't reach.
+// can't reach. The runner's declared Go cache, its layer as `GOCACHE` and its `GOCACHEPROG` (#e94a6r4), is what an
+// integrate job with no kept cache tests on, with no -count=1 and its layer left in place, and anywhere else the two
+// are never read: a gate box's job runs on an empty cache of its own with no cache program.
 func TestTheIntegrateJobsCacheIsKeptAndDropsCountOne(test *testing.T) {
 	test.Parallel()
 	needs.Tool(test, "bash", "the gate is a bash script")
@@ -758,12 +761,14 @@ func TestTheIntegrateJobsCacheIsKeptAndDropsCountOne(test *testing.T) {
 	}
 	digest := toolchainDigest(test, goroot)
 	for _, row := range []struct {
-		name               string
-		kept, integrateJob bool
+		name                       string
+		kept, integrateJob, runner bool
 	}{
 		{name: "unset"},
 		{name: "set", kept: true, integrateJob: true},
 		{name: "an integrate job with no kept cache", integrateJob: true},
+		{name: "an integrate job on the runner's declared cache", integrateJob: true, runner: true},
+		{name: "a gate box whose account names a cache program", runner: true},
 	} {
 		kept := row.kept
 		test.Run(row.name, func(test *testing.T) {
@@ -785,9 +790,15 @@ func TestTheIntegrateJobsCacheIsKeptAndDropsCountOne(test *testing.T) {
 			gate := exec.Command("bash", "-c", script, "gate", goroot, digest, filepath.Join(tree, "no-node"),
 				strings.Repeat("0", 64), "", integrateCache, integrateJob, "./...")
 			laid := filepath.Join(test.TempDir(), "laid modules")
+			layer := test.TempDir()
 			gate.Dir = tree
-			gate.Env = append(os.Environ(), "GATE_LOG="+log, "TMPDIR="+temporary, "GOCACHE="+test.TempDir(),
+			// The test's own process may run under a runner's cache program, so every row starts from none, and the
+			// rows that are the runner's name a stand-in.
+			gate.Env = append(own_go_cache.Environment(os.Environ(), layer), "GATE_LOG="+log, "TMPDIR="+temporary,
 				"GOMODCACHE="+laid, "GOPROXY=https://proxy.example.com")
+			if row.runner {
+				gate.Env = append(gate.Env, "GOCACHEPROG=loom-job-runner gocacheprog shared layer")
+			}
 			output, gateError := gate.CombinedOutput()
 			if gateError != nil {
 				test.Fatalf("the gate failed: %v\n%s", gateError, output)
@@ -808,6 +819,20 @@ func TestTheIntegrateJobsCacheIsKeptAndDropsCountOne(test *testing.T) {
 				!strings.Contains(string(output), said) {
 				test.Errorf("the gate asked go mod for %q and %q, want each with %q, saying %q:\n%s", asked[0],
 					asked[1], modules, said, output)
+			}
+			if row.runner && row.integrateJob {
+				if strings.Contains(asked[2], "-count") || !strings.Contains(asked[2], "| cache "+layer+" empty yes "+
+					"| cache program loom-job-runner gocacheprog shared layer |") {
+					test.Errorf("the tests ran %q, want no -count on the runner's layer %s and its program", asked[2],
+						layer)
+				}
+				if information, statError := os.Stat(layer); statError != nil || !information.IsDir() {
+					test.Errorf("the gate removed the runner's layer %s: %v", layer, statError)
+				}
+				return
+			}
+			if strings.Contains(asked[2], "| cache program loom-job-runner") {
+				test.Errorf("outside an integrate job the tests ran %q, with the account's cache program", asked[2])
 			}
 			cache := filepath.Join(integrateCache, "gocache")
 			if !kept {

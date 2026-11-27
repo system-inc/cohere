@@ -48,7 +48,8 @@ import (
 // pushed.
 
 // integrateJobCacheVariable is the integrate job's kept directory: its Go build and test cache, `gocache`, kept across
-// jobs, and its replay store, `steps`. Unset, the integrate job's tests run as a gate box's do, on an empty cache with
+// jobs, and its replay store, `steps`. Unset, the integrate job's tests run on the Go cache its runner declared, with
+// no -count=1 (runnerDeclaredCache, #e94a6r4), and with none declared as a gate box's do, on an empty cache with
 // -count=1.
 const integrateJobCacheVariable = "COHERE_INTEGRATE_CACHE"
 
@@ -1010,12 +1011,21 @@ func (job *integrateJobRun) tests(share func(string) []string) (string, int) {
 	return tested, 0
 }
 
+// runnerDeclaredCache reports whether the job's runner declared a Go cache, its layer and its program, which
+// sharedBoxCacheBlock then runs the tests on when no kept cache is named (#e94a6r4).
+func runnerDeclaredCache() bool {
+	return strings.TrimSpace(os.Getenv("GOCACHEPROG")) != "" && strings.TrimSpace(os.Getenv("GOCACHE")) != ""
+}
+
 // cacheSaid is how the integrate job's lines name the Go cache its tests ran on.
 func (job *integrateJobRun) cacheSaid() string {
-	if job.cache == "" {
-		return "an empty Go cache with -count=1"
+	switch {
+	case job.cache != "":
+		return "the integrate job's kept Go cache"
+	case runnerDeclaredCache():
+		return "the runner's declared Go cache"
 	}
-	return "the integrate job's kept Go cache"
+	return "an empty Go cache with -count=1"
 }
 
 // landingLines are the integrate job's last lines, all Loom's finisher needs to make the landing on Kirk's Mac, in

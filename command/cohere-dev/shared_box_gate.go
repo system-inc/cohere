@@ -33,16 +33,25 @@ package main
 
 // sharedBoxCacheBlock is sharedBoxGate's choice of Go cache, by integrateCache, which every script that runs it sets
 // before it: empty on every gate box and scratch box (macBoxIntegrateCacheLine), so the box's environment never keeps a
-// cache there, and the integrate job's kept directory on Shackler alone. Empty, the cache is made empty for this job
-// and removed after it, and countFlag is -count=1, which every go test the gate runs carries: today's cold, correct
-// run. Set, the cache is integrateCache's gocache, kept across the integrate job's jobs, and countFlag is empty, so
-// Go's honest keys replay every package whose inputs didn't change as "(cached)".
-const sharedBoxCacheBlock = `# The Go cache: this job's own, empty, on a shared box, or the integrate job's, kept.
+// cache there, and the integrate job's kept directory on Shackler alone. Set, the cache is integrateCache's gocache,
+// kept across the integrate job's jobs. Empty, in an integrate job whose runner declared a Go cache
+// (runnerCacheProgram, #e94a6r4), the cache is the runner's: its writable layer as `GOCACHE` and its program,
+// `GOCACHEPROG`, serving a get from the layer, then from a shared folder only the cold fill at main's tip writes, and
+// every put to the layer alone. Either way it is a cache no candidate shares, so countFlag is empty and Go's honest
+// keys replay every package whose inputs didn't change as "(cached)", and keepCache says the cache stays. Otherwise
+// the cache is made empty for this job and removed after it, and countFlag is -count=1, which every go test the gate
+// runs carries: the cold, correct run of a shared box.
+const sharedBoxCacheBlock = `# The Go cache: the integrate job's kept one, the runner's declared one, or this job's own.
 countFlag=-count=1
+keepCache=""
 if [ -n "${integrateCache:-}" ]; then
   gocache="$integrateCache/gocache"
   mkdir -p "$gocache" || refuse "the integrate job's Go cache $gocache couldn't be made"
-  countFlag=""
+  countFlag=""; keepCache=1
+elif [ -n "$runnerCacheProgram" ]; then
+  gocache="$runnerCache"
+  export GOCACHEPROG="$runnerCacheProgram"
+  countFlag=""; keepCache=1
 else
   gocache=$(mktemp -d "${TMPDIR:-/tmp}/cohere-gate-gocache.XXXXXX")
 fi
@@ -165,7 +174,13 @@ fi
 # one, kept before the account's Go settings go. Anywhere else a GOMODCACHE is the account's own, never read.
 laidModules=""
 [ -z "${integrateJob:-}" ] || laidModules="${GOMODCACHE:-}"
-unset GOFLAGS GOCACHE GOMODCACHE GOPATH GOWORK GOPROXY GONOSUMDB GONOSUMCHECK GOPRIVATE GOINSECURE GOSUMDB
+# The Go cache the runner declared for an integrate job, its layer and its program, both or neither, kept before the
+# account's Go settings go (sharedBoxCacheBlock). Anywhere else they are never read.
+runnerCache=""; runnerCacheProgram=""
+if [ -n "${integrateJob:-}" ] && [ -n "${GOCACHEPROG:-}" ] && [ -n "${GOCACHE:-}" ]; then
+  runnerCache="$GOCACHE"; runnerCacheProgram="$GOCACHEPROG"
+fi
+unset GOFLAGS GOCACHEPROG GOCACHE GOMODCACHE GOPATH GOWORK GOPROXY GONOSUMDB GONOSUMCHECK GOPRIVATE GOINSECURE GOSUMDB
 ` + sharedBoxPathLine + `
 export GOROOT="$goroot" GOTOOLCHAIN=local GOENV=off GOFLAGS="-buildvcs=false -trimpath"
 # An integrate job has no network, so the set the box laid is read with the proxy and the checksum database off, go.sum
@@ -189,7 +204,7 @@ if [ -n "${` + boxCoreBudgetVariable + `:-}" ]; then
 fi
 ` + sharedBoxCacheBlock + `# The shards' outputs and the run's own temporary directory, when the script before this
 # made one, go with the cache, and a kept cache stays.
-trap '[ -n "${integrateCache:-}" ] || rm -rf "$gocache"; [ -z "${shards:-}" ] || rm -rf "$shards"; [ -z "${gatetemp:-}" ] || { chmod -R u+w "$gatetemp" 2>/dev/null; rm -rf "$gatetemp"; }' EXIT
+trap '[ -n "${keepCache:-}" ] || rm -rf "$gocache"; [ -z "${shards:-}" ] || rm -rf "$shards"; [ -z "${gatetemp:-}" ] || { chmod -R u+w "$gatetemp" 2>/dev/null; rm -rf "$gatetemp"; }' EXIT
 export GOCACHE="$gocache"
 echo "` + boxMarker + `$(git rev-parse HEAD) on $(go env GOOS)/$(go env GOARCH)"
 step toolchain

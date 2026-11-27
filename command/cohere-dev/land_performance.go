@@ -219,6 +219,15 @@ cd root
 phase modules
 # The build's Go cache is kept under the scratch across landings, so a landing compiles only what it changed: the binary
 # is built on a cache the box kept, as the file's tools say. A -trimpath build's bytes are the same on any cache.
+# Under an integrate job whose runner declared a Go cache, its program in GOCACHEPROG, go builds through the runner's
+# cache instead, and that is left as it is (#e94a6r4, system_cohere's ruling): this builds the binary under test, a
+# warm build only shortens this phase, and what the measurement times is cohere's runs, never the build. The build
+# phase names whose cache it built on, so a short build never reads as a faster cohere.
+if [ -n "${GOCACHEPROG:-}" ]; then
+  say "build-cache the runner's declared Go cache"
+else
+  say "build-cache the measurement's kept Go cache"
+fi
 built=$(GOCACHE="$base/gocache" ` + performanceBuild + ` -o "$base/cohere" ./command/cohere 2>&1) ||
   refuse "cohere didn't build at $commit: $(echo "$built" | tail -n 1)"
 cd "$base"
@@ -414,10 +423,12 @@ type performanceMeasurement struct {
 	commit, platform, cpu, goVersion, binary string
 	cores                                    int
 	loadBefore, loadAfter                    []float64
-	// phases are the script's phases, each as the land line says it, "build 12.3s".
-	phases   []string
-	runs     []performanceRun
-	timeline *contract.TimelineRecord
+	// phases are the script's phases, each as the land line says it, "build 12.3s", the build's with the cache it
+	// built on, buildCache, as "build 12.3s on the measurement's kept Go cache".
+	phases     []string
+	buildCache string
+	runs       []performanceRun
+	timeline   *contract.TimelineRecord
 }
 
 // performanceRows are the rows the note compares, by the name it says each by.
@@ -759,12 +770,18 @@ func readPerformance(output []byte, commit string, runError error) (performanceM
 			} else {
 				measurement.loadAfter = load
 			}
+		case "build-cache":
+			measurement.buildCache = strings.TrimSpace(rest)
 		case "phase":
 			name, milliseconds, _ := strings.Cut(rest, " ")
 			// Ignored: a phase that doesn't read is said as 0s, since the phases are for reading what costs what, and
 			// no number of the file comes from them.
 			spent, _ := strconv.ParseInt(milliseconds, 10, 64)
-			measurement.phases = append(measurement.phases, fmt.Sprintf("%s %.1fs", name, float64(spent)/1000))
+			phase := fmt.Sprintf("%s %.1fs", name, float64(spent)/1000)
+			if name == "build" && measurement.buildCache != "" {
+				phase += " on " + measurement.buildCache
+			}
+			measurement.phases = append(measurement.phases, phase)
 		case "run":
 			run, runProblem := performanceRunOf(rest)
 			if runProblem != "" {

@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/go_language/staticcheck_configuration"
+	"github.com/system-inc/cohere/internal/testing/own_go_cache"
 )
 
 // A load handed go env's answer for its own workspace and environment reads it and asks go env nothing, and a load of
@@ -119,7 +120,7 @@ func TestTheRunsBuildCacheIsSkippedForTheStaticcheckConf(test *testing.T) {
 	writeListingFiles(test, root, listingFiles)
 	project := filepath.Join(root, "project")
 	buildCache := filepath.Join(root, "build-cache")
-	goEnvironmentOf(test, project, []string{"GOWORK=off", "GOCACHE=" + buildCache})
+	goEnvironmentOf(test, project, own_go_cache.Environment([]string{"GOWORK=off"}, buildCache))
 
 	// Named as go names a cgo output it writes to the build cache, and never written: the directory is all it reads.
 	cgoOutput := filepath.Join(buildCache, "4f", "4f00c0ffee-d")
