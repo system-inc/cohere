@@ -69,12 +69,9 @@ require (
 	// so a missing, empty or truncated profile fails (command/cohere/contract_profile_test.go, #r33n96f).
 	github.com/google/pprof v0.0.0-20230207041349-798e818bf904
 
-	// A JavaScript interpreter, in a Go linter, on purpose. cohere replaces Prettier, and replacing
-	// Prettier means matching it byte for byte on an already-Prettier-formatted tree. typescript-go's
-	// own formatter cannot: FormatCodeSettings has no printWidth and no line-breaking logic, and
-	// 21.8% of tracked files diverge from our fork after every settings-reachable fix. The only thing
-	// that reproduces our formatter is our formatter, and goja is what runs it in-process.
-	github.com/dop251/goja v0.0.0-20260822123354-58e940e0d230
+	// A backtracking regular expression engine with an ECMAScript mode: the rules handed JavaScript regexps
+	// compile them with it (internal/lint/ecmascript/regexp), since Go's RE2 has no lookaround or backreferences.
+	github.com/dlclark/regexp2/v2 v2.5.2
 
 	// A type parameter's terms, read as staticcheck reads them: SA4023's port asks it what the original
 	// asks (internal/go_language/rules/typed_nil_interface_comparison).
@@ -104,8 +101,6 @@ require (
 	// staticcheck's configuration reader parses staticcheck.conf with it, and the ST checks require that
 	// reader for their options (dot import and HTTP status code allow lists).
 	github.com/BurntSushi/toml v1.4.1-0.20240526193622-a339e1f7089c // indirect
-	github.com/dlclark/regexp2/v2 v2.5.2 // indirect
-	github.com/go-sourcemap/sourcemap v2.1.3+incompatible // indirect
 	golang.org/x/sync v0.23.0 // indirect
 	golang.org/x/text v0.42.0 // indirect
 )

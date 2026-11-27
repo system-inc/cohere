@@ -1,5 +1,7 @@
 package micromark
 
+import "testing"
+
 // gfmTaskListItemFixtures hold no definition, html text, liquid, math, wiki-link, GFM table,
 // strikethrough, footnote or autolink literal syntax: those constructs are still pending stubs, so a
 // fixture leaning on them would differ for reasons that are not the task list item's. So no `[x]:`, no
@@ -116,4 +118,9 @@ var gfmTaskListItemFixtures = []string{
 	"> [x] foo",
 	"# [x] foo",
 	"foo\n[x] bar",
+}
+
+func TestGfmTaskListItemEvents(test *testing.T) {
+	test.Parallel()
+	compareEvents(test, gfmTaskListItemFixtures)
 }

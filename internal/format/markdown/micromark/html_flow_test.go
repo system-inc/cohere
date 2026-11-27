@@ -1,5 +1,7 @@
 package micromark
 
+import "testing"
+
 // htmlFlowFixtures hold no container, emphasis, code fence, code span, autolink, link end, table, math or
 // liquid syntax outside the HTML itself: those constructs are not ported yet. Text that is not HTML (flow)
 // also never forms HTML (text) or an autolink upstream, since html-text and autolink are still stubs, so
@@ -191,4 +193,9 @@ var htmlFlowFixtures = []string{
 	"***\n<div>",
 	"<div>\n***",
 	"<!-- a -->\n***",
+}
+
+func TestHtmlFlowEvents(test *testing.T) {
+	test.Parallel()
+	compareEvents(test, htmlFlowFixtures)
 }

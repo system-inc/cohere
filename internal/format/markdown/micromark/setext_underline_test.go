@@ -1,6 +1,9 @@
 package micromark
 
-import "strings"
+import (
+	"strings"
+	"testing"
+)
 
 // setextUnderlineFixtures hold no container (block quote, list), emphasis, code, html, character
 // reference, definition, link, table, autolink literal, strikethrough, math, liquid or wiki-link syntax:
@@ -109,4 +112,9 @@ var setextUnderlineFixtures = []string{
 	"a\u00a0\n===",
 	"\\=\n===",
 	"\\-\n---",
+}
+
+func TestSetextUnderlineEvents(test *testing.T) {
+	test.Parallel()
+	compareEvents(test, setextUnderlineFixtures)
 }

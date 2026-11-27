@@ -86,6 +86,11 @@ func TestUpdateTargetsAndTopLevelAwaitMatchTheFork(test *testing.T) {
 				compared++
 				if actual != expected {
 					test.Errorf("%s %q: the fork prints %q and Formatter %q", fileName, text, expected, actual)
+				} else if again, againError := formatter.Format(fileName, expected); againError != nil ||
+					again != expected {
+					// Formatted output formats to itself, or every run rewrites what the last one wrote.
+					test.Errorf("%s %q: formatted again, %q prints %q (%v)", fileName, text, expected, again,
+						againError)
 				}
 			}
 

@@ -21,8 +21,7 @@ import (
 // pending is a decision its owner converts under that task; it leaves this list when it does.
 var tsDecisionsAllowed = map[string]string{
 	// A table keyed by extension, which its one reader looks up with the name source_name.TreatedAs gives.
-	"internal/edit/write.go: .ts":              "TypeScriptParsable reads its list with source_name.TreatedAs(fileName)",
-	"internal/format/prettier/handles.go: .ts": "parserFor reads its table with source_name.TreatedAs(fileName)",
+	"internal/edit/write.go: .ts": "TypeScriptParsable reads its list with source_name.TreatedAs(fileName)",
 
 	// A tool's disk walk with no program to ask, so it cannot tell Adamic source from a static library.
 	"internal/lint/rules/tailwind/tools/generate_variant/main.go: .ts": "the variant generator's walk of a Tailwind consumer, which has no program",
