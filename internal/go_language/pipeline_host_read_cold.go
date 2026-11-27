@@ -22,8 +22,9 @@ func (pipeline *pipeline) hostReadColdReason() string {
 	}
 	// Extra builds run only within the lint phase (runLint), so a run that asks for the types alone, or loads only for
 	// the long-line wrap, checks none, and a cold host there would type-check every package from source for no build.
-	// Such a run reads no builds today (describeProject's readsBuilds), so keepsForBuilds answers false first; this
-	// says it here too, where the cold read is decided, rather than lean on how the description reads builds.
+	// Such a run reads no builds today (describeProject's readsBuilds), so keepsForBuilds answers false first: this is
+	// a belt over readsBuilds, kept where the cold read is decided rather than lean on how the description reads
+	// builds.
 	if !pipeline.request.requests(contract.PhaseLint) {
 		return ""
 	}
@@ -42,18 +43,19 @@ func (pipeline *pipeline) hostReadColdReason() string {
 // buildPacksMissing reports whether every extra build is missing from the project's store, each by a stat, never a
 // read: its pack (cache.Store.HasPack) and its ran marker (cache.Store.HasRun), each under either loader. The pack
 // alone would not tell: a run's first pack write removes every other executable's packs (cache.Store's
-// RemoveOtherIdentitiesPacks) and leaves their entries, so with two executables over one root, the installed cohere
-// and one built in a worktree, each would find every build's pack gone and read cold on every run while its builds
-// restore from their own warm store. The marker is named as the pack is, by the executable, the build, the rules and
-// the loader, is written wherever a build's packs are, at its save and by a build that ran none, a broken one among
-// them (check.CacheSession.WritePacksWithoutSave), and is never swept, so a build that has run under this executable
-// keeps it. Each is named as the build's session names its pack (check.ProjectPackPlace), by the context lintCache
-// gives that session (projectCacheContext) under the build's own go env, read here as the build's run reads it, once
-// it has answered (buildGoEnvironment.answer), under each loader the build may load under: which one is known only
-// once its own listing has run, after this, so a pack or a marker under either is the build's. A pack that is there
-// but damaged is not missing, nor is a marker. Nothing unknown reads as missing: a build whose go env failed,
-// cohere-go's identity unread, or a store holding no shard stamps, through which no build keeps a pack (openPacks),
-// each answers false.
+// RemoveOtherIdentitiesPacks) and leaves their entries, so with two executables over one root, the installed cohere and
+// one built in a worktree, each would find every build's pack gone and read cold on every run while its builds restore
+// from their own warm store. The marker is named as the pack is, by the executable, the build, the rules and the
+// loader, is written wherever a build's packs are, at its save and by a build that ran none, a broken one among them
+// (check.CacheSession.WritePacksWithoutSave), and is never swept, so a build that has run under this executable keeps
+// it. It says the build's restore ran, not that its store holds entries: a broken build marks its run too, so a fixed
+// all-broken tree takes one run of builds checking from source, then settles. Each is named as the build's session
+// names its pack (check.ProjectPackPlace), by the context lintCache gives that session (projectCacheContext) under the
+// build's own go env, read here as the build's run reads it, once it has answered (buildGoEnvironment.answer), under
+// each loader the build may load under: which one is known only once its own listing has run, after this, so a pack or
+// a marker under either is the build's. A pack that is there but damaged is not missing, nor is a marker. Nothing
+// unknown reads as missing: a build whose go env failed, cohere-go's identity unread, or a store holding no shard
+// stamps, through which no build keeps a pack (openPacks), each answers false.
 func (pipeline *pipeline) buildPacksMissing() bool {
 	_, extras, buildsError := pipeline.buildsBeside()
 	identity, identityError := pipeline.executableIdentity()

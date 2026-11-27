@@ -1096,8 +1096,10 @@ The system cache's trim counts a pack in its size cap and deletes it once unread
 The project's store is never trimmed, so its packs are kept in a directory of the child that reads them, and the
 first pack a run writes there removes every other child's, file by file, so they stay one for each build. Beside
 each pack the store keeps an empty marker that the build has run under that child, named as the pack is, in a `ran`
-directory the removal never reads, written once and only stat'd after (#s8e6z0n). The host's build keeps no pack, and
-a run with no extra build writes no `"packs"`.
+directory the removal never reads, written once and only stat'd after (#s8e6z0n). A marker says the build's restore
+ran, not that its store holds entries: a build that failed to type-check marks its run too, so a tree whose every
+extra build was broken and is then fixed takes one slow run, its builds checking from source, and settles after it.
+The host's build keeps no pack, and a run with no extra build writes no `"packs"`.
 
 `"hostReadCold":"buildPacksMissing"`, additive within contract 3 and cohere-go's alone, says the host's build read its
 findings store cold (#s8e6z0n). A host whose store holds every package restores nearly all of them, so it keeps for
