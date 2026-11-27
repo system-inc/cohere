@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"slices"
 	"sort"
 	"strings"
 
 	"github.com/system-inc/cohere/internal/command_line/streams"
-	"github.com/system-inc/cohere/internal/testing/corpus"
 	"github.com/system-inc/cohere/internal/testing/listed_directories"
 )
 
@@ -19,25 +19,24 @@ import (
 // It runs every package of the module except the ones landingGateOnly names, and Go's test cache decides
 // what actually runs: a package whose inputs an edit did not touch answers from the cache, and one whose
 // tests import the edited code or read the edited file runs. That is the measured dependency set, kept by
-// Go, so nothing here maps edits to packages. The corpus walks are left out inside their package by the
-// variable fastTierVariable names, which their helpers read.
+// Go, so nothing here maps edits to packages.
 //
 // It takes no slot: it is the edit loop and has to stay instant. It prints the machine's load when it
 // starts, so a fast run beside a held full gate is visible. It is never the landing gate, and says so last.
 
 // fastTierVariable tells a package's tests that the fast tier is running them, so a test the landing gate
-// alone runs can skip itself. The corpus walks in high_level_intermediate_representation read it.
+// alone runs can skip itself.
 const fastTierVariable = "COHERE_FAST_TIER"
 
-// fastBudgetCpuSeconds is what a package, or part of one, must cost in CPU, user plus system, measured alone
+// fastBudgetCpuSeconds is what a package must cost in CPU, user plus system, measured alone
 // with -count=1 and its test binary already built, to join landingGateOnly. Anything at or under it stays
 // in the edit loop. TestEveryLandingGateOnlyEntryStillEarnsItsPlace holds every entry's recorded cost above
 // it.
 //
 // CPU and not wall, because wall moves with the machine's load and CPU does not (#1qbez1f). With a 2s wall
-// budget beside it, the registry's ESLint corpus passed two gates at 2.5s and 3.5s under load and failed the
-// third at 1.1s on a quieter machine, while its CPU read 10.5 to 12.7s throughout. A gate whose verdict
-// depends on who else is running is a flaky test.
+// budget beside it, the registry's replay of ESLint's own rows passed two gates at 2.5s and 3.5s under load
+// and failed the third at 1.1s on a quieter machine, while its CPU read 10.5 to 12.7s throughout. A gate
+// whose verdict depends on who else is running is a flaky test.
 //
 // CPU is steadier than wall, not load-invariant. A heavily parallel package's CPU inflates under contention:
 // command/cohere read 926 to 933s of CPU at load 105 to 166 against 49.4s at load about 10, and
@@ -48,9 +47,9 @@ const fastBudgetCpuSeconds = 15
 // fastEvictionCpuSeconds is what an entry, measured again now, must fall to before
 // TestEveryLandingGateOnlyEntryStillEarnsItsPlace sends it back to the edit loop: a third under the budget
 // to join, because a live measurement scatters and one threshold judged both ways flips on the scatter.
-// hir's corpus walks, a difference of two runs, read 14.9s in one of build's land runs, 18.5s at load 10
-// and 24.8s at load 13 to 50, all on 2026-10-05, and failed build's land at 14.9 against a single bar of
-// 15. Under 10 is a change in what the tests do, not in who else is running.
+// One entry, a difference of two runs, read 14.9s in one of build's land runs, 18.5s at load 10 and 24.8s
+// at load 13 to 50, all on 2026-10-05, and failed build's land at 14.9 against a single bar of 15. Under
+// 10 is a change in what the tests do, not in who else is running.
 const fastEvictionCpuSeconds = 10
 
 // landingGateEntry is one thing the fast tier leaves to the full gate.
@@ -58,17 +57,8 @@ type landingGateEntry struct {
 	// pattern is the package, as `go test` names it from the module root.
 	pattern string
 
-	// skippedBy is the variable its tests read to leave themselves out, for an entry that is part of a
-	// package rather than all of it; empty for a whole package.
-	skippedBy string
-
-	// reads is the corpus its expensive tests read, for an entry whose cost is that corpus (internal/testing/corpus);
-	// the zero Corpus for one that reads none. Without the corpus those tests skip and the entry costs
-	// nothing, which would read as an entry that got cheap.
-	reads corpus.Corpus
-
 	// wallSeconds and cpuSeconds are its cost measured alone with -count=1 on a quiet machine, when it was
-	// added; for part of a package, the package run in full less the package run in the fast tier.
+	// added.
 	// TestEveryLandingGateOnlyEntryStillEarnsItsPlace measures both again and judges the CPU; the wall is
 	// what the fast tier prints, for a reader, and judges nothing.
 	wallSeconds, cpuSeconds float64
@@ -92,15 +82,6 @@ var landingGateOnly = []landingGateEntry{
 		wallSeconds: 2.4, cpuSeconds: 26.0,
 		reason: "it type-checks all of cohere for each of the six release targets",
 	},
-	{
-		pattern:   "./internal/lint/ecmascript/high_level_intermediate_representation",
-		skippedBy: fastTierVariable,
-		reads:     corpus.Structure,
-		// At load about 10: the package in full took 12.8s and 22.3s of CPU, in the fast tier 1.8s and 3.8s.
-		wallSeconds: 11.0, cpuSeconds: 18.5,
-		reason: "the corpus walks lower hundreds of real files, again in each of about 45 tests; the package's " +
-			"other tests stay in the fast tier",
-	},
 }
 
 // fastTest runs the fast tier of the module at root, the working directory's when it is empty, in the environment
@@ -116,7 +97,7 @@ func fastTest(root string, base []string, arguments []string, limit *bound) int 
 		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", modulePackagesError)
 		return 1
 	}
-	skippedPackages := map[string]bool{}
+	leftOut := map[string]bool{}
 	for _, entry := range landingGateOnly {
 		if !packages[entry.pattern] {
 			fmt.Fprintf(
@@ -127,41 +108,29 @@ func fastTest(root string, base []string, arguments []string, limit *bound) int 
 			)
 			return 2
 		}
-		if entry.skippedBy == "" {
-			skippedPackages[entry.pattern] = true
-		}
+		leftOut[entry.pattern] = true
 	}
 
 	selected := []string{}
 	for pattern := range packages {
-		if !skippedPackages[pattern] {
+		if !leftOut[pattern] {
 			selected = append(selected, pattern)
 		}
 	}
 	sort.Strings(selected)
 
-	environment, uncovered, testEnvironmentError := testEnvironment(base)
-	if testEnvironmentError != nil {
-		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", testEnvironmentError)
-		return 2
-	}
 	code := runAttached(
 		limit,
 		root,
-		append(environment, fastTierVariable+"=1"),
+		append(slices.Clone(base), fastTierVariable+"=1"),
 		"go",
 		append(append([]string{"test"}, arguments...), selected...),
 	)
 
 	fmt.Fprintln(streams.Errors, "cohere-dev: the fast tier left these to the landing gate:")
 	for _, entry := range landingGateOnly {
-		what := entry.pattern
-		if entry.skippedBy != "" {
-			what += "'s corpus walks"
-		}
-		fmt.Fprintf(streams.Errors, "  %s (%.1fs alone): %s\n", what, entry.wallSeconds, entry.reason)
+		fmt.Fprintf(streams.Errors, "  %s (%.1fs alone): %s\n", entry.pattern, entry.wallSeconds, entry.reason)
 	}
-	printUncovered(streams.Errors, uncovered)
 	fmt.Fprintln(
 		streams.Errors,
 		"fast tier: not the landing gate. Run cohere-dev test ./... through the lock before landing on main.",

@@ -9,6 +9,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/go_language/contract"
 	"github.com/system-inc/cohere/internal/go_language/project"
+	"github.com/system-inc/cohere/internal/testing/written_repository"
 )
 
 // A root reached through a symbolic link checks what its real path does (#yyv7nr2): the census walks the root, which
@@ -169,7 +170,7 @@ func TestAModuleAGoWorkUsesThroughALinkIsCounted(test *testing.T) {
 
 // writeTreeAt writes files under base, each name slash separated, making their directories, and makes each of
 // repositories a git repository of its own, so a fixture holds the repositories its ignore files and nested clones
-// need. It writes each without running git (writeRepository), so none reads the machine's git configuration.
+// need. It writes each without running git (written_repository.Write), so none reads the machine's git configuration.
 func writeTreeAt(test *testing.T, base string, files map[string]string, repositories ...string) {
 	test.Helper()
 	for name, contents := range files {
@@ -182,7 +183,8 @@ func writeTreeAt(test *testing.T, base string, files map[string]string, reposito
 		}
 	}
 	for _, repository := range repositories {
-		if writeError := writeRepository(filepath.Join(base, filepath.FromSlash(repository))); writeError != nil {
+		writeError := written_repository.Write(filepath.Join(base, filepath.FromSlash(repository)))
+		if writeError != nil {
 			test.Fatalf("writing the repository in %s: %v", repository, writeError)
 		}
 	}

@@ -1,76 +1,9 @@
 package shouting
 
 import (
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
-
-	"github.com/system-inc/cohere/internal/testing/corpus"
 )
-
-// The gates must not change what masking produces, only how fast it gets there.
-func TestShoutingMaskGatesPreserveOutput(test *testing.T) {
-	test.Parallel()
-
-	var texts []string
-	root := corpus.Structure.At(test, corpus.StructurePin, "source")
-	// Ignored: the callback skips every path it cannot read and never returns an error, so the walk has none
-	// to return, and the count below catches a corpus that came back too small.
-	_ = filepath.Walk(root, func(path string, info os.FileInfo, pathError error) error {
-		if pathError != nil || info.IsDir() || len(texts) >= 800 {
-			return nil
-		}
-		if !strings.HasSuffix(path, ".ts") && !strings.HasSuffix(path, ".tsx") {
-			return nil
-		}
-		if data, readError := os.ReadFile(path); readError == nil {
-			texts = append(texts, string(data))
-		}
-		return nil
-	})
-	if len(texts) < 100 {
-		test.Fatal("the structure corpus gave no comment texts, so there is nothing to compare the gates over")
-	}
-
-	// Ungated reference implementations. The command one is the line pass itself, which the gate only
-	// decides whether to run; the example one is copied from before its gate.
-	referenceCommand := blankCommandLines
-	referenceExamples := func(text string) string {
-		lines := strings.Split(text, "\n")
-		insideExample := false
-		for index, line := range lines {
-			withoutGutter := jsDocGutter.ReplaceAllString(line, "")
-			if exampleTag.MatchString(withoutGutter) {
-				insideExample = true
-				lines[index] = strings.Repeat(" ", len(line))
-				continue
-			}
-			if insideExample && anyJsDocTag.MatchString(withoutGutter) {
-				insideExample = false
-			}
-			if insideExample {
-				lines[index] = strings.Repeat(" ", len(line))
-			}
-		}
-		return strings.Join(lines, "\n")
-	}
-
-	commandDifferences, exampleDifferences := 0, 0
-	for _, text := range texts {
-		if maskCommandLines(text) != referenceCommand(text) {
-			commandDifferences++
-		}
-		if maskJsDocExamples(text) != referenceExamples(text) {
-			exampleDifferences++
-		}
-	}
-	if commandDifferences != 0 || exampleDifferences != 0 {
-		test.Fatalf("gates changed output: %d command diffs, %d example diffs across %d files",
-			commandDifferences, exampleDifferences, len(texts))
-	}
-	test.Logf("gates preserve output across %d files", len(texts))
-}
 
 // The gates must actually skip work, or they are pure overhead.
 func TestShoutingMaskGatesActuallySkip(test *testing.T) {
@@ -100,8 +33,8 @@ func TestShoutingMaskGatesActuallySkip(test *testing.T) {
 		}
 	}
 	// The whitespace arm is the one a literal cannot express, and a fixture is the only thing that
-	// catches it: 800 real files contained no multi-space form, so the corpus diff passed while the
-	// gate was wrong.
+	// catches it: 800 real files once contained no multi-space form, so a comparison over them passed
+	// while the gate was wrong.
 	for _, spacing := range []string{"s c", "s  c", "s\tc"} {
 		if !containsAnyCommandStarter(spacing) {
 			test.Fatalf("command gate rejects %q, which the pattern matches", spacing)
@@ -109,55 +42,8 @@ func TestShoutingMaskGatesActuallySkip(test *testing.T) {
 	}
 }
 
-// The uppercase gate must not change which tokens are reported, only how fast the answer arrives.
-//
-// Compared token by token rather than by count, for the same reason the comment guard is: a gate
-// that lost one shout and gained another would hold a count stable while silencing a real finding.
-func TestShoutingUppercaseGatePreservesTokens(test *testing.T) {
-	test.Parallel()
-
-	comments := realCommentCorpus(test)
-
-	ungated := func(body string) []string {
-		masked := MaskCodeAndCommands(body)
-		var tokens []string
-		seen := map[string]bool{}
-		for _, span := range referenceUppercaseTokens(masked) {
-			token := masked[span[0]:span[1]]
-			if seen[token] || !isShoutedToken(token) {
-				continue
-			}
-			seen[token] = true
-			tokens = append(tokens, token)
-		}
-		return tokens
-	}
-
-	// The gate as every language applies it: checked on the text before masking.
-	gatedTokens := func(body string) []string {
-		if !HasAdjacentUppercaseLetters(body) {
-			return nil
-		}
-		return distinctShoutedWords(MaskCodeAndCommands(body))
-	}
-
-	for _, comment := range comments {
-		gated := gatedTokens(comment)
-		reference := ungated(comment)
-		if len(gated) != len(reference) {
-			test.Fatalf("gate changed the token count for %q: %v against %v", comment, gated, reference)
-		}
-		for index := range gated {
-			if gated[index] != reference[index] {
-				test.Fatalf("gate changed token %d for %q: %q against %q",
-					index, comment, gated[index], reference[index])
-			}
-		}
-	}
-	test.Logf("uppercase gate preserves every token across %d real comments", len(comments))
-}
-
-// The cases a corpus cannot be relied on to hold, written out because that lesson has now cost twice.
+// The cases a sample of real comments cannot be relied on to hold, written out because that lesson has now cost
+// twice.
 func TestShoutingUppercaseGateAdmitsRealShouts(test *testing.T) {
 	test.Parallel()
 

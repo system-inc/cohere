@@ -6,7 +6,7 @@ package unist
 // middleComments }) or another factory's result into them. Here each builds a *Node and registers its
 // position with the context, since positions are shared and reassigned during the build (see point and
 // position in context.go). A field upstream's literal has as an empty array is a non-nil empty slice
-// here, as the printer's tree loader makes it from the JSON; a field it has as null is nil.
+// here, and a field it has as null is nil.
 
 // content is createContent's { anchor, tag, middleComments }.
 type content struct {

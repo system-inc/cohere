@@ -7,10 +7,10 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rules/tailwind/vendored"
 )
 
-// The public twins of Tailwind assertions that needed a shape only a repository's own stylesheet had
-// (#f598zk0, tier B). The live originals stay opt-in through their corpus; these ask the same question of
-// testdata/public_theme, which declares each shape on purpose, so they run everywhere and fail where an
-// original would have skipped.
+// Tailwind assertions that need a shape only a repository's own stylesheet has (#f598zk0, tier B), asked of
+// testdata/public_theme, which declares each shape on purpose, so they run everywhere. They began as twins of
+// originals that read a consumer's checkout, and replaced them when cohere's tests stopped reading other
+// repositories (#5wj23dd).
 
 // publicThemeSystem is testdata/public_theme's design system, over the vendored tailwindcss.
 func publicThemeSystem(test *testing.T) *LoadedDesignSystem {
@@ -28,8 +28,10 @@ func publicThemeSystem(test *testing.T) *LoadedDesignSystem {
 	return system
 }
 
-// TestARootDeclaredBothWaysKeepsBothKindsOnThePublicTheme is TestARootDeclaredBothWaysKeepsBothKinds'
-// twin, in both orders: `pane` is declared static first and `rail` functional first.
+// TestARootDeclaredBothWaysKeepsBothKindsOnThePublicTheme: a root declared both as a static and as a functional
+// `@utility` keeps both kinds, in both orders: `pane` is declared static first and `rail` functional first. A map
+// from root to one kind once let the second block overwrite the first, so a consumer's `fade-in` was answerable
+// by neither the parser nor the evaluator.
 func TestARootDeclaredBothWaysKeepsBothKindsOnThePublicTheme(test *testing.T) {
 	test.Parallel()
 	system := publicThemeSystem(test)
@@ -48,8 +50,9 @@ func TestARootDeclaredBothWaysKeepsBothKindsOnThePublicTheme(test *testing.T) {
 	}
 }
 
-// TestTableCarriesTheThemeOnThePublicTheme is TestLiveTableCarriesTheRepositoryTheme's twin. The public
-// theme declares four static roots and two functional ones, so a composition that drops either kind fails.
+// TestTableCarriesTheThemeOnThePublicTheme asserts the per-repository half of a table is present
+// (checkTableCarriesTheTheme). The public theme declares four static roots and two functional ones, so a
+// composition that drops either kind fails.
 func TestTableCarriesTheThemeOnThePublicTheme(test *testing.T) {
 	test.Parallel()
 	system := publicThemeSystem(test)

@@ -142,7 +142,6 @@ func runSplitGate(
 	pin string,
 	listing gateListing,
 	races []string,
-	corpora []gateCorpus,
 	boxes []string,
 ) gateSplit {
 	wait, waitError := waitSetting(gateSplitWaitVariable, os.Getenv(gateSplitWaitVariable), gateSplitWaitDefault)
@@ -159,7 +158,7 @@ func runSplitGate(
 	}
 	times, timesFile := readGateTimes()
 	halves := splitGate(listing, races, times, [2]string{free[0], free[1]})
-	verdict, unavailable := runGateHalves(worktree, commit, pin, corpora, listing, races, halves, timesFile, times)
+	verdict, unavailable := runGateHalves(worktree, commit, pin, listing, races, halves, timesFile, times)
 	return gateSplit{verdict: verdict, unavailable: unavailable}
 }
 
@@ -473,21 +472,19 @@ func inListingOrder(names []string, order []string) []string {
 
 // halfRun is what one half's gap came to, as runOnGateBox returns it.
 type halfRun struct {
-	output      []byte
-	stayedHeld  bool
-	unavailable string
-	runError    error
+	output     []byte
+	stayedHeld bool
+	runError   error
 }
 
-// runGateHalves runs both halves at once, each on its box in her gap, each laying the corpora she lacks, and returns
-// their one verdict, or why there is none, naming the box: a half that gave no verdict, refused, or, in a verdict with
-// no failure, didn't cover exactly what it was given. A red verdict is returned as it is, its failures named. It
-// rewrites the gate's times at timesFile from both halves once both gave a verdict.
+// runGateHalves runs both halves at once, each on its box in her gap, and returns their one verdict, or why there is
+// none, naming the box: a half that gave no verdict, refused, or, in a verdict with no failure, didn't cover exactly
+// what it was given. A red verdict is returned as it is, its failures named. It rewrites the gate's times at timesFile
+// from both halves once both gave a verdict.
 func runGateHalves(
 	worktree string,
 	commit string,
 	pin string,
-	corpora []gateCorpus,
 	listing gateListing,
 	races []string,
 	halves [2]gateHalf,
@@ -504,9 +501,9 @@ func runGateHalves(
 			fmt.Fprintf(lines, "cohere-dev: testing %s's half on %s in her gap, %d packages%s%s; the land lock "+
 				"stays held while it runs\n", shortCommit(commit), half.box, len(half.packages), racesNamed(half),
 				estimateNamed(half))
-			remote := macBoxRemoteCommand(half.box, commit, pin, half.races, corpora, half.packages)
-			output, stayedHeld, unavailable, runError := runOnGateBox(worktree, half.box, remote, corpora, lines)
-			runs[index] = halfRun{output: output, stayedHeld: stayedHeld, unavailable: unavailable, runError: runError}
+			remote := macBoxRemoteCommand(half.box, commit, pin, half.races, half.packages)
+			output, stayedHeld, runError := runOnGateBox(worktree, half.box, remote)
+			runs[index] = halfRun{output: output, stayedHeld: stayedHeld, runError: runError}
 		})
 	}
 	group.Wait()
@@ -514,8 +511,6 @@ func runGateHalves(
 	for index, half := range halves {
 		run := runs[index]
 		switch {
-		case run.unavailable != "":
-			return boxVerdict{}, run.unavailable
 		// A box taken between her claim's read and her half's gap never ran her half, and a gate is never half run.
 		case run.stayedHeld:
 			return boxVerdict{}, fmt.Sprintf("%s was taken before her half ran (%s), and a gate is never half run",

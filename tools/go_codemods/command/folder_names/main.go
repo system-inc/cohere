@@ -80,16 +80,31 @@ func runCommandLine() int {
 		fmt.Fprintf(streams.Errors, "foldernames: %v\n", readError)
 		return 1
 	}
-	return run(*root, moves, *dryRun, streams.Output)
+	return run(*root, moves, *dryRun, gitMove, streams.Output)
 }
 
-// run plans the moves, proves them and, unless dryRun, makes them, writing its report and its errors to output,
-// and returns the code foldernames exits with. main hands it streams.Output, a test a writer of its own. The report
-// goes through buffered, whose error is sticky, so the one Flush here says whether all of it arrived, and a report
-// that did not arrive is a run that did not finish. A failure of the streams is said where streams.Finish runs.
-func run(root string, moves []folderMove, dryRun bool, output io.Writer) int {
+// folderMover moves the folder source to destination, both relative to root and slash-separated, once the moves are
+// proven. destination's parent exists and destination does not.
+type folderMover func(root string, source string, destination string) error
+
+// gitMove is the mover foldernames runs with: `git mv`, so each file's history follows it. No test runs it, since a
+// test starts no git; the tests move with a mover of their own that renames and records, and this is one command.
+func gitMove(root string, source string, destination string) error {
+	command := exec.Command("git", "-C", root, "mv", source, destination)
+	if combined, moveError := command.CombinedOutput(); moveError != nil {
+		return fmt.Errorf("git mv %s %s: %w: %s", source, destination, moveError, combined)
+	}
+	return nil
+}
+
+// run plans the moves, proves them and, unless dryRun, makes them with mover, writing its report and its errors to
+// output, and returns the code foldernames exits with. main hands it gitMove and streams.Output, a test a mover and a
+// writer of its own. The report goes through buffered, whose error is sticky, so the one Flush here says whether all
+// of it arrived, and a report that did not arrive is a run that did not finish. A failure of the streams is said
+// where streams.Finish runs.
+func run(root string, moves []folderMove, dryRun bool, mover folderMover, output io.Writer) int {
 	bufferedOutput := buffered(output)
-	exitCode := moveFolders(root, moves, dryRun, bufferedOutput)
+	exitCode := moveFolders(root, moves, dryRun, mover, bufferedOutput)
 	if flushError := bufferedOutput.Flush(); flushError != nil {
 		return max(exitCode, 1)
 	}
@@ -106,7 +121,7 @@ func buffered(writer io.Writer) *bufio.Writer {
 }
 
 // moveFolders is run with its report buffered.
-func moveFolders(root string, moves []folderMove, dryRun bool, output *bufio.Writer) int {
+func moveFolders(root string, moves []folderMove, dryRun bool, mover folderMover, output *bufio.Writer) int {
 	loaded, loadError := workspace.Load(root, nil)
 	if loadError != nil {
 		fmt.Fprintf(output, "foldernames: loading: %v\n", loadError)
@@ -201,7 +216,7 @@ func moveFolders(root string, moves []folderMove, dryRun bool, output *bufio.Wri
 
 	for _, move := range mapping.moves {
 		source := path.Join(mapping.NewFolder(path.Dir(move.OldFolder)), path.Base(move.OldFolder))
-		// git mv needs the new folder's parent, which a move to a new shelf is the first to fill.
+		// A mover needs the new folder's parent, which a move to a new shelf is the first to fill.
 		if makeError := os.MkdirAll(
 			filepath.Join(loaded.Root, filepath.FromSlash(path.Dir(move.NewFolder))),
 			0o755,
@@ -209,13 +224,12 @@ func moveFolders(root string, moves []folderMove, dryRun bool, output *bufio.Wri
 			fmt.Fprintf(output, "foldernames: %v\n", makeError)
 			return 1
 		}
-		command := exec.Command("git", "-C", loaded.Root, "mv", source, move.NewFolder)
-		if combined, moveError := command.CombinedOutput(); moveError != nil {
-			fmt.Fprintf(output, "foldernames: git mv %s %s: %v: %s\n", source, move.NewFolder, moveError, combined)
+		if moveError := mover(loaded.Root, source, move.NewFolder); moveError != nil {
+			fmt.Fprintf(output, "foldernames: %v\n", moveError)
 			return 1
 		}
 	}
-	fmt.Fprintf(output, "moved %d folders with git mv\n", len(mapping.moves))
+	fmt.Fprintf(output, "moved %d folders\n", len(mapping.moves))
 	for _, filename := range sortedKeys(rewritten) {
 		information, statError := os.Stat(filename)
 		if statError != nil {
