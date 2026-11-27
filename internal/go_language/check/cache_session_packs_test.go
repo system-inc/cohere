@@ -29,7 +29,13 @@ func runStore(root string, clock func() time.Time) *cache.Store {
 // packedSession is an extra build's session over store, a run's, with its packs opened under the source loader, as
 // the build's first Restore opens them before it reads its hits.
 func packedSession(store *cache.Store) *CacheSession {
-	session := NewCacheSession(&Caching{Store: store}, nil)
+	return packedSessionOf(store, "")
+}
+
+// packedSessionOf is packedSession run by the executable whose identity is executable, which names its packs'
+// directory.
+func packedSessionOf(store *cache.Store, executable string) *CacheSession {
+	session := NewCacheSession(&Caching{Store: store, Context: cache.Context{ExecutableIdentity: executable}}, nil)
 	session.KeepBuildPacks("project")
 	session.openPacks("source")
 	return session
@@ -678,10 +684,10 @@ func TestAKeyThePackHeldStaleIsServedOnAReloadAsTheRunReadIt(test *testing.T) {
 	}
 }
 
-// The project's first pack write of a run removes every pack of another executable identity, file by file and then its
-// directory, a pack's temporary file left behind among them, and keeps every pack of its own executable, another
-// build's included: each new executable would otherwise leave every pack of the one before where no run reads it
-// (#b2t9xmf).
+// The project's first pack write of a run removes every pack of an executable identity older than the two others a
+// sweep keeps, file by file and then its directory, a pack's temporary file left behind among them, and keeps every
+// pack of its own executable, another build's included, and of the two others whose packs are newest: each new
+// executable would otherwise leave every pack of the one before where no run reads it (#b2t9xmf, #frh9sp4).
 func TestAPackOfAnotherIdentityIsRemovedAtTheSave(test *testing.T) {
 	test.Parallel()
 
@@ -698,13 +704,23 @@ func TestAPackOfAnotherIdentityIsRemovedAtTheSave(test *testing.T) {
 		Name:     cache.PackName([]string{"other"}),
 	}
 	ours := cache.PackPlace{Identity: identity, Name: cache.PackName([]string{"another build"})}
-	for _, place := range []cache.PackPlace{other, ours} {
+	// As many other executables as a sweep keeps, each newer than other.
+	kept := []cache.PackPlace{
+		{Identity: cache.PackIdentity("a kept executable"), Name: cache.PackName([]string{"kept"})},
+		{Identity: cache.PackIdentity("another kept executable"), Name: cache.PackName([]string{"kept"})},
+	}
+	for _, place := range append([]cache.PackPlace{other, ours}, kept...) {
 		if writeError := store.WritePack(place, nil, nil); writeError != nil {
 			test.Fatal(writeError)
 		}
 	}
 	packs := filepath.Join(root, ".cache", "cohere", "go", "packs")
 	otherDirectory := filepath.Join(packs, other.Identity.String())
+	// An hour older than the kept executables' packs, so other's are the ones the sweep removes.
+	aged := time.Now().Add(-time.Hour)
+	if timesError := os.Chtimes(filepath.Join(otherDirectory, other.Name.String()), aged, aged); timesError != nil {
+		test.Fatal(timesError)
+	}
 	leftBehind := filepath.Join(otherDirectory, other.Name.String()+".123.temporary")
 	if writeError := os.WriteFile(leftBehind, []byte("half a pack"), 0o644); writeError != nil {
 		test.Fatal(writeError)
@@ -716,6 +732,39 @@ func TestAPackOfAnotherIdentityIsRemovedAtTheSave(test *testing.T) {
 	for _, place := range []cache.PackPlace{ours, written} {
 		if _, refused := store.ReadPack(place); refused != "" {
 			test.Errorf("want cohere-go's pack %x kept, got it %s", place.Name[:2], refused)
+		}
+	}
+	for _, place := range kept {
+		if _, refused := store.ReadPack(place); refused != "" {
+			test.Errorf("want the newer executable's pack %x kept, got it %s", place.Identity[:2], refused)
+		}
+	}
+}
+
+// Two executables taking turns over one project's store, x's run, then y's, then x's again, each reading one record,
+// leave x's third run reading its whole pack, none missing and none written: y's save keeps x's pack, one of the
+// other executables a sweep keeps, so x's run never reads every record one by one again (#frh9sp4).
+func TestARunAfterAnotherExecutablesReadsItsWholePack(test *testing.T) {
+	test.Parallel()
+
+	root := test.TempDir()
+	store := cache.Open(root, nil)
+	key := cache.Key{0x11}
+	if putError := store.Put(key, []byte("a record")); putError != nil {
+		test.Fatal(putError)
+	}
+	for turn, executable := range []string{"x", "y", "x"} {
+		session := packedSessionOf(runStore(root, laterClock), executable)
+		if contents, _, found := session.entryAt(session.caching.Store, key); !found || string(contents) != "a record" {
+			test.Fatalf("%s's run %d read %q (found %v), want the record", executable, turn+1, contents, found)
+		}
+		session.writePacks()
+		counts := session.counts.Packs
+		// Each executable's first run has no pack and writes one; x's second has its own.
+		first := turn < 2
+		if counts == nil || (counts.Missing == 1) != first || (counts.Written == 1) != first ||
+			(counts.RecordsServed == 1) == first {
+			test.Errorf("%s's run %d, its first %v, did %+v with its pack", executable, turn+1, first, counts)
 		}
 	}
 }
@@ -756,5 +805,32 @@ func TestEveryFieldOfTheSystemContextNamesItsPackApart(test *testing.T) {
 	}
 	if systemPackPlace(context, "another project").Name == place.Name {
 		test.Error("another project names the same system pack")
+	}
+}
+
+// A run that reads the project's pack whole marks it used, as it marks the system cache's, so a sweep by another
+// executable keeps it among the most recently used (#frh9sp4).
+func TestARunMarksTheProjectsPackItReadUsed(test *testing.T) {
+	test.Parallel()
+
+	root := test.TempDir()
+	store := cache.Open(root, nil)
+	key := cache.Key{0x13}
+	if putError := store.Put(key, []byte("a record")); putError != nil {
+		test.Fatal(putError)
+	}
+	place := packedOnce(test, runStore(root, laterClock), key, "a record")
+	packPath := filepath.Join(root, ".cache", "cohere", "go", "packs", place.Identity.String(), place.Name.String())
+	// Aged past the hour a mark waits (cache.markInterval), so the read sets the pack's time.
+	aged := time.Now().Add(-2 * time.Hour)
+	if timesError := os.Chtimes(packPath, aged, aged); timesError != nil {
+		test.Fatal(timesError)
+	}
+	if session := packedSession(runStore(root, laterClock)); session.packs.counts.Read != 1 {
+		test.Fatalf("want the project's pack read whole, got %+v", session.packs.counts)
+	}
+	if information, statError := os.Stat(packPath); statError != nil ||
+		information.ModTime().Before(time.Now().Add(-time.Minute)) {
+		test.Errorf("want the project's pack read marked used, got %v", statError)
 	}
 }

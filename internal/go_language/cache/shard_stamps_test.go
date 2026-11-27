@@ -2,6 +2,7 @@ package cache
 
 import (
 	"encoding/hex"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -185,6 +186,7 @@ func TestAShardStampIsJudgedByTheSystemClockByDefault(test *testing.T) {
 // A run removes the packs of other executables from each store directory once, at its first ask, however many builds
 // write packs there or through however many stores, so no build after the first lists the directory again; another
 // directory is swept at its own first ask, and a store holding no stamps, or another run's, sweeps each time it asks.
+// Each ask finds one other executable more than a sweep keeps, the oldest's pack the one a sweep removes.
 func TestARunSweepsEachStoreOfOtherIdentitiesPacksOnce(test *testing.T) {
 	test.Parallel()
 
@@ -192,8 +194,20 @@ func TestARunSweepsEachStoreOfOtherIdentitiesPacksOnce(test *testing.T) {
 	other := PackPlace{Identity: PackIdentity("another executable"), Name: PackName([]string{"other"})}
 	swept := func(store *Store) bool {
 		test.Helper()
+		for index := range keptOtherIdentities {
+			kept := PackPlace{Identity: PackIdentity(fmt.Sprint("a kept executable ", index)),
+				Name: PackName([]string{"kept"})}
+			if writeError := store.WritePack(kept, nil, nil); writeError != nil {
+				test.Fatal(writeError)
+			}
+		}
 		if writeError := store.WritePack(other, nil, nil); writeError != nil {
 			test.Fatal(writeError)
+		}
+		// An hour older than the kept executables' packs, so it is the one a sweep removes.
+		aged := time.Now().Add(-time.Hour)
+		if timesError := os.Chtimes(store.packPath(other), aged, aged); timesError != nil {
+			test.Fatal(timesError)
 		}
 		store.RemoveOtherIdentitiesPacks(ours)
 		_, refused := store.ReadPack(other)

@@ -23,8 +23,9 @@ import (
 // was made of. A pack is the store's own file, the sha256 of its contents then its contents, as an entry is (Put),
 // under the store's `packs` directory, which no shard's two hex characters can name, so no Get reads it, in the
 // directory of the executable identity whose runs read it (PackPlace), so a new executable's runs can remove the packs
-// no run will read again (RemoveOtherIdentitiesPacks). Its contents are packMagic, packFormatVersion, each stamp in
-// order of its shard, and each entry in order of the key it was asked by.
+// of the executables no run has read lately, keeping the few most recently used (RemoveOtherIdentitiesPacks). Its
+// contents are packMagic, packFormatVersion, each stamp in order of its shard, and each entry in order of the key it
+// was asked by.
 
 // packDirectoryName is the directory of a store that holds its packs.
 const packDirectoryName = "packs"
@@ -35,6 +36,13 @@ const packMagic = "cohere go build pack\x00"
 // packFormatVersion is the pack's own format, which a reader refuses when it is not its own: a pack of another
 // format is ignored whole. Format 2 holds the shards' stamps.
 const packFormatVersion uint32 = 2
+
+// keptOtherIdentities is how many other executable identities' packs a sweep keeps, those whose newest pack is the
+// newest (#frh9sp4): two executables taking turns over one tree, a dev build beside a release or a timing pair's main
+// and head, would otherwise each remove the other's packs at every run, and each run would find its own gone and read
+// every record one by one. Two keep both settled and leave room for a third, and each kept identity costs about 21 MB
+// at cohere's root.
+const keptOtherIdentities = 2
 
 // PackMissing is why a pack was not read when there is none, which is no refusal: a build's first run, or a new
 // executable's, has none, and writes one.
@@ -206,13 +214,17 @@ func (store *Store) WritePack(place PackPlace, entries []PackEntry, stamps map[b
 	return store.writeWhole(store.packPath(place), body)
 }
 
-// RemoveOtherIdentitiesPacks removes every pack of the store that runs of another executable identity than identity
-// read, once a run for the store (ShardStamps), file by file and then its identity's directory: each new executable, a
-// release or a rebuild, leaves every pack of the one before it where no run reads it again, about 21 MB at cohere's
-// root (#b2t9xmf). The project's store calls it, which nothing else trims; the system cache's trim ages its packs out.
-// A directory that is not an identity's, or a file in one that is neither a pack nor a pack's temporary file, is left
-// alone. It removes nothing recursively, so a link or a directory where a pack goes stays, and keeps its identity's
-// directory with it.
+// RemoveOtherIdentitiesPacks removes the packs of the store that runs of other executable identities than identity
+// read, all but those of the keptOtherIdentities whose newest pack is the newest, once a run for the store
+// (ShardStamps), file by file and then each identity's directory: each new executable, a release or a rebuild, leaves
+// every pack of the one before it where no run reads it again, about 21 MB at cohere's root (#b2t9xmf), while two
+// executables taking turns over one tree each read the other's last packs again at its next run (#frh9sp4). A pack's
+// time is when a run last wrote or read it (MarkPackUsed), so the identities kept are the most recently used; one
+// whose directory holds no pack reads as the oldest, and identities as new are chosen by their directories' names, so
+// every sweep keeps the same ones. Its own identity's packs are never removed. The project's store calls it, which
+// nothing else trims; the system cache's trim ages its packs out. A directory that is not an identity's, or a file in
+// one that is neither a pack nor a pack's temporary file, is left alone. It removes nothing recursively, so a link or a
+// directory where a pack goes stays, and keeps its identity's directory with it.
 func (store *Store) RemoveOtherIdentitiesPacks(identity Key) {
 	if !store.stamps.firstSweep(store.directory) {
 		return
@@ -221,35 +233,74 @@ func (store *Store) RemoveOtherIdentitiesPacks(identity Key) {
 	// Ignored: a store with no packs directory has nothing to remove, and one that cannot be listed is swept by a
 	// later run's, its packs never read meanwhile.
 	identities, _ := os.ReadDir(directory)
+	var others []otherIdentityPacks
 	for _, other := range identities {
 		if !other.IsDir() || !isKeyName(other.Name()) || other.Name() == identity.String() {
 			continue
 		}
 		otherDirectory := filepath.Join(directory, other.Name())
-		// Ignored: as above, a directory that cannot be listed is left for a later run.
+		// Ignored: as above, a directory that cannot be listed is left for a later run, and reads as holding no pack.
 		packs, _ := os.ReadDir(otherDirectory)
-		for _, pack := range packs {
+		others = append(others,
+			otherIdentityPacks{directory: otherDirectory, packs: packs, newest: newestPackTime(packs)})
+	}
+	slices.SortFunc(others, func(left otherIdentityPacks, right otherIdentityPacks) int {
+		// The newest first, so the kept are the most recently used; the directory then decides between two as new.
+		if order := right.newest.Compare(left.newest); order != 0 {
+			return order
+		}
+		return strings.Compare(left.directory, right.directory)
+	})
+	for _, other := range others[min(keptOtherIdentities, len(others)):] {
+		for _, pack := range other.packs {
 			if !pack.Type().IsRegular() || !isKeyName(strings.Split(pack.Name(), ".")[0]) {
 				continue
 			}
 			// Ignored: a pack that cannot be removed is read by no run, and a later run's sweep tries it again.
-			_ = os.Remove(filepath.Join(otherDirectory, pack.Name()))
+			_ = os.Remove(filepath.Join(other.directory, pack.Name()))
 		}
 		// Ignored: a directory left holding what was not removed stays, and a later run's sweep tries it again.
-		_ = os.Remove(otherDirectory)
+		_ = os.Remove(other.directory)
 	}
 }
 
-// isKeyName reports whether name is a key's hex, as every pack's name and every identity's directory is.
+// otherIdentityPacks is the directory of another executable identity's packs, as a sweep found it: what it holds,
+// and the time of its newest pack, zero when it holds none.
+type otherIdentityPacks struct {
+	directory string
+	packs     []fs.DirEntry
+	newest    time.Time
+}
+
+// newestPackTime is the time of the newest pack among packs, a directory's listing, and zero when it holds none: only
+// a regular file named by a key is a pack, so a pack's temporary file left behind, a link or a directory never makes
+// an identity read as used.
+func newestPackTime(packs []fs.DirEntry) time.Time {
+	var newest time.Time
+	for _, pack := range packs {
+		if !pack.Type().IsRegular() || !isKeyName(pack.Name()) {
+			continue
+		}
+		// A pack removed since the listing, or one whose time cannot be read, tells nothing of when it was used.
+		information, informationError := pack.Info()
+		if informationError == nil && information.ModTime().After(newest) {
+			newest = information.ModTime()
+		}
+	}
+	return newest
+}
+
+// isKeyName is whether name is a key's hex, as every pack's name and every identity's directory is.
 func isKeyName(name string) bool {
 	decoded, decodeError := hex.DecodeString(name)
 	return decodeError == nil && len(decoded) == len(Key{})
 }
 
-// MarkPackUsed tells a trim the pack at place is in use, as MarkUsed tells it of an entry: a run that read the
-// system cache's pack calls it, so the trim counts the pack in the size cap and deletes it only once it has gone
-// unread for five days (TrimSystemCache), as it does any entry. It changes the pack's time alone, never its
-// directory's, and never a shard's (ShardStamps).
+// MarkPackUsed marks the pack at place used, as MarkUsed marks an entry, at most once an hour (markInterval): a run
+// that read a pack whole calls it. In the system cache's store, the trim counts the pack in the size cap and deletes
+// it only once it has gone unread for five days (TrimSystemCache), as it does any entry; in the project's, a sweep
+// keeps the packs of the other executables whose newest pack is the newest (RemoveOtherIdentitiesPacks). It changes
+// the pack's time alone, never its directory's, and never a shard's (ShardStamps).
 func (store *Store) MarkPackUsed(place PackPlace) {
 	markUsed(store.packPath(place), time.Now())
 }

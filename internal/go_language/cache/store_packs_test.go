@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -299,5 +300,120 @@ func TestTheTrimTakesAPackAsAnEntry(test *testing.T) {
 	}
 	if !present(newest) {
 		test.Error("the newest entry, within the cap alone, was deleted")
+	}
+}
+
+// packOf is a pack of the executable named executable in store, its time set to at, as the last run of it to write or
+// read it left it.
+func packOf(test *testing.T, store *Store, executable string, at time.Time) PackPlace {
+	test.Helper()
+	place := PackPlace{Identity: PackIdentity(executable), Name: PackName([]string{executable})}
+	if writeError := store.WritePack(place, samplePackEntries, nil); writeError != nil {
+		test.Fatal(writeError)
+	}
+	if timesError := os.Chtimes(store.packPath(place), at, at); timesError != nil {
+		test.Fatal(timesError)
+	}
+	return place
+}
+
+// A sweep keeps the packs of the keptOtherIdentities other executables whose newest pack is the newest, so two
+// executables taking turns over one tree both stay settled, and removes the rest's, file by file and then the
+// directory (#frh9sp4). An identity whose directory holds no pack reads as the oldest, and the sweep's own identity
+// stays however old its packs are.
+func TestASweepKeepsTheMostRecentlyUsedOtherIdentities(test *testing.T) {
+	test.Parallel()
+
+	for name, swept := range map[string]struct {
+		// newestFirst are the other executables holding a pack, each an hour older than the one before it.
+		newestFirst []string
+		// empty are the other executables whose directory holds no pack.
+		empty   []string
+		removed []string
+	}{
+		"the oldest of three":   {newestFirst: []string{"x", "y", "z"}, removed: []string{"z"}},
+		"one holding no pack":   {newestFirst: []string{"x", "y"}, empty: []string{"e"}, removed: []string{"e"}},
+		"no more than it keeps": {newestFirst: []string{"x", "y"}},
+	} {
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
+
+			store := Open(test.TempDir(), nil)
+			now := time.Now()
+			// The sweep's own pack is the oldest of all, a month old, so only its identity keeps it.
+			own := packOf(test, store, "w", now.Add(-30*24*time.Hour))
+			for index, executable := range swept.newestFirst {
+				packOf(test, store, executable, now.Add(-time.Duration(index)*time.Hour))
+			}
+			for _, executable := range swept.empty {
+				directory := filepath.Join(store.directory, packDirectoryName, PackIdentity(executable).String())
+				if makeError := os.MkdirAll(directory, 0o755); makeError != nil {
+					test.Fatal(makeError)
+				}
+			}
+			store.RemoveOtherIdentitiesPacks(own.Identity)
+			if _, refused := store.ReadPack(own); refused != "" {
+				test.Errorf("the sweep's own pack, the oldest, was %s", refused)
+			}
+			for _, executable := range append(slices.Clone(swept.newestFirst), swept.empty...) {
+				directory := filepath.Join(store.directory, packDirectoryName, PackIdentity(executable).String())
+				_, statError := os.Stat(directory)
+				if want := slices.Contains(swept.removed, executable); want != os.IsNotExist(statError) {
+					test.Errorf("want %s's packs removed %v, got its directory %v", executable, want, statError)
+				}
+			}
+		})
+	}
+}
+
+// Other executables whose newest packs are as new are chosen by their directories' names, the first kept, so every
+// sweep keeps the same ones (#frh9sp4).
+func TestASweepChoosesBetweenIdentitiesAsNewByName(test *testing.T) {
+	test.Parallel()
+
+	store := Open(test.TempDir(), nil)
+	at := time.Now().Add(-time.Hour)
+	executables := []string{"x", "y", "z"}
+	for _, executable := range executables {
+		packOf(test, store, executable, at)
+	}
+	byName := slices.SortedFunc(slices.Values(executables), func(left string, right string) int {
+		return strings.Compare(PackIdentity(left).String(), PackIdentity(right).String())
+	})
+	store.RemoveOtherIdentitiesPacks(PackIdentity("w"))
+	for index, executable := range byName {
+		_, statError := os.Stat(filepath.Join(store.directory, packDirectoryName, PackIdentity(executable).String()))
+		if want := index >= keptOtherIdentities; want != os.IsNotExist(statError) {
+			test.Errorf("want %s's packs, by its name %d of %d, removed %v, got its directory %v", executable,
+				index+1, len(byName), want, statError)
+		}
+	}
+}
+
+// Two executables taking turns over one store, as a dev build beside a release or a timing pair's main and head do,
+// never remove each other's pack: x writes its pack and sweeps, y writes its own and sweeps, and x sweeps again, and
+// each pack is there throughout, so neither's run finds its own gone and reads every record one by one (#frh9sp4).
+func TestTwoExecutablesTakingTurnsKeepEachOthersPacks(test *testing.T) {
+	test.Parallel()
+
+	// A store holding no stamps sweeps at each ask, as each run's first write does.
+	store := Open(test.TempDir(), nil)
+	x := PackPlace{Identity: PackIdentity("x"), Name: PackName([]string{"x"})}
+	y := PackPlace{Identity: PackIdentity("y"), Name: PackName([]string{"y"})}
+	for turn, sweep := range []struct {
+		place PackPlace
+		write bool
+	}{{place: x, write: true}, {place: y, write: true}, {place: x}} {
+		if sweep.write {
+			if writeError := store.WritePack(sweep.place, samplePackEntries, nil); writeError != nil {
+				test.Fatal(writeError)
+			}
+		}
+		store.RemoveOtherIdentitiesPacks(sweep.place.Identity)
+		for _, held := range []PackPlace{x, y}[:min(turn+1, 2)] {
+			if _, refused := store.ReadPack(held); refused != "" {
+				test.Errorf("after turn %d, the pack of %x was %s", turn+1, held.Identity[:2], refused)
+			}
+		}
 	}
 }
