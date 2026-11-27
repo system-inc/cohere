@@ -20,7 +20,8 @@ import (
 // store has lost since is a miss, as it is read from the store. The pack is written at the save when the run read or
 // wrote a record it did not hold, a shard's stamp moved, or it was missing or refused, so a warm run whose pack served
 // everything writes nothing. The host's session keeps none. The project's packs are kept by executable identity, and
-// the run's first write of one removes every other executable's (cache.Store.RemoveOtherIdentitiesPacks).
+// the run's first write of one removes the packs of every other executable but the two most recently used
+// (cache.Store.RemoveOtherIdentitiesPacks), so two executables taking turns over one tree each find their own.
 
 // PackCounts is what an extra build's session did with its packs over every load of the run: the packs read whole and
 // those missing, the records they served, those they held whose shard had moved, read from the store, the keys asked
@@ -48,8 +49,8 @@ func (session *CacheSession) KeepBuildPacks(project string) {
 // openPacks reads the pack of each store the session reads records from, once a run, before its first Restore reads
 // its hits: the project's store, and the system cache's when the session keeps it and keyed the standard library,
 // each only when it holds the run's shard stamps, without which no write of the run would mark a shard moved. A pack
-// missing or refused serves nothing and is written at the save; one read is marked used in the system cache's store,
-// as each entry read there is, so its trim keeps it.
+// missing or refused serves nothing and is written at the save; one read is marked used, in the system cache's store
+// as each entry read there is, so its trim keeps it, and in the project's, so a sweep there keeps it (buildPacks.open).
 func (session *CacheSession) openPacks(loader string) {
 	packs := session.packs
 	if packs == nil || packs.opened {
@@ -170,7 +171,7 @@ func (session *CacheSession) putRecord(store *cache.Store, key cache.Key, entry 
 // it was read or written (ShardStamps). A shard a store of the run has changed since, this session's writes included,
 // is moved, and recorded as none, as is a stamp not trusted as it was read, within two seconds of the clock then
 // (cache.ShardStamps): the next run reads that shard from the store. The first project pack the run writes removes
-// the packs of every other executable (cache.Store.RemoveOtherIdentitiesPacks).
+// the packs of every other executable but the two most recently used (cache.Store.RemoveOtherIdentitiesPacks).
 // A pack that could not be written is a problem of its store, never a finding: the next run reads that store's records
 // one by one, as it would with no pack.
 func (session *CacheSession) writePacks() {

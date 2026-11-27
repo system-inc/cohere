@@ -30,7 +30,9 @@ type buildPacks struct {
 	counts PackCounts
 }
 
-// open reads store's pack at place into the packs, and counts it read, missing or refused.
+// open reads store's pack at place into the packs, and counts it read, missing or refused. A pack read whole is marked
+// used, in the system cache's store so its trim keeps it, and in the project's so a sweep there keeps its executable's
+// packs among the most recently used (cache.Store.RemoveOtherIdentitiesPacks).
 func (packs *buildPacks) open(store *cache.Store, system bool, place cache.PackPlace) {
 	read, refused := store.ReadPack(place)
 	pack := &buildPack{store: store, place: place, system: system, served: read.Entries, stamps: read.Stamps,
@@ -39,9 +41,7 @@ func (packs *buildPacks) open(store *cache.Store, system bool, place cache.PackP
 	switch refused {
 	case "":
 		packs.counts.Read++
-		if system {
-			store.MarkPackUsed(place)
-		}
+		store.MarkPackUsed(place)
 	case cache.PackMissing:
 		// No refusal: a first run, or a new executable's, has none to read.
 		packs.counts.Missing++
