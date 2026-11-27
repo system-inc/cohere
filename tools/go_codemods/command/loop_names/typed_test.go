@@ -205,11 +205,11 @@ func TestTypedNames(test *testing.T) {
 			want: []string{"c:fixtureContext"},
 		},
 		{
-			name: "a receiver whose type's name its methods use takes the name the package gives the type",
+			name: "a receiver never takes the name a local of its type carries",
 			body: "type reactivity struct{ next *reactivity }\n" +
 				"func newReactivity() *reactivity { state := &reactivity{}; return state }\n" +
 				"func (r *reactivity) clone() *reactivity { return &reactivity{next: r} }",
-			want: []string{"r:reactivity|state|fixtureReactivity"},
+			want: []string{"r:reactivity|fixtureReactivity"},
 		},
 		{
 			name: "a type switch's letter is typed, then typed and its subject, in every clause",
@@ -266,6 +266,39 @@ func TestSettleTakesTheNextNameTheRenamingAccepts(test *testing.T) {
 	}
 	if name, renamed := accepted[14]; renamed {
 		test.Fatalf("got %q on line 14, want the letter kept when every name is taken", name)
+	}
+}
+
+// TestReceiverIgnoresALocalOfItsType confirms that letter receivers whose type's own word is refused, as `constant`
+// is beside an import of go/constant, take the name built from the type and its package, never the unrelated name
+// a local of the type carries elsewhere in the package: the shape that named every `*Constant` receiver of the
+// copied go/ir `vFalse` (#64r1v42).
+func TestReceiverIgnoresALocalOfItsType(test *testing.T) {
+	test.Parallel()
+	checked := typeCheck(test, "package fixture\n\nimport \"go/constant\"\n\n"+
+		"type Constant struct{ Value constant.Value }\n"+
+		"func (c *Constant) Name() string { return c.Value.String() }\n"+
+		"func (c *Constant) IsNil() bool { return c.Value == nil }\n"+
+		"func falseValue() *Constant { vFalse := &Constant{Value: constant.MakeBool(false)}; return vFalse }\n")
+	renamePackage := local_rename.Package{
+		FileSet: checked.fileSet,
+		Types:   checked.packageTypes,
+		Info:    checked.info,
+		Files:   checked.files,
+	}
+	candidates := findCandidates(checked.packageTypes, checked.info, checked.fileSet, checked.files, fixtureWords(test))
+	want := []string{"c:fixtureConstant", "c:fixtureConstant"}
+	if got := outcomes(candidates); !reflect.DeepEqual(got, want) {
+		test.Fatalf("got %q, want %q", got, want)
+	}
+	plan, _ := settle(renamePackage, candidates)
+	if len(plan.Accepted) != 2 {
+		test.Fatalf("got %d receivers accepted, want both: %v", len(plan.Accepted), plan.Accepted)
+	}
+	for object, newName := range plan.Accepted {
+		if newName != "fixtureConstant" {
+			test.Fatalf("got %s renamed %q, want fixtureConstant", object, newName)
+		}
 	}
 }
 
