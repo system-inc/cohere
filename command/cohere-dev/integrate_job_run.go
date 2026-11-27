@@ -2,7 +2,9 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
@@ -15,7 +17,7 @@ import (
 	"unicode"
 
 	"github.com/system-inc/cohere/internal/command_line/streams"
-	"github.com/system-inc/cohere/internal/testing/needs"
+	release "github.com/system-inc/cohere/internal/release/packaging"
 )
 
 // cohere-dev integrate-job: the one command a Loom integrate job runs on Shackler to judge a merge Loom made for main
@@ -26,7 +28,9 @@ import (
 // isn't the commit it runs at, and lays the merge's tree under its scratch. Each step says one line with its seconds,
 // and the first refusal stops it:
 //
-//  1. Preflight: what no gate needs to run for, refused in seconds (integrateJobPreflight).
+//  1. Preflight: what no gate needs to run for, refused in seconds (integrateJobPreflight), and the laid resolved set
+//     of cohere-swift's packages named for every child after, so Swift is built and checked here offline
+//     (nameSwiftResolved).
 //  2. Lay: the merge's tree and its TypeScript pin under the scratch.
 //  3. Measure: performanceScript run here with bash, before any test, handed main's binary's sha256, so a merge that
 //     builds main's binary keeps main's file and times nothing.
@@ -40,10 +44,10 @@ import (
 // With --fill it judges no merge but the commit it runs at, main's tip itself (#fnrchck, Loom's ruling): the job Loom's
 // runner lets fill the shared Go cache does the same work at main an integration does, so its verdict compares with an
 // integration's at the same tree step by step. Its preflight lays the mirrors, waits for the commit to reach them, and
-// runs only what reads the tree, the gitlinks; what judges a candidate has nothing new to judge (fillPreflight). It
-// lays that commit's tree as a merge's is laid, measures nothing, its account saying so once, runs the tests and the
-// checks as an integration does, and its last line is `filled <tree>`, with no finisher's lines, nothing committed or
-// pushed.
+// runs only what reads the tree, the gitlinks and the laid set; what judges a candidate has nothing new to judge
+// (fillPreflight). It lays that commit's tree as a merge's is laid, measures nothing, its account saying so once, runs
+// the tests and the checks as an integration does, and its last line is `filled <tree>`, with no finisher's lines,
+// nothing committed or pushed.
 
 // integrateJobCacheVariable is the integrate job's kept directory: its Go build and test cache, `gocache`, kept across
 // jobs, and its replay store, `steps`. Unset, the integrate job's tests run as a gate box's do, on an empty cache with
@@ -63,6 +67,14 @@ const integrateJobGitVariable = "COHERE_DEV_INTEGRATE_JOB_GIT"
 const (
 	integrateJobMirrorVariable = "COHERE_INTEGRATE_MIRROR"
 	integrateJobMirrorDefault  = macBoxMirrors + "/cohere.git"
+)
+
+// integrateJobSwiftResolvedRoot is where Machines lays the resolved sets of cohere-swift's packages on Shackler, each
+// `<the sha256 of the Package.resolved it was resolved from>`, root's and read-only (#je1r32a), and
+// integrateJobSwiftResolvedVariable names another root in its place, for a test.
+const (
+	integrateJobSwiftResolvedRoot     = "/opt/loom-tools/swiftpm-cohere"
+	integrateJobSwiftResolvedVariable = "COHERE_DEV_INTEGRATE_JOB_SWIFT_RESOLVED"
 )
 
 // integrateJobMergeWaitVariable shortens, for a test, how long the integrate job waits for its merge to reach the
@@ -268,19 +280,6 @@ func integrateJob(arguments []string) int {
 				return 1
 			}
 		}
-	}
-	// cohere-swift can't be built in an integrate job's sandbox (needs.SwiftUnlaid), so the tests that build it skip by
-	// name (needs.SwiftLaid), cohere on the tree checks every language but Swift (integrateJobCohereArguments), and the
-	// landing's account says so. A merge that changes Swift's own paths is let through on that rule, its Swift proven
-	// on a Mac beside it, Kirk's one-time bridge (#je1r32a).
-	if setError := os.Setenv(needs.SwiftUnlaidVariable, needs.SwiftUnlaidSetting); setError != nil {
-		fmt.Fprintf(
-			streams.Errors,
-			"cohere-dev: setting %s for the integrate job's tests: %v\n",
-			needs.SwiftUnlaidVariable,
-			setError,
-		)
-		return 1
 	}
 	job.scratch = filepath.Join(home, integrateJobScratch)
 	job.mirrors = filepath.Join(job.scratch, "mirrors")
@@ -572,6 +571,9 @@ func (job *integrateJobRun) preflight() (string, int) {
 		fmt.Fprintf(streams.Errors, "cohere-dev: %s\n", refusal)
 		return "", 1
 	}
+	if code := job.nameSwiftResolved(); code != 0 {
+		return "", code
+	}
 	job.commits, job.subject = commits, subject
 	return subject + ", " + shortCommit(job.candidate) + " merged onto main at " + shortCommit(job.running) + " as " +
 		shortCommit(job.merge), 0
@@ -579,9 +581,9 @@ func (job *integrateJobRun) preflight() (string, int) {
 
 // fillPreflight is a fill's first step: the commit the job runs at reached in the mirrors as a merge is (reachMerge),
 // and of integrateJobPreflight's checks the one that reads only the tree, its submodules recorded as gitlinks
-// (checkGitlinks). The rest judge a candidate, and a fill has none,
-// main's tip being already landed: the merge's two parents, main holding the candidate (heldByMain), the commits'
-// subjects and their task, and the landing's subject and --message.
+// (checkGitlinks), and the laid set its tests build cohere-swift from (nameSwiftResolved). The rest judge a candidate,
+// and a fill has none, main's tip being already landed: the merge's two parents, main holding the candidate
+// (heldByMain), the commits' subjects and their task, and the landing's subject and --message.
 func (job *integrateJobRun) fillPreflight() (string, int) {
 	if code := job.reachMerge(); code != 0 {
 		return "", code
@@ -590,7 +592,59 @@ func (job *integrateJobRun) fillPreflight() (string, int) {
 		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", checkGitlinksError)
 		return "", 1
 	}
+	if code := job.nameSwiftResolved(); code != 0 {
+		return "", code
+	}
 	return "main at " + shortCommit(job.merge) + ", no candidate to judge", 0
+}
+
+// swiftResolvedFile is the file of a tree whose bytes name the laid resolved set its Swift package builds from.
+const swiftResolvedFile = "swift_language/Package.resolved"
+
+// nameSwiftResolved finds the laid resolved set of cohere-swift's packages for what the job judges, the directory
+// under integrateJobSwiftResolvedRoot named by the sha256 of its swiftResolvedFile, and names it in
+// release.SwiftResolvedVariable for every child the job starts after: the measurement, the tests' script and the
+// checks, cohere on the tree among them. Each SwiftPM build of theirs then builds offline from it
+// (release.SwiftResolvedArguments), which is how Swift is checked in a sandbox with no network. The bytes hashed are
+// the blob, the ones the lay checks out, every text file LF in git and in the tree alike (.gitattributes). A tree with
+// no such file has no Swift package to build, and names none. A set that isn't laid is refused naming the sha: the lay
+// is Machines' to make (#je1r32a), which is the road's to fix and never a red of what the job judges.
+func (job *integrateJobRun) nameSwiftResolved() int {
+	judged := map[bool]string{false: "merge", true: "commit"}[job.options.Fill]
+	// Ignored: a tree with no swiftResolvedFile has no Swift package to build, and the read below says why it failed if
+	// one is there.
+	if blob, _ := gitOutput(job.repository, "rev-parse", "--verify", "--quiet",
+		job.merge+":"+swiftResolvedFile); blob == "" {
+		return 0
+	}
+	// Read whole, never through gitOutput, which trims what it reads, so the hash is of the file's own bytes.
+	reading := exec.Command("git", "cat-file", "blob", job.merge+":"+swiftResolvedFile)
+	reading.Dir = job.repository
+	var readingErrors bytes.Buffer
+	reading.Stderr = &readingErrors
+	contents, readError := reading.Output()
+	if readError != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: reading the %s's %s: %v: %s\n", judged, swiftResolvedFile, readError,
+			strings.TrimSpace(readingErrors.String()))
+		return 1
+	}
+	digest := sha256.Sum256(contents)
+	sha := hex.EncodeToString(digest[:])
+	set := filepath.Join(settingOr(integrateJobSwiftResolvedVariable, integrateJobSwiftResolvedRoot), sha)
+	if information, statError := os.Stat(filepath.Join(set, "scratch", "checkouts")); statError != nil ||
+		!information.IsDir() {
+		fmt.Fprintf(streams.Errors, "cohere-dev: no resolved set of cohere-swift's packages is laid at %s for the "+
+			"%s's %s, sha256 %s, so its Swift can't be built offline here: Machines' lay owes it (#je1r32a), which is "+
+			"the road's to fix and never a red of this %s\n", set, judged, swiftResolvedFile, sha, judged)
+		return 1
+	}
+	if setError := os.Setenv(release.SwiftResolvedVariable, set); setError != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: naming the laid set %s in %s for the integrate job's children: %v\n",
+			set, release.SwiftResolvedVariable, setError)
+		return 1
+	}
+	fmt.Fprintf(streams.Errors, "cohere-dev: integrate-job builds cohere-swift from the laid set %s\n", set)
+	return 0
 }
 
 // reachMerge lays the integrate job's mirrors, borrowing the house's, waits for what it judges, the merge or a fill's
@@ -989,8 +1043,8 @@ func (job *integrateJobRun) landingLines() (string, error) {
 		}
 		performance = base64.StdEncoding.EncodeToString(contents)
 	}
-	gated := fmt.Sprintf("Gated by cohere-dev integrate-job on %s in %s: %s. %s.", integrateJobBox,
-		time.Since(job.started).Round(time.Second), strings.Join(job.ran, ", "), needs.SwiftUnlaid)
+	gated := fmt.Sprintf("Gated by cohere-dev integrate-job on %s in %s: %s.", integrateJobBox,
+		time.Since(job.started).Round(time.Second), strings.Join(job.ran, ", "))
 	account := gated + "\n\n" + job.measured + "\n\nSteps: " + strings.Join(job.steps, ", ") + "."
 	message := landingMessage(job.subject, "", job.candidate, job.running, job.commits, account, "")
 	fmt.Fprintf(&lines, "%sperformance %s\n", integrateJobMarker, performance)
@@ -1047,7 +1101,7 @@ func (job *integrateJobRun) checks(share func(string) []string) (string, int) {
 				})
 		}},
 		{"self-check", func() (int, string) {
-			code, ran := checkCohere(job.tree, integrateJobCohereArguments,
+			code, ran := checkCohere(job.tree, gateCohereArguments,
 				func() []string { return gateEnvironment(share("building cohere")) },
 				func() []string { return gateEnvironment(share("cohere on the tree")) })
 			return code, map[bool]string{true: "cohere on the tree, 0 findings and no gaps"}[ran]

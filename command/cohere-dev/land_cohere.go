@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -53,13 +52,6 @@ type cohereRecord struct {
 // gateCohereArguments are the gate's run of cohere: write nothing, check every build, as a run without
 // `--host-build-only` does, and print the records.
 var gateCohereArguments = []string{"--no-fix", "--json"}
-
-// integrateJobCohereArguments are the integrate job's run of cohere: the gate's, naming every language but swift and
-// every format, since cohere-swift can't be built in an integrate job's sandbox (needs.SwiftUnlaid). Both flags are
-// named, since naming --languages alone checks no format. A language or format cohere adds later is left out here until
-// it is named, and the run's own record names it as left out.
-var integrateJobCohereArguments = append(slices.Clone(gateCohereArguments), "--languages", "go,typescript", "--formats",
-	"json,markdown,yaml,css,graphql")
 
 // checkCohere builds cohere at the worktree's tree and runs it with arguments at its root, `--no-fix --json` and what a
 // run narrows to, and refuses the landing unless every summary passes with 0 findings, 0 type errors and no gap. The
