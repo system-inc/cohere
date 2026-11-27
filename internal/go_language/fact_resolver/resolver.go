@@ -172,11 +172,6 @@ type Counts struct {
 	// Fallbacks is how many questions the kind answered by replaying the push's walk of a package, the whole package
 	// or only as far as the answer needed, because the answer depended on the order the push walks the package in.
 	Fallbacks atomic.Int64
-
-	// Contradicted is how many verdicts a package's fallback computed otherwise than a verdict the kind's demand walk
-	// had already kept there, which is zero on a correct run, since a walk keeps a verdict only when it met no
-	// order-dependent answer, and such a verdict is the push's in every order; the differential requires zero.
-	Contradicted atomic.Int64
 }
 
 // New is an empty resolver, which learns each package as the checker tells it ctrlflow has finished there, and reads
