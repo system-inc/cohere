@@ -883,6 +883,38 @@ func TestLandRefusesSubjectsTheHouseDoesNotWrite(test *testing.T) {
 	}
 }
 
+// A merge of main needs no area even at a shallow history's edge, as the job history Loom lays is shallow (#tbtmxpd):
+// there git log prints the merge with fewer parents than it has, so read from the log it was an ordinary commit and its
+// subject was refused (J-0q4dm0t, #e94a6r4). The merge's own object names both parents, and that is what decides it.
+func TestAMergeOfMainAtAShallowEdgeNeedsNoArea(test *testing.T) {
+	test.Parallel()
+	fixture := newLandFixture(test)
+	worktreeA := fixture.worktree("a")
+	fixture.commit(fixture.repository, "moved.txt")
+	fixture.git(worktreeA, "merge", "-q", "--no-edit", "-m", "Merge main into a", "main")
+	merge := fixture.git(worktreeA, "rev-parse", "HEAD")
+	gitDirectory := fixture.git(fixture.repository, "rev-parse", "--absolute-git-dir")
+	writeFixtureFile(test, filepath.Join(gitDirectory, "shallow"), merge+"\n")
+	if parents := fixture.git(fixture.repository, "log", "-1", "--format=%P", merge); parents != "" {
+		test.Fatalf("git log prints the shallow merge's parents %q, so this history isn't shallow at it", parents)
+	}
+	mainCommit := fixture.git(fixture.repository, "rev-parse", "main")
+	commits, commitsError := branchCommits(fixture.repository, mainCommit, merge)
+	if commitsError != nil {
+		test.Fatal(commitsError)
+	}
+	if len(commits) != 1 || commits[0].Commit != merge || !commits[0].Merge {
+		test.Fatalf("the branch's commits read %+v, want the one merge %s, read as a merge", commits, merge)
+	}
+	vocabulary, vocabularyError := subjectVocabulary(fixture.repository, merge)
+	if vocabularyError != nil {
+		test.Fatal(vocabularyError)
+	}
+	if subjectsError := checkSubjects(commits, vocabulary); subjectsError != nil {
+		test.Errorf("the merge of main was refused: %v", subjectsError)
+	}
+}
+
 // A worktree whose cohere-dev differs from main's lands through main's land, run from the main checkout against
 // the worktree, once, and main gains exactly one `Land #` commit (#8wpk5tp). Before, the worktree's own land
 // ran, and one on old code landed the old way: 50f70d03 fast-forwarded main onto its branch. The stand-in for

@@ -113,7 +113,7 @@ func (listing *treeListing) object(entryPath string) string {
 func (listing *treeListing) modules(worktree string) (map[string]string, error) {
 	directories := []string{"."}
 	if object := listing.objects["go.work"]; object != "" {
-		contents, readError := readBlobs(worktree, []string{object})
+		contents, readError := readObjects(worktree, []string{object})
 		if readError != nil {
 			return nil, readError
 		}
@@ -134,7 +134,7 @@ func (listing *treeListing) modules(worktree string) (map[string]string, error) 
 			objects = append(objects, object)
 		}
 	}
-	contents, readError := readBlobs(worktree, objects)
+	contents, readError := readObjects(worktree, objects)
 	if readError != nil {
 		return nil, readError
 	}
@@ -169,7 +169,7 @@ func (listing *treeListing) importClosure(worktree string, start string) ([]stri
 				objects = append(objects, object)
 			}
 		}
-		contents, readError := readBlobs(worktree, objects)
+		contents, readError := readObjects(worktree, objects)
 		if readError != nil {
 			return nil, readError
 		}
@@ -213,8 +213,9 @@ func ourDirectory(modules map[string]string, importPath string) (string, bool) {
 	return path.Join(modules[longest], strings.TrimPrefix(importPath, longest)), true
 }
 
-// readBlobs reads blobs by object name through one `git cat-file --batch`.
-func readBlobs(worktree string, objects []string) (map[string][]byte, error) {
+// readObjects reads objects by name, blobs or commits alike, through one `git cat-file --batch`, each as the object
+// itself holds it: a commit's every parent line is kept, whatever a shallow history's edge hides from git log.
+func readObjects(worktree string, objects []string) (map[string][]byte, error) {
 	contents := map[string][]byte{}
 	if len(objects) == 0 {
 		return contents, nil

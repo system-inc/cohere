@@ -76,14 +76,17 @@ type branchCommit struct {
 	Merge   bool
 }
 
-// branchCommits are the commits head holds and main does not, oldest first.
+// branchCommits are the commits head holds and main does not, oldest first. Whether each is a merge is read from its
+// own object's parent lines (mergeCommits), never from the parents git log prints, which stop at a shallow history's
+// edge: a merge there prints fewer parents than it has, and the job history Loom lays is shallow (#tbtmxpd), so a merge
+// of main read as an ordinary commit, its subject refused (J-0q4dm0t, #e94a6r4).
 func branchCommits(worktree string, mainCommit string, head string) ([]branchCommit, error) {
 	// %x00 between fields and %x01 between commits, so a subject is read whole.
 	listing, gitOutputError := gitOutput(
 		worktree,
 		"log",
 		"--reverse",
-		"--format=%H%x00%P%x00%s%x01",
+		"--format=%H%x00%s%x01",
 		mainCommit+".."+head,
 	)
 	if gitOutputError != nil {
@@ -92,16 +95,45 @@ func branchCommits(worktree string, mainCommit string, head string) ([]branchCom
 	commits := []branchCommit{}
 	for _, record := range strings.Split(listing, "\x01") {
 		fields := strings.Split(strings.TrimSpace(record), "\x00")
-		if len(fields) != 3 {
+		if len(fields) != 2 {
 			continue
 		}
-		commits = append(commits, branchCommit{
-			Commit:  fields[0],
-			Subject: fields[2],
-			Merge:   len(strings.Fields(fields[1])) > 1,
-		})
+		commits = append(commits, branchCommit{Commit: fields[0], Subject: fields[1]})
+	}
+	merges, mergesError := mergeCommits(worktree, commits)
+	if mergesError != nil {
+		return nil, mergesError
+	}
+	for index := range commits {
+		commits[index].Merge = merges[commits[index].Commit]
 	}
 	return commits, nil
+}
+
+// mergeCommits are which of commits are merges, by commit, read from each commit's object through one
+// `git cat-file --batch` (readObjects): a commit object names every parent on a `parent` line of its header whether or
+// not the history holds the parent, so it says what the commit is even past a shallow edge.
+func mergeCommits(worktree string, commits []branchCommit) (map[string]bool, error) {
+	names := make([]string, 0, len(commits))
+	for _, commit := range commits {
+		names = append(names, commit.Commit)
+	}
+	objects, readError := readObjects(worktree, names)
+	if readError != nil {
+		return nil, fmt.Errorf("reading the commits being landed: %w", readError)
+	}
+	merges := map[string]bool{}
+	for _, name := range names {
+		header, _, _ := strings.Cut(string(objects[name]), "\n\n")
+		parents := 0
+		for _, line := range strings.Split(header, "\n") {
+			if strings.HasPrefix(line, "parent ") {
+				parents++
+			}
+		}
+		merges[name] = parents > 1
+	}
+	return merges, nil
 }
 
 // subjectVocabulary is every area a subject may name before its colon, read from a commit's tree: each
