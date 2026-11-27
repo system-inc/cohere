@@ -77,8 +77,9 @@ const performanceMainBinary = "0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a69788
 const performanceFixtureBinary = "5f0c3a9e1d2b4c6a8e0f1a3b5c7d9e1f2a4b6c8d0e2f4a6b8c0d2e4f6a8b0c2d"
 
 // shacklerSays is everything the stand-in Shackler prints for a measurement, `COMMIT` the commit the remote names:
-// a gap's own quiet line among the script's, her machine, the cold rounds at the root with walls coldWalls, deeafbf4's,
-// which find 7 things there and exit 1, as an older tree may, and the warm and timeline rows, each with its fills.
+// a gap's own quiet line among the script's, where her modules came from, which the reading passes over, her machine,
+// the cold rounds at the root with walls coldWalls, deeafbf4's, which find 7 things there and exit 1, as an older tree
+// may, and the warm and timeline rows, each with its fills.
 // Each run's user is four times its wall and its system time a tenth of it, and each walks 120 files at the root and
 // 95 at deeafbf4, its summary counting the findings it printed.
 func shacklerSays(coldWalls []int64) string {
@@ -98,6 +99,7 @@ func shacklerSays(coldWalls []int64) string {
 	say("phase mirror 312")
 	say("phase lay 4108")
 	say("phase toolchain 2950")
+	say("modules the box's laid set at /opt/loom-tools/gomod-cohere, offline")
 	say("phase modules 640")
 	say("phase build 11870")
 	say("tested COMMIT on darwin/arm64")
@@ -613,7 +615,11 @@ func TestThePerformanceScriptMeasuresInItsScratch(test *testing.T) {
 	needs.Platform(test, "darwin", "the script reads a Mac's sysctl and /usr/bin/time -l, and Shackler is one")
 	needs.Tool(test, "bash", "the script is a bash script")
 	directory := test.TempDir()
-	environment := append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null",
+	// The test's own process may run under a runner's Go cache program, which the script reads, so it starts from none
+	// and the row that is the runner's names a stand-in.
+	environment := append(slices.DeleteFunc(withoutModuleCache(os.Environ()), func(entry string) bool {
+		return strings.HasPrefix(entry, "GOCACHEPROG=")
+	}), "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null",
 		"GIT_AUTHOR_NAME=test", "GIT_AUTHOR_EMAIL=test@example.com", "GIT_COMMITTER_NAME=test",
 		"GIT_COMMITTER_EMAIL=test@example.com")
 	git := func(where string, arguments ...string) string {
@@ -650,11 +656,13 @@ func TestThePerformanceScriptMeasuresInItsScratch(test *testing.T) {
 		git(from, "push", "-q", filepath.Join(mirrors, name), "HEAD:refs/heads/main")
 	}
 
-	// A toolchain whose go answers what the script asks, records each build, and builds a stand-in for cohere that
-	// records each run, walks 2 files at the root and finds 1 thing in 1 file at deeafbf4, exiting 1 there as the
-	// real one does, its lint and summary records saying so. With PERFORMANCE_COHERE_UNLINTED set it prints no lint
+	// A toolchain whose go answers what the script asks, records each go mod with the tree it ran in, its module cache
+	// and its proxy, records each build, and builds a stand-in for cohere that records each run, walks 2 files at the
+	// root and finds 1 thing in 1 file at deeafbf4, exiting 1 there as the real one does, its lint and summary records
+	// saying so. With PERFORMANCE_COHERE_UNLINTED set it prints no lint
 	// record, and with PERFORMANCE_COHERE_UNSUMMARIZED no summary.
 	builds := filepath.Join(directory, "builds")
+	modules := filepath.Join(directory, "modules")
 	runs := filepath.Join(directory, "runs")
 	binary := filepath.Join(directory, "stand-in-cohere")
 	binaryScript := "#!/bin/sh\necho \"$PWD $COHERE_SYSTEM_CACHE $COHERE_GO_CHILD $*\" >> '" + runs + "'\n" +
@@ -676,11 +684,18 @@ func TestThePerformanceScriptMeasuresInItsScratch(test *testing.T) {
 		"echo '{\"kind\":\"summary\",\"findings\":0,\"complete\":true,\"exitCode\":0}'\n"
 	writeFixtureFile(test, binary, binaryScript)
 	goroot := filepath.Join(directory, "go")
-	goScript := "#!/bin/sh\ncase \"$1\" in\nmod) exit 0 ;;\n" +
+	goScript := "#!/bin/sh\ncase \"$1\" in\n" +
+		"mod) echo \"$2 ${PWD##*/} GOMODCACHE=${GOMODCACHE:-} GOPROXY=${GOPROXY:-} GOSUMDB=${GOSUMDB:-}\" >> '" +
+		modules +
+		"'; exit 0 ;;\n" +
 		"env) case \"$2\" in GOOS) echo darwin ;; GOARCH) echo arm64 ;; GOVERSION) echo go1.27.1 ;; esac; exit 0 ;;\n" +
-		"build) echo \"GOCACHE=$GOCACHE CGO_ENABLED=$CGO_ENABLED $*\" >> '" + builds + "'\n" +
+		"build) echo \"GOCACHE=$GOCACHE CGO_ENABLED=$CGO_ENABLED $*\" >> '" +
+		builds +
+		"'\n" +
 		"  while [ \"$#\" -gt 0 ]; do [ \"$1\" != -o ] || output=\"$2\"; shift; done\n" +
-		"  cp '" + binary + "' \"$output\"; chmod +x \"$output\"; exit 0 ;;\nesac\n" +
+		"  cp '" +
+		binary +
+		"' \"$output\"; chmod +x \"$output\"; exit 0 ;;\nesac\n" +
 		"echo \"the stand-in go has no answer for: $*\" >&2; exit 2\n"
 	if makeError := os.MkdirAll(filepath.Join(goroot, "bin"), 0o755); makeError != nil {
 		test.Fatal(makeError)
@@ -697,15 +712,20 @@ func TestThePerformanceScriptMeasuresInItsScratch(test *testing.T) {
 	}
 	home := filepath.Join(directory, "home")
 	scratch := filepath.Join(home, "scratch", "system_cohere_tools", "performance")
-	// read runs the script once, with extra in its environment, and reads what it said.
-	read := func(extra ...string) ([]byte, performanceMeasurement, string) {
+	// readScript runs text, the script as the test laid it or as the integrate job sets it, once, with extra in its
+	// environment, and reads what it said; read runs the script as the test laid it.
+	readScript := func(text string, extra ...string) ([]byte, performanceMeasurement, string) {
 		test.Helper()
 		bash := exec.Command("bash", "-s", "--", commit, reference, "2", "3", "2", fmt.Sprint(performanceWarmRounds))
-		bash.Dir, bash.Stdin = test.TempDir(), strings.NewReader(script)
+		bash.Dir, bash.Stdin = test.TempDir(), strings.NewReader(text)
 		bash.Env = slices.Concat(environment, []string{"HOME=" + home}, extra)
 		output, bashError := bash.CombinedOutput()
 		measurement, problem := readPerformance(output, commit, bashError)
 		return output, measurement, problem
+	}
+	read := func(extra ...string) ([]byte, performanceMeasurement, string) {
+		test.Helper()
+		return readScript(script, extra...)
 	}
 	measure := func() performanceMeasurement {
 		test.Helper()
@@ -760,6 +780,28 @@ func TestThePerformanceScriptMeasuresInItsScratch(test *testing.T) {
 		test.Errorf("the measurement read %d phases, cpu %q with %d cores and stamps %+v", len(measurement.phases),
 			measurement.cpu, measurement.cores, measurement.timeline.Stamps)
 	}
+	// The build phase names whose Go cache it built on: the measurement's kept one, or under a runner that declared a
+	// cache program the runner's, which the build is left to use (#e94a6r4).
+	for _, row := range []struct {
+		extra []string
+		cache string
+	}{
+		{cache: "the measurement's kept Go cache"},
+		{extra: []string{"GOCACHEPROG=loom-job-runner gocacheprog"}, cache: "the runner's declared Go cache"},
+	} {
+		phases := measurement.phases
+		if len(row.extra) > 0 {
+			output, underRunner, problem := read(row.extra...)
+			if problem != "" {
+				test.Fatalf("the script's measurement under a runner's cache didn't read: %s\n%s", problem, output)
+			}
+			phases = underRunner.phases
+		}
+		built := slices.IndexFunc(phases, func(phase string) bool { return strings.HasPrefix(phase, "build ") })
+		if built < 0 || !strings.HasSuffix(phases[built], "s on "+row.cache) {
+			test.Errorf("with %q the phases read %q, want the build's on %s", row.extra, phases, row.cache)
+		}
+	}
 
 	for _, tree := range []string{"root", "deeafbf4"} {
 		writeFixtureFile(test, filepath.Join(scratch, tree, ".cache", "left"), "a store a run before left\n")
@@ -786,8 +828,75 @@ func TestThePerformanceScriptMeasuresInItsScratch(test *testing.T) {
 		}
 	}
 
+	// The modules both trees' runs read: in an integrate job (integrateJobSetting) with a set laid and named in
+	// `GOMODCACHE`, as Loom names one, that set with the proxy and the checksum database off, go mod download only
+	// confirming each module is there; anywhere else, as on main, a cache of the measurement's own under the scratch,
+	// filled from the proxy as Go sets it, an account's `GOMODCACHE` never read, and so in an integrate job with no set
+	// named.
+	integrateJobScript, integrateJobError := replacedOnce(script, integrateJobLine, integrateJobSetting)
+	if integrateJobError != nil {
+		test.Fatal(integrateJobError)
+	}
+	ownCache, laid := filepath.Join(scratch, "gomodcache"), filepath.Join(directory, "laid modules")
+	ownSaid := "modules this measurement's own cache at " + ownCache + ", from the proxy"
+	for _, modulesCase := range []struct {
+		name                                   string
+		integrateJob                           bool
+		named, cache, proxy, sumDatabase, said string
+	}{
+		{name: "outside an integrate job with no module cache named, its own cache from the proxy", cache: ownCache,
+			said: ownSaid},
+		{name: "outside an integrate job, an account's module cache is never read", named: laid, cache: ownCache,
+			said: ownSaid},
+		{name: "in an integrate job with no module set named, its own cache from the proxy", integrateJob: true,
+			cache: ownCache, said: ownSaid},
+		{
+			name:         "in an integrate job, the module set laid for it read offline",
+			integrateJob: true,
+			named:        laid,
+			cache:        laid,
+			proxy:        "off",
+			sumDatabase:  "off",
+			said:         "modules the box's laid set at " + laid + ", offline",
+		},
+	} {
+		// Not parallel: each case runs the script in the one scratch the cases before it laid, and reads the one
+		// record of go mod's calls.
+		test.Run(modulesCase.name, func(test *testing.T) {
+			if removeError := os.Remove(modules); removeError != nil && !os.IsNotExist(removeError) {
+				test.Fatal(removeError)
+			}
+			extra := []string{"GOPROXY=https://proxy.example.com"}
+			if modulesCase.named != "" {
+				extra = append(extra, "GOMODCACHE="+modulesCase.named)
+			}
+			text := script
+			if modulesCase.integrateJob {
+				text = integrateJobScript
+			}
+			output, _, problem := readScript(text, extra...)
+			if problem != "" {
+				test.Fatalf("the script's measurement didn't read: %s\n%s", problem, output)
+			}
+			want := []string{}
+			for _, tree := range []string{"root", "deeafbf4"} {
+				for _, asked := range []string{"download", "verify"} {
+					want = append(want, asked+" "+tree+" GOMODCACHE="+modulesCase.cache+" GOPROXY="+modulesCase.proxy+
+						" GOSUMDB="+modulesCase.sumDatabase)
+				}
+			}
+			if asked := strings.Split(strings.TrimSpace(string(readMaybeMissing(test, modules))), "\n"); !slices.Equal(
+				asked, want) {
+				test.Errorf("go mod was asked\n%s\nwant\n%s", strings.Join(asked, "\n"), strings.Join(want, "\n"))
+			}
+			if !strings.Contains(string(output), performanceMarker+modulesCase.said+"\n") {
+				test.Errorf("the script didn't say %q:\n%s", modulesCase.said, output)
+			}
+		})
+	}
+
 	// Handed main's binary, which is the one it builds here, the script says so after its build and stops before any
-	// run, as the land job reads it (#6ex523f).
+	// run, as the integrate job reads it (#6ex523f).
 	sum := sha256.Sum256([]byte(binaryScript))
 	mainBinary := hex.EncodeToString(sum[:])
 	ranBefore := len(readMaybeMissing(test, runs))

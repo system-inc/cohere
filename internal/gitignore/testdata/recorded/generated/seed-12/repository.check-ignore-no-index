@@ -1,0 +1,9 @@
+.gitignore:1:!**	q?
+.gitignore:1:!**	q?/.gitignore
+.gitignore:1:!**	q?/b
+.gitignore:1:!**	q?/b/#hash
+.gitignore:1:!**	q?/b/.gitignore
+.gitignore:1:!**	q?/node_modules
+.gitignore:1:!**	q?/node_modules/ab
+.gitignore:1:!**	q?/node_modules/ab/.gitignore
+.gitignore:1:!**	q?/node_modules/ab/trail 

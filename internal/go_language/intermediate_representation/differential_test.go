@@ -10,9 +10,8 @@ package intermediate_representation_test
 // one no-return predicate, differentialNoReturn, in place of buildir's ctrlflow facts, which need an analysis
 // pass; the predicate only has to be the same on both sides for the lowering after a call to be compared.
 //
-// The ordinary run compares the package's own testdata, a fixture holding every control-flow form, and a few
-// standard library packages. COHERE_GO_IR_DIFFERENTIAL widens it: root is every package of the cohere module, std
-// the standard library, and anything else a go/packages pattern.
+// The corpus is the package's own testdata, a fixture holding every control-flow form, and a few standard library
+// packages.
 
 import (
 	"fmt"
@@ -36,10 +35,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/intermediate_representation"
 )
 
-// differentialCorpusVariable names the corpus a wide run compares.
-const differentialCorpusVariable = "COHERE_GO_IR_DIFFERENTIAL"
-
-// differentialStandardPackages are the standard library packages the ordinary run compares.
+// differentialStandardPackages are the standard library packages the corpus holds beside the testdata.
 var differentialStandardPackages = []string{"strings", "sort", "sync", "go/ast"}
 
 // differentialKinds maps go/ir's instruction and value type names to ours, by the rename table (#7zbpd7w,
@@ -147,29 +143,16 @@ func differentialMerge(tally differentialTally, other differentialTally) differe
 // it to show the comparator fails on a lowering that differs.
 type differentialOurMutation func(*intermediate_representation.Package)
 
-// TestDifferential compares the ordinary corpus, or the one COHERE_GO_IR_DIFFERENTIAL names, and fails on any
-// difference, listing them grouped by cause.
+// TestDifferential compares the corpus and fails on any difference, listing them grouped by cause.
 func TestDifferential(test *testing.T) {
 	test.Parallel()
-	corpus := os.Getenv(differentialCorpusVariable)
 	started := time.Now()
 	var tally differentialTally
-	if corpus == "" {
-		for _, unit := range differentialTestdataUnits(test) {
-			tally = differentialMerge(tally, differentialCompareUnit(test, unit, nil))
-		}
-		tally = differentialMerge(tally, differentialCompareLoaded(test, differentialStandardPackages))
-	} else {
-		pattern := corpus
-		switch corpus {
-		case "root":
-			pattern = "./..."
-		case "std":
-			pattern = "std"
-		}
-		tally = differentialMerge(tally, differentialCompareLoaded(test, []string{pattern}))
+	for _, unit := range differentialTestdataUnits(test) {
+		tally = differentialMerge(tally, differentialCompareUnit(test, unit, nil))
 	}
-	differentialReport(test, corpus, tally, time.Since(started))
+	tally = differentialMerge(tally, differentialCompareLoaded(test, differentialStandardPackages))
+	differentialReport(test, "naive", tally, time.Since(started))
 }
 
 // TestDifferentialFailsOnASwappedOperand plants a mutant in our build of a fixed function, its subtraction's
@@ -208,8 +191,8 @@ func Sum(left, right int) int { return left + right }
 	}
 }
 
-// differentialEveryForm is a fixture holding each control-flow form the lowering handles, so the ordinary run
-// compares them all even where the standard library packages it reads don't.
+// differentialEveryForm is a fixture holding each control-flow form the lowering handles, so the corpus holds them
+// all even where the standard library packages it reads don't.
 const differentialEveryForm = `package everyform
 
 import (
@@ -374,8 +357,8 @@ finish:
 }
 `
 
-// differentialTestdataUnits are the units the ordinary run checks in memory: each program in testdata/fixedbugs
-// and the every-form fixture.
+// differentialTestdataUnits are the units of the corpus checked in memory: each program in testdata/fixedbugs and the
+// every-form fixture.
 func differentialTestdataUnits(test *testing.T) []differentialUnit {
 	test.Helper()
 	paths, globError := filepath.Glob(filepath.Join("testdata", "fixedbugs", "*.go"))
@@ -714,18 +697,14 @@ func differentialOurKinds(block *intermediate_representation.BasicBlock) string 
 	return strings.Join(kinds, " ")
 }
 
-// differentialReport logs the tally, the differences grouped by cause with a few of each, and the time and peak
-// memory taken, then fails the test if any function differs.
-func differentialReport(test *testing.T, corpus string, tally differentialTally, elapsed time.Duration) {
+// differentialReport logs the tally of the comparison run names, the differences grouped by cause with a few of each,
+// and the time and peak memory taken, then fails the test if any function differs.
+func differentialReport(test *testing.T, run string, tally differentialTally, elapsed time.Duration) {
 	test.Helper()
-	corpusName := corpus
-	if corpusName == "" {
-		corpusName = "ordinary"
-	}
 	peak := differentialPeakResident()
-	test.Logf("corpus %s: %d packages compared, %d skipped for load errors, %d functions, %d identical "+
+	test.Logf("%s: %d packages compared, %d skipped for load errors, %d functions, %d identical "+
 		"(%d instructions), %d differ, %d go/ir instance names spelled through an alias; %s, peak resident %s",
-		corpusName, tally.packages, len(tally.skipped), tally.functions, tally.identical, tally.instructions,
+		run, tally.packages, len(tally.skipped), tally.functions, tally.identical, tally.instructions,
 		len(tally.differences), tally.aliasSpelledInstances, elapsed.Round(time.Millisecond), peak)
 	if len(tally.skipped) > 0 {
 		test.Logf("skipped: %s", strings.Join(tally.skipped, " "))

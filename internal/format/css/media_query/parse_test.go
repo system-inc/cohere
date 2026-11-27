@@ -145,7 +145,7 @@ func TestParseTrees(test *testing.T) {
 }
 
 // TestParseRefusals checks the two ways the library does not return: a TypeError from an unbalanced "}"
-// in a feature, and an endless loop on an unclosed url( (which the oracle cannot run).
+// in a feature, and an endless loop on an unclosed url(, which the library never returns from.
 func TestParseRefusals(test *testing.T) {
 	test.Parallel()
 	for _, parameters := range []string{"(a} b", "screen and (color}", "url(", "  url (a(b)"} {

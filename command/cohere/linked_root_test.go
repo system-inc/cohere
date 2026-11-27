@@ -49,9 +49,10 @@ func TestAPlainCohereAtALinkedRootChecksWhatItsRealPathDoes(test *testing.T) {
 	if realExit != 1 || !strings.Contains(atReal, "consistency-no-screaming-snake-case") {
 		test.Fatalf("the run at the real path exited %d, want 1 with its finding:\n%s", realExit, atReal)
 	}
-	// What each run checked: the module's line, each finding and the footer, each without how long it took. The rest
-	// of the account names what the machine had, as its memory, which moves between two runs.
-	durations := regexp.MustCompile(`[0-9]+(\.[0-9]+)?(ms|s)\b`)
+	// What each run checked: the module's line, each finding and the footer, each without how long it took, minutes
+	// and all, since a slow box describes a module in 1m9.702s. The rest of the account names what the machine had,
+	// as its memory, which moves between two runs.
+	durations := regexp.MustCompile(`([0-9]+m)?[0-9]+(\.[0-9]+)?(ms|s)\b`)
 	checked := func(output string) string {
 		var lines []string
 		for line := range strings.SplitSeq(output, "\n") {

@@ -140,6 +140,27 @@ func TestOnlyAHeldBoxIsPassedOver(test *testing.T) {
 	}
 }
 
+// A gate that skips far more tests than main's last landing says so, loudly: more than twice as many and at least
+// skipJumpFloor more. 196 against 10 is the jump #3kpxrdt's two landings printed and passed over.
+func TestAGateSaysWhenItsSkipsJump(test *testing.T) {
+	test.Parallel()
+	for _, row := range []struct {
+		now, before int
+		jumps       bool
+	}{
+		{196, 10, true},
+		{25, 0, true},
+		{10, 10, false},
+		{25, 10, false},
+		{19, 0, false},
+		{196, -1, false},
+	} {
+		if said := skipJump(row.now, row.before); (said != "") != row.jumps {
+			test.Errorf("%d against %d reads %q, want a jump: %t", row.now, row.before, said, row.jumps)
+		}
+	}
+}
+
 // A test in a file Linux never compiles, by its name or by its build constraint, is found from the syntax, since a
 // box on Linux cannot report a test that does not exist there; one Linux compiles, or only Linux does, is not.
 func TestTheTestsLinuxNeverCompilesAreFoundFromTheSyntax(test *testing.T) {

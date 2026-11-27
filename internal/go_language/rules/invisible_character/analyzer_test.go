@@ -9,23 +9,20 @@ import (
 
 	"github.com/system-inc/cohere/internal/go_language/check/analysistest"
 	"github.com/system-inc/cohere/internal/go_language/check/parity"
+	"github.com/system-inc/cohere/internal/go_language/check/parity/staticcheck_fixtures"
 )
 
-// upstreamTestdata is a testdata of the test's own, holding staticcheck's own fixtures for `ST1018` at Go 1.0, read
-// where the module cache keeps them, copied byte for byte as go1.0, with the go.mod staticcheck's testutil lays over
-// the folder, `module example.com` at Go 1.0, written to disk beside it since cohere-go's load reads go.mod from
-// disk. parity's calls take one testdata, and this package's cannot hold the copy, so the copy is the port's own.
+// upstreamTestdata is a testdata of the test's own, holding staticcheck's own fixtures for `ST1018`, all in its one
+// folder, go1.0, byte for byte as the release keeps them, with the go.mod staticcheck's testutil lays over the folder,
+// `module example.com` at Go 1.0, written to disk beside it since cohere-go's load reads go.mod from disk. parity's
+// calls take one testdata, and this package's cannot hold the copy, so the copy is the port's own.
 func upstreamTestdata(test *testing.T) string {
 	test.Helper()
-	testdata := test.TempDir()
 	// Never copied into this package's testdata: the fixture is not gofmt-clean, one comment is a space out of gofmt's
-	// alignment, and every Go file the module owns must be, so a byte-for-byte copy can live only in the test's own
-	// temporary directory.
-	upstreamFolder := filepath.Join(parity.StaticcheckDirectory(test), "stylecheck", "st1018", "testdata", "go1.0")
+	// alignment, and every Go file the module owns must be, so staticcheck_fixtures keeps it under another name and a
+	// byte-for-byte copy can live only in the test's own temporary directory.
+	testdata := staticcheck_fixtures.Directory(test, "stylecheck", "st1018", "testdata")
 	folder := filepath.Join(testdata, "go1.0")
-	if copyError := os.CopyFS(folder, os.DirFS(upstreamFolder)); copyError != nil {
-		test.Fatalf("copying %s: %v", upstreamFolder, copyError)
-	}
 	// testutil's own overlay, `module example.com\ngo 1.0`, with the newline gofmt and editors leave at the end.
 	moduleFile := []byte("module example.com\ngo 1.0\n")
 	if writeError := os.WriteFile(filepath.Join(folder, "go.mod"), moduleFile, 0o600); writeError != nil {

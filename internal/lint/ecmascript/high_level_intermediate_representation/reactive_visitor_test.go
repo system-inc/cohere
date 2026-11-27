@@ -1,9 +1,9 @@
 package high_level_intermediate_representation
 
 import (
-	"github.com/system-inc/cohere/modules/mutation_aliasing"
-	"github.com/system-inc/cohere/modules/static_single_assignment"
 	"testing"
+
+	"github.com/system-inc/cohere/modules/static_single_assignment"
 )
 
 // TestReactiveVisitorReachesEveryInstruction is the conservation property, applied to the walk.
@@ -186,62 +186,6 @@ func TestReactiveVisitorSeesSequenceInstructions(test *testing.T) {
 	if result.Instructions == 0 {
 		test.Error("the tree reports no instructions at all")
 	}
-}
-
-// TestReactiveVisitorCorpus is the walk over real source.
-//
-// The cases above prove the property on constructs written to exercise it. This proves it did not
-// stop holding on code nobody wrote for this test, which is the only thing that would catch a
-// terminal variant no hand-written case happens to produce.
-func TestReactiveVisitorCorpus(test *testing.T) {
-	test.Parallel()
-
-	converted, mismatched, treeInstructions, walkedTotal := 0, 0, 0, 0
-
-	forEachCorpusFunction(test, 400, func(
-		function *Function,
-		ranges *mutation_aliasing.MutableRanges,
-		scopes *ReactiveScopes,
-	) {
-		aligned, merged := AlignThenMergeReactiveScopes(function, scopes)
-		BuildReactiveScopeTerminals(function, scopes, MergedScopeIdentity{Aligned: aligned, Merged: merged})
-
-		tree, result := BuildReactiveFunction(function)
-		if tree == nil {
-			return
-		}
-		converted++
-
-		walked := 0
-		VisitReactiveFunction(tree, ReactiveVisitor{
-			Instruction: func(instruction *ReactiveInstruction, traverse func()) {
-				walked++
-				traverse()
-			},
-		})
-		nodes := countReactiveInstructionNodes(tree.Body)
-		treeInstructions += nodes
-		walkedTotal += walked
-		if walked != nodes {
-			mismatched++
-		}
-		_ = result
-	})
-
-	if converted < 100 {
-		test.Fatalf("only %d functions converted; the corpus walk is not reaching real source", converted)
-	}
-	if treeInstructions == 0 {
-		test.Fatal("the corpus produced no tree instructions, so a matching walk proves nothing")
-	}
-	if mismatched != 0 {
-		test.Errorf("%d of %d functions had a walk that did not reach every tree instruction "+
-			"(%d reached against %d in the trees); a consuming pass is blind wherever it does not go",
-			mismatched, converted, walkedTotal, treeInstructions)
-	}
-
-	test.Logf("converted=%d treeInstructions=%d walked=%d mismatched=%d",
-		converted, treeInstructions, walkedTotal, mismatched)
 }
 
 // countReactiveInstructionNodes counts every `ReactiveInstruction` node in a tree, independently of

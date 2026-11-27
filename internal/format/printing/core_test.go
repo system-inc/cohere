@@ -1,27 +1,15 @@
 package printing
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
 	"math/rand"
-	"os/exec"
 	"strings"
-	"testing"
-
-	"github.com/system-inc/cohere/internal/format/doc"
-	"github.com/system-inc/cohere/internal/testing/corpus"
 )
 
 /*
- * The print core against upstream's, through a toy language.
- *
- * No real printer exists yet to test the core through, and comment attachment is where a port drifts
- * silently: a comment on the wrong node prints in a plausible wrong place. So this generates a small
- * language, parenthesised lists of atoms with block and line comments at random gaps, and runs the same
- * AST and the same tiny printer through upstream's real printAstToDoc in node and through this core.
- * Two things are compared: the formatted text, and for every comment where it attached (leading,
- * trailing or dangling, and on which node). The second localizes a failure the first only reports.
+ * A toy language for exercising the print core without a real printer: parenthesised lists of atoms, an
+ * optional label on a list, and block and line comments at random gaps. The path tests walk the trees it
+ * generates, so their shape and nesting come from a seed rather than by hand.
  */
 
 // toySource builds text and AST together, so positions are exact by construction.
@@ -32,11 +20,8 @@ type toySource struct {
 	counter  int
 }
 
-// gap writes one to three items. Runs matter: two comments on one line are what the same-line scans in
-// isOwnLineComment and isEndOfLineComment exist for, a blank line next to a comment is what the
-// blank-line hardlines exist for, and a comma is a gap character that is not whitespace or "(", which is
-// what makes breakTies decide anything. A first version wrote one item per gap, and five mutations of
-// the core survived it.
+// gap writes one to three items: comments, newlines, blank lines, commas and spaces, so a run can put two
+// comments on one line or a blank line next to a comment.
 func (source *toySource) gap() {
 	for count := 1 + source.random.Intn(3); count > 0; count-- {
 		source.gapItem()
@@ -78,8 +63,8 @@ func (source *toySource) node(depth int) *toyNode {
 	start := source.text.Len()
 	source.text.WriteString("(")
 	node := &toyNode{Kind: "List", From: start}
-	// The label is written before the children and listed after them in the visitor keys, so position
-	// order and key order disagree, which is what sortedChildNodes' sort is for.
+	// The label is a node held in its own property rather than in the children slice, so a walk of the
+	// tree has to reach it both ways.
 	if source.random.Intn(3) == 0 {
 		labelStart := source.text.Len()
 		source.text.WriteString("#tag")
@@ -116,298 +101,3 @@ func toyProgram(random *rand.Rand) (*toyNode, []*toyNode, string) {
 
 // toySettings is the toy language's per-print state, which it has none of.
 type toySettings struct{}
-
-func toyPrinter() *Printer[*toyNode, toySettings, NoArguments] {
-	printer := &Printer[*toyNode, toySettings, NoArguments]{}
-	printer.LocStart = func(node *toyNode) int { return node.From }
-	printer.LocEnd = func(node *toyNode) int { return node.To }
-	printer.VisitorKeys = func(node *toyNode) []string {
-		switch node.Kind {
-		case "List":
-			return []string{"children", "label"}
-		case "Program":
-			return []string{"children"}
-		}
-		return nil
-	}
-	printer.CanAttachComment = func(
-		node *toyNode,
-		_ []*toyNode,
-	) bool {
-		return node.Kind == "Atom" || node.Kind == "List"
-	}
-	printer.IsBlockComment = func(comment *toyNode) bool { return comment.Kind == "Block" }
-	// A handler, so the hooks are exercised and placement is observable: an end-of-line block comment
-	// inside a list dangles on that list. Without one, a mutation that misclassified end-of-line comments
-	// survived, because default attachment sends both placements to the same node; the JavaScript
-	// handlers branch on placement, so the toy has to as well.
-	printer.HandleComments.EndOfLine = func(context *CommentContext[*toyNode, toySettings, NoArguments]) bool {
-		if context.HasEnclosing && context.Enclosing.Kind == "List" && context.Comment.Kind == "Block" {
-			AddDanglingComment(context.Enclosing, context.Comment, "")
-			return true
-		}
-		return false
-	}
-	printer.PrintComment = func(
-		path *AstPath[*toyNode, toySettings],
-		options *Options[*toyNode, toySettings, NoArguments],
-	) doc.Doc {
-		comment, _ := path.Node()
-		return doc.Text(options.OriginalText[comment.From:comment.To])
-	}
-	printer.Print = func(
-		path *AstPath[*toyNode, toySettings],
-		options *Options[*toyNode, toySettings, NoArguments],
-		print PrintFunction[NoArguments],
-		_ *NoArguments,
-	) doc.Doc {
-		node, _ := path.Node()
-		children := Map(path, func(*AstPath[*toyNode, toySettings], int) doc.Doc { return print("", nil) }, "children")
-		switch node.Kind {
-		case "Program":
-			return doc.Concat{
-				doc.Join(doc.Hardline, children),
-				PrintDanglingComments(path, options, DanglingOptions[*toyNode]{}),
-				doc.Hardline,
-			}
-		case "List":
-			var label doc.Doc = doc.Text("")
-			if node.Label != nil {
-				label = doc.Concat{print("label", nil), doc.Text(" ")}
-			}
-			if len(children) == 0 {
-				return doc.Concat{
-					doc.Text("("),
-					label,
-					PrintDanglingComments(path, options, DanglingOptions[*toyNode]{}),
-					doc.Text(")"),
-				}
-			}
-			return doc.NewGroup(doc.Concat{
-				doc.Text("("), label,
-				doc.NewIndent(doc.Concat{doc.Softline, doc.Join(doc.LineDoc, children)}),
-				PrintDanglingComments(path, options, DanglingOptions[*toyNode]{}),
-				doc.Softline,
-				doc.Text(")"),
-			}, doc.GroupOptions{})
-		default:
-			return doc.Text(node.Value)
-		}
-	}
-	return printer
-}
-
-const toyUpstreamScript = `
-import { printAstToDoc } from "./src/main/ast-to-doc.js";
-import { printDanglingComments } from "./src/main/comments/print.js";
-import { addDanglingComment } from "./src/main/comments/utilities.js";
-import { builders as b, printer as docPrinter } from "./src/document/public.js";
-process.stdin.setEncoding("utf8");
-let input = ""; process.stdin.on("data", (chunk) => input += chunk);
-process.stdin.on("end", async () => {
-  const results = [];
-  for (const { ast, comments, text, width } of JSON.parse(input)) {
-    ast.comments = comments;
-    const visitorKeys = (node) => node.type === "List" ? ["children", "label"] : node.type === "Program" ? ["children"] : [];
-    const printer = {
-      features: {},
-      canAttachComment: (node) => node.type === "Atom" || node.type === "List",
-      isBlockComment: (comment) => comment.type === "Block",
-      handleComments: {
-        endOfLine(comment) {
-          if (comment.enclosingNode?.type === "List" && comment.type === "Block") {
-            addDanglingComment(comment.enclosingNode, comment);
-            return true;
-          }
-          return false;
-        },
-      },
-      printComment: (path, options) => options.originalText.slice(path.node.start, path.node.end),
-      print(path, options, print) {
-        const node = path.node;
-        // omitempty drops an empty children array from the JSON, so a missing one means none.
-        const children = node.children ? path.map(print, "children") : [];
-        if (node.type === "Program") return [b.join(b.hardline, children), printDanglingComments(path, options), b.hardline];
-        if (node.type === "List") {
-          const label = node.label ? [print("label"), " "] : "";
-          if (children.length === 0) return ["(", label, printDanglingComments(path, options), ")"];
-          return b.group(["(", label, b.indent([b.softline, b.join(b.line, children)]), printDanglingComments(path, options), b.softline, ")"]);
-        }
-        return node.value;
-      },
-    };
-    const options = {
-      printer, originalText: text, locStart: (n) => n.start, locEnd: (n) => n.end,
-      getVisitorKeys: visitorKeys, embeddedLanguageFormatting: "off", printWidth: width, tabWidth: 2,
-    };
-    try {
-      const doc = await printAstToDoc(ast, options);
-      const formatted = docPrinter.printDocToString(doc, { printWidth: width, tabWidth: 2, useTabs: false, endOfLine: "lf" }).formatted;
-      const attached = [];
-      const walk = (node) => {
-        for (const comment of node.comments ?? []) attached.push([comment.start, comment.leading ? "leading" : comment.trailing ? "trailing" : "dangling", node.type, node.start]);
-        if (node.label) walk(node.label);
-        for (const child of node.children ?? []) walk(child);
-      };
-      walk(ast);
-      attached.sort((x, y) => x[0] - y[0]);
-      results.push({ formatted, attached });
-    } catch (error) {
-      results.push({ error: String(error) });
-    }
-  }
-  process.stdout.write(JSON.stringify(results));
-});
-`
-
-type toyCase struct {
-	Ast      *toyNode   `json:"ast"`
-	Comments []*toyNode `json:"comments"`
-	Text     string     `json:"text"`
-	Width    int        `json:"width"`
-}
-
-type toyResult struct {
-	Formatted string       `json:"formatted"`
-	Attached  []attachment `json:"attached"`
-	Error     string       `json:"error"`
-}
-
-func attachedSummary(root *toyNode) []attachment {
-	// Empty, not nil: a nil slice encodes as null and upstream's empty array as [], and every comment-free
-	// program read as a mismatch until this said so.
-	attached := []attachment{}
-	var walk func(*toyNode)
-	walk = func(node *toyNode) {
-		for _, comment := range node.Comments {
-			kind := "dangling"
-			if comment.Leading {
-				kind = "leading"
-			} else if comment.Trailing {
-				kind = "trailing"
-			}
-			attached = append(attached, attachment{
-				CommentStart: comment.From,
-				Kind:         kind,
-				NodeType:     node.Kind,
-				NodeStart:    node.From,
-			})
-		}
-		if node.Label != nil {
-			walk(node.Label)
-		}
-		for _, child := range node.Children {
-			walk(child)
-		}
-	}
-	walk(root)
-	for left := 1; left < len(attached); left++ {
-		for right := left; right > 0 && attached[right].CommentStart < attached[right-1].CommentStart; right-- {
-			attached[right], attached[right-1] = attached[right-1], attached[right]
-		}
-	}
-	return attached
-}
-
-// TestCoreAgreesWithUpstream is the differential. Off unless COHERE_PRETTIER_FORK names the fork.
-func TestCoreAgreesWithUpstream(test *testing.T) {
-	test.Parallel()
-	root := corpus.PrettierFork.Root(test)
-	const count = 3000
-	random := rand.New(rand.NewSource(20261002))
-	cases := make([]toyCase, count)
-	for index := range cases {
-		ast, comments, text := toyProgram(random)
-		cases[index] = toyCase{Ast: ast, Comments: comments, Text: text, Width: 6 + random.Intn(30)}
-	}
-	encoded, encodeError := json.Marshal(cases)
-	if encodeError != nil {
-		test.Fatal(encodeError)
-	}
-
-	command := exec.Command("node", "--input-type=module", "-e", toyUpstreamScript)
-	command.Dir = root
-	command.Stdin = bytes.NewReader(encoded)
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-	command.Stdout, command.Stderr = &stdout, &stderr
-	if runError := command.Run(); runError != nil {
-		test.Fatalf("node: %v\n%s", runError, stderr.String())
-	}
-	var upstream []toyResult
-	if decodeError := json.Unmarshal(stdout.Bytes(), &upstream); decodeError != nil {
-		test.Fatal(decodeError)
-	}
-
-	// The Go side gets fresh ASTs, decoded from the same JSON, so neither side sees the other's
-	// attachment state.
-	var fresh []toyCase
-	if decodeError := json.Unmarshal(encoded, &fresh); decodeError != nil {
-		test.Fatal(decodeError)
-	}
-
-	commentsTotal, upstreamErrors, textMismatches, attachMismatches := 0, 0, 0, 0
-	for index, testCase := range fresh {
-		commentsTotal += len(testCase.Comments)
-		if upstream[index].Error != "" {
-			upstreamErrors++
-			if upstreamErrors <= 3 {
-				test.Logf("upstream refused case %d: %s", index, upstream[index].Error)
-			}
-			continue
-		}
-		options := &Options[*toyNode, toySettings, NoArguments]{
-			Printer:                    toyPrinter(),
-			OriginalText:               testCase.Text,
-			EmbeddedLanguageFormatting: "off",
-		}
-		printed, printAstToDocError := PrintAstToDoc(testCase.Ast, testCase.Comments, options)
-		if printAstToDocError != nil {
-			test.Errorf("case %d: %v\ntext %q", index, printAstToDocError, testCase.Text)
-			continue
-		}
-		formatted := doc.Print(printed, doc.Options{PrintWidth: testCase.Width, TabWidth: 2})
-
-		attachedGo, attachedGoError := json.Marshal(attachedSummary(testCase.Ast))
-		if attachedGoError != nil {
-			test.Fatalf("case %d: encoding Go's attachment: %v", index, attachedGoError)
-		}
-		attachedUpstream, attachedUpstreamError := json.Marshal(upstream[index].Attached)
-		if attachedUpstreamError != nil {
-			test.Fatalf("case %d: encoding upstream's attachment: %v", index, attachedUpstreamError)
-		}
-		if string(attachedGo) != string(attachedUpstream) {
-			attachMismatches++
-			if attachMismatches <= 3 {
-				test.Errorf(
-					"case %d attachment\ntext %q\nwant %s\ngot  %s",
-					index,
-					testCase.Text,
-					attachedUpstream,
-					attachedGo,
-				)
-			}
-		}
-		if formatted != upstream[index].Formatted {
-			textMismatches++
-			if textMismatches <= 3 {
-				test.Errorf(
-					"case %d output\ntext %q\nwant %q\ngot  %q",
-					index,
-					testCase.Text,
-					upstream[index].Formatted,
-					formatted,
-				)
-			}
-		}
-	}
-	test.Logf("%d programs, %d comments, %d upstream refused, %d attachment mismatches, %d output mismatches",
-		count, commentsTotal, upstreamErrors, attachMismatches, textMismatches)
-	if upstreamErrors > count/10 {
-		test.Errorf(
-			"upstream refused %d of %d programs, so the comparison is thinner than it looks",
-			upstreamErrors,
-			count,
-		)
-	}
-}

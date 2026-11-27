@@ -87,7 +87,7 @@ has no finding was read. There is one, and it returns the Response to its caller
   reference guard. A probe reporting whenever the guard fires counted 0 on all four trees, and no shape
   was found that reaches it; the doc comment says why it stays.
 - `gofmt -l` and `go vet` clean through the overlay. The whole suite through the overlay is green apart
-  from `TestEveryRegisteredRuleIsReachableFromTheLiveConfig` (this rule is not in the live config yet),
+  from `TestEveryRegisteredRuleIsReachableFromTheSets` (this rule is not in a set yet),
   `TestRulesFlagListsEveryRegisteredRule` (it builds the binary without the overlay, 460 against 461),
   and `command/cohere` tests failing to build on another author's in-progress edits to `main.go` and
   `format_test.go`, untouched here.

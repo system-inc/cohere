@@ -6,11 +6,11 @@ import (
 	"go/parser"
 	"go/token"
 	"go/types"
-	"os/exec"
 	"path/filepath"
 	"reflect"
-	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/testing/go_root"
 )
 
 // useWalkSources are standard-library packages whose syntax holds every kind of expression the walk places, checked
@@ -61,13 +61,9 @@ type checkedSource struct {
 func checkedStandardLibrary(test *testing.T, paths []string) map[*types.Package]checkedSource {
 	test.Helper()
 
-	// The test binary is built with -trimpath, so it knows no `GOROOT` of its own: go env names it.
-	goRoot, goEnvironmentError := exec.Command("go", "env", "GOROOT").Output()
-	if goEnvironmentError != nil {
-		test.Fatalf("reading GOROOT with go env: %v", goEnvironmentError)
-	}
+	// The test binary is built with -trimpath, so it knows no `GOROOT` of its own: go_root finds it.
 	context := build.Default
-	context.GOROOT, context.CgoEnabled = strings.TrimSpace(string(goRoot)), false
+	context.GOROOT, context.CgoEnabled = go_root.GoRoot(test), false
 	fileSet := token.NewFileSet()
 	checked := map[string]*types.Package{}
 	sources := map[*types.Package]checkedSource{}

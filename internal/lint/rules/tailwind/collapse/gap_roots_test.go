@@ -117,10 +117,6 @@ func TestGapRootDescriptionsResolveWhatTailwindCompiles(test *testing.T) {
 		load func(test *testing.T) *LoadedDesignSystem
 	}{
 		{name: "public", load: publicThemeSystem},
-		{name: "ahra", load: func(test *testing.T) *LoadedDesignSystem {
-			system, _ := liveTableFor(test, corpusRepositories[0].spelling)
-			return system
-		}},
 	} {
 		test.Run(gapSystem.name, func(test *testing.T) {
 			test.Parallel()

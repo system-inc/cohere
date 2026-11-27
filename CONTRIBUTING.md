@@ -160,17 +160,9 @@ runs. Its account's Go settings are left unread. `go mod verify` passes before a
 toolchain or module cache it can't vouch for, refuses the landing, and its verdict's land line says "scratch box,
 shared uid".
 
-A gate box holds the private corpora too, laid read-only under `~/scratch/system_cohere_tools/corpora` at the
-commits `internal/testing/corpus/corpus_pinned.go` names in the tree being landed (`gate_corpus.go`, #5r0vrte), and its
-script sets each corpus's variable to its laid copy. A box that lacks one names it and tests nothing; land then
-lays it from the checkout its corpora file names, carried on a gap of its own, and asks the box again. ahra goes
-without `data/`, which no test reads. ahra and connected are installed from their pnpm lockfiles and the
-Prettier fork from its yarn.lock, with no install scripts, then the eight bundles cohere embeds built into its
-`dist/`, which the formatter loads when the fork is set; Structure is a repository holding every commit a test reads
-through `At`. A corpus's place is its commit and the digest of how it is laid, so changing the lay lays it again,
-and laying a corpus anew removes the copy before it. To move a pin, change its
-constant and say why: the next landing on each box lays it. A corpus the corpora file doesn't name is said on
-the land line, and its tests run nowhere.
+No test reads a checkout of another repository (#5wj23dd): a gate box lays the commit being landed and its
+TypeScript pin, and nothing beside them. A property such a checkout once proved lives on a fixture committed here,
+or its test is gone.
 
 Every landing measures itself, and nothing lands unmeasured (`land_performance.go`, #6wnsnq2). Once the gate passes,
 land pushes the gated commit to Loom's feed and, in Shackler's gap, under `~/scratch/system_cohere_tools/performance`,

@@ -101,7 +101,7 @@ var tablesExemptFromTheInventory = map[string]bool{
 //	deprecationRenames               3   canonicalize-candidates.ts's DEPRECATION_MAP
 //	gradientDirections               8   its DIRECTIONS, the legacy gradient's eight
 //	utilityCanonicalizations         2   its UTILITY_CANONICALIZATIONS, in order, holding the passes
-//	                                     ported so far; canonical_unported.json counts the rest
+//	                                     ported so far; canonical_unported_public.json counts the rest
 //	variantCanonicalizations         1   its VARIANT_CANONICALIZATIONS, the same way
 //	FrameworkSuggestions           237   each functional root's `suggest` recipe: literals, theme
 //	                                     namespaces and flags, never keys. Probed from Tailwind by

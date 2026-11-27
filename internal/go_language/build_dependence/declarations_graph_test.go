@@ -3,22 +3,13 @@ package build_dependence
 import (
 	"fmt"
 	"maps"
-	"os/exec"
-	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
 	"testing"
-	"time"
 
 	"golang.org/x/tools/go/packages"
-
-	"github.com/system-inc/cohere/internal/testing/needs"
 )
-
-// declarationsTreesVariable names the trees the declarations-only graph's wide run loads (#w72zxtq), comma-separated,
-// `std` standing for the standard library's own source.
-const declarationsTreesVariable = "COHERE_GO_BUILD_DEPENDENCE_DECLARATIONS"
 
 // declarationsListed is how many differing lines or bits a comparison lists, beside their count.
 const declarationsListed = 8
@@ -166,8 +157,9 @@ func expectBitsAlike(
 
 // A declarations-only graph gives every declared object the two bits a whole graph gives it, and resolves to the same
 // units' places, sizes, universe names and declared objects and the same kind edges, over block 1's fixtures under the
-// builds its tests judge each by, and the shadowed fixture, whose seed comes from a body's name. ObjectBits of every
-// object a fixture defines or uses and DependentObjects answer alike too. Every fixture sets a bit under some build,
+// builds its tests judge each by, the methods fixture's generic Pair, its method values and its embedded interfaces
+// among them, and the shadowed fixture, whose seed comes from a body's name. ObjectBits of every object a fixture
+// defines or uses and DependentObjects answer alike too. Every fixture sets a bit under some build,
 // so none is compared with nothing. Walk only a function's header for its unit's size and names in the mode and the
 // lines of every fixture that declares a function differ, the shadowed fixture's bits with them; leave out the walk
 // of a var's initializers for the types they pass through and the inferred fixture's edges and bits differ.
@@ -435,49 +427,6 @@ func TestADeclarationsGraphTakesAWholeGraphsRecords(test *testing.T) {
 			differenceOf(host, loadFixture(test, "layout", build)))
 		if tally.bitsSet == 0 {
 			test.Errorf("layout from records under %s: no bit is set, so the comparison compared nothing", build.name)
-		}
-	}
-}
-
-// The wide run: each tree COHERE_GO_BUILD_DEPENDENCE_DECLARATIONS names, `std` for the standard library's own source,
-// loaded whole under the host, its whole graph and its declarations-only graph held to each other as the fixtures'
-// are, their declaration lines and then every object's bits under linux and under windows, one build's load at a time
-// beside the host's. It logs each graph's add and each comparison's tally.
-func TestADeclarationsGraphGivesEveryObjectAWholeGraphsBitsInATree(test *testing.T) {
-	test.Parallel()
-
-	trees := needs.OptIn(test, declarationsTreesVariable, "it names the trees, comma-separated, `std` for the "+
-		"standard library's own source, whose declarations-only graph is held to its whole graph under linux and "+
-		"windows")
-	for tree := range strings.SplitSeq(trees, ",") {
-		directory := tree
-		if tree == "std" {
-			root, rootError := exec.Command("go", "env", "GOROOT").Output()
-			if rootError != nil {
-				test.Fatal(rootError)
-			}
-			directory = filepath.Join(strings.TrimSpace(string(root)), "src")
-		}
-		started := time.Now()
-		host := loadTree(test, directory, wideEnvironment("darwin", ""))
-		loaded := time.Now()
-		whole := graphOf(host, nil)
-		wholeAdded := time.Now()
-		declarations := declarationsGraphOf(host, nil)
-		declarationsAdded := time.Now()
-		lines := expectDeclarationsAlike(test, tree, whole, declarations)
-		test.Logf("%s on the host: %d packages loaded in %s; the whole graph added in %s, the declarations-only one "+
-			"in %s", tree, len(host), loaded.Sub(started).Round(time.Second),
-			wholeAdded.Sub(loaded).Round(time.Millisecond), declarationsAdded.Sub(wholeAdded).Round(time.Millisecond))
-		for _, name := range []string{"linux", "windows"} {
-			wide := wideBuilds[name]
-			tally := expectBitsAlike(test, tree+" under "+name, whole, declarations,
-				differenceOf(host, loadTree(test, directory, wideEnvironment(wide.goos, wide.tags))))
-			tally.lines, tally.edgeLines, tally.linesDiffer = lines.lines, lines.edgeLines, lines.linesDiffer
-			test.Logf("%s under %s: %s", tree, name, tally)
-			if tally.bitsSet == 0 {
-				test.Errorf("%s under %s: no bit is set, so the comparison compared nothing", tree, name)
-			}
 		}
 	}
 }

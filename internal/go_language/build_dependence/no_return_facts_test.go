@@ -112,14 +112,3 @@ func judgeNoReturn(host loadedBuild, build loadedBuild, hostFlows controlFlows, 
 	}
 	return judgment
 }
-
-// judgedAgainCount is how many units block 1 calls independent the judgment sends to be judged again.
-func judgedAgainCount(judgment noReturnJudgment, units []Unit) int {
-	count := 0
-	for index, unit := range units {
-		if judgment.judgedAgain[index] && !unit.Dependent {
-			count++
-		}
-	}
-	return count
-}
