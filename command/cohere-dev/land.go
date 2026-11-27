@@ -298,9 +298,9 @@ func landOntoMain(run landingRun) (int, string) {
 			}
 			return code, ""
 		}
-		// Nothing lands unmeasured: the tree that lands is the gated tree with the performance file written from
-		// Shackler's measurement of the gated commit, and nothing else changed (land_performance.go).
-		measuredTree, measured, measureCode := measurePerformance(run.Worktree, gating, tree, mainCommit)
+		// Nothing lands unmeasured: Shackler measures the gated commit first, and the tree that lands is the gated
+		// tree, nothing written into it (land_performance.go, #6v8r4nn).
+		measured, measureCode := measurePerformance(run.Worktree, gating, mainCommit)
 		if measureCode != 0 {
 			restore()
 			fmt.Fprintf(streams.Errors, "cohere-dev: the landing was not measured, so nothing landed; %s is back "+
@@ -309,7 +309,7 @@ func landOntoMain(run landingRun) (int, string) {
 		}
 		landing, commitTreeError := commitTree(
 			run.Worktree,
-			measuredTree,
+			tree,
 			run.Message(mainCommit, gated+"\n\n"+measured, resolution),
 			mainCommit,
 			run.Head,
@@ -349,7 +349,7 @@ func landOntoMain(run landingRun) (int, string) {
 			restore()
 			return 1, ""
 		}
-		// The tree it was gated at with the performance file written, so nothing else on disk moves.
+		// The tree it was gated at, so nothing on disk moves.
 		// Ignored: main holds the landing either way, and a worktree left at the gated commit says the same.
 		_, _ = gitCombined(run.Worktree, "switch", "--quiet", "--detach", landing)
 		fmt.Fprintf(streams.Errors, "cohere-dev: landed %s on main: %s; %s\n", shortCommit(landing), run.Subject,

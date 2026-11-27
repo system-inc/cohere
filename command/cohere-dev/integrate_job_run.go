@@ -1,8 +1,6 @@
 package main
 
 import (
-	"bytes"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"os"
@@ -28,22 +26,25 @@ import (
 //
 //  1. Preflight: what no gate needs to run for, refused in seconds (integrateJobPreflight).
 //  2. Lay: the merge's tree and its TypeScript pin under the scratch.
-//  3. Measure: performanceScript run here with bash, before any test, handed main's binary's sha256, so a merge that
-//     builds main's binary keeps main's file and times nothing.
+//  3. Measure: performanceScript run here with bash, before any test, handed the baseline's binary's sha256, so a
+//     merge that builds main's binary times nothing. Its record is written to integrateJobRecordPath, for Loom's
+//     runner to collect when the job exits 0, and its baseline is main's last landed record, which Loom hands it in
+//     performanceBaselineVariable (#6v8r4nn).
 //  4. Tests: macBoxScript run here with bash and read by readBoxRun, so coverage, the shards, -race and the verdict
 //     are the gate box's, on the Go cache integrateJobCacheVariable keeps, or an empty one.
 //  5. Checks: go vet, the rule CPU budget, the unit isolation, the docs data and cohere on the tree, through the gate's
 //     own functions, a step whose inputs a passed run keyed replaying it (integrateJobReplay).
 //  6. Landing: nothing is committed or pushed. The last lines say what Loom's finisher needs to make the landing on
-//     Kirk's Mac (landingLines): the performance file, the tested tree's hash, and the landing's whole message.
+//     Kirk's Mac (landingLines): that the tree is the merge's own, the tested tree's hash, and the landing's whole
+//     message.
 //
 // With --fill it judges no merge but the commit it runs at, main's tip itself (#fnrchck, Loom's ruling): the job Loom's
 // runner lets fill the shared Go cache does the same work at main an integration does, so its verdict compares with an
 // integration's at the same tree step by step. Its preflight lays the mirrors, waits for the commit to reach them, and
 // runs only what reads the tree, the gitlinks; what judges a candidate has nothing new to judge (fillPreflight). It
-// lays that commit's tree as a merge's is laid, measures nothing, its account saying so once, runs the tests and the
-// checks as an integration does, and its last line is `filled <tree>`, with no finisher's lines, nothing committed or
-// pushed.
+// lays that commit's tree as a merge's is laid, measures nothing, its account saying so once, and writes no record,
+// runs the tests and the checks as an integration does, and its last line is `filled <tree>`, with no finisher's
+// lines, nothing committed or pushed.
 
 // integrateJobCacheVariable is the integrate job's kept directory: its Go build and test cache, `gocache`, kept across
 // jobs, and its replay store, `steps`. Unset, the integrate job's tests run on the Go cache its runner declared, with
@@ -81,6 +82,11 @@ const integrateJobMergePoll = 5 * time.Second
 // integrateJobCommitVariable is the commit the Loom job runs at, which Loom's runner sets in every job's environment.
 // Unset, as in a plain checkout, the commit is the working directory's `HEAD`.
 const integrateJobCommitVariable = "LOOM_JOB_COMMIT"
+
+// integrateJobRecordPath is where the integrate job writes its measurement's record, the JSON performanceFile, from the
+// directory it was started in. Loom's runner collects it when the job exits 0, and hands the next job the last landed
+// one as its baseline (performanceBaselineVariable).
+var integrateJobRecordPath = filepath.Join("integrate-job", "performance.json")
 
 // integrateJobBox is the box an integrate job runs on, which its lines name: Shackler, who holds numbers of record.
 const integrateJobBox = performanceBox
@@ -179,13 +185,14 @@ type integrateJobRun struct {
 	// commits are what the candidate brings to main, and subject the landing's, both read by the preflight.
 	commits []branchCommit
 	subject string
-	// mergeTree is the merge's tree, and integratedTree the tree integrated, mergeTree with the performance file the
-	// measurement wrote or kept.
-	mergeTree      string
-	integratedTree string
+	// mergeTree is the merge's tree, the tree tested and integrated: nothing is written into it.
+	mergeTree string
 	// measured is what the measurement says in the landing's body, and ran what the gate ran, as its account says it.
 	measured string
 	ran      []string
+	// record is where the measurement's record is written, integrateJobRecordPath from the directory the job was
+	// started in.
+	record string
 	// cache is the integrate job's kept directory, empty when integrateJobCacheVariable is unset.
 	cache string
 	// git is the git every git the job starts runs (integrateJobGit), first on its own path and on its scripts'.
@@ -216,7 +223,16 @@ func integrateJob(arguments []string) int {
 		return 1
 	}
 	fmt.Fprintf(streams.Errors, "cohere-dev: integrate-job runs the git at %s\n", git)
+	// The record's place is read before anything could move the working directory, since Loom's runner collects it
+	// from the directory it started the job in.
+	startedIn, workingDirectoryError := os.Getwd()
+	if workingDirectoryError != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: reading the directory the integrate job started in: %v\n",
+			workingDirectoryError)
+		return 1
+	}
 	job := &integrateJobRun{options: options, started: time.Now(), merge: options.Merge, git: git,
+		record: filepath.Join(startedIn, integrateJobRecordPath),
 		cache:  strings.TrimSpace(os.Getenv(integrateJobCacheVariable)),
 		mirror: settingOr(integrateJobMirrorVariable, integrateJobMirrorDefault)}
 	if job.cache != "" && !filepath.IsAbs(job.cache) {
@@ -426,7 +442,6 @@ func (job *integrateJobRun) integrate() int {
 		}
 	}
 	if job.options.Fill {
-		job.integratedTree = job.mergeTree
 		job.say("measure skipped: a fill measures nothing")
 	}
 	// The tests and the checks run through one pool token, each taking its share as the pool is when it starts.
@@ -449,14 +464,9 @@ func (job *integrateJobRun) integrate() int {
 		fmt.Fprintf(streams.Output, "filled %s\n", job.mergeTree)
 		return 0
 	}
-	lines, linesError := job.landingLines()
-	if linesError != nil {
-		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", linesError)
-		return 1
-	}
 	// What was said first is delivered first, so the landing's lines are the last of everything printed.
 	streams.Show(streams.Errors)
-	fmt.Fprint(streams.Output, lines)
+	fmt.Fprint(streams.Output, job.landingLines())
 	return 0
 }
 
@@ -838,24 +848,25 @@ func layIntegrateJobMirrors(cohereObjects string, directory string, typeScriptOb
 	return nil
 }
 
-// measure measures the merge here, before any test runs (#6ex523f): performanceScript, handed main's binary's sha256
-// from main's performance file, through the integrate job's own bash, read as a landing on the gap reads it. A merge
-// that builds main's binary keeps main's file, the script having timed nothing.
+// measure measures the merge here, before any test runs (#6ex523f): performanceScript, handed the baseline's binary's
+// sha256, through the integrate job's own bash, read as a landing on the gap reads it, and its record written to
+// job.record. A merge that builds the baseline's binary times nothing, and its record says it skipped. A tree with no
+// cohere to measure, which cohere's own never is, has no record.
 func (job *integrateJobRun) measure() (string, int) {
 	said, measurable, code := cohereToMeasure(job.repository, job.merge)
 	if !measurable {
-		job.integratedTree, job.measured = job.mergeTree, said
+		job.measured = said
 		if code == 0 {
 			job.say("measure skipped: %s", said)
 		}
 		return said, code
 	}
-	// A main whose file is missing or doesn't read has no binary to compare, so the script measures, and the note says
+	// A baseline that is missing or doesn't read has no binary to compare, so the script measures, and the note says
 	// why it compares with nothing.
+	baseline := readPerformanceBaseline()
 	mainBinary := ""
-	previous, found, unread := readPreviousPerformance(job.repository, job.running)
-	if found && unread == "" && sha256Pattern.MatchString(previous.Tools.Binary) {
-		mainBinary = previous.Tools.Binary
+	if baselineAgainst(baseline) != "" && sha256Pattern.MatchString(baseline.record.Tools.Binary) {
+		mainBinary = baseline.record.Tools.Binary
 	}
 	script, scriptError := withIntegrateJobMirrors(performanceScript, job.mirrors)
 	if scriptError == nil {
@@ -871,13 +882,25 @@ func (job *integrateJobRun) measure() (string, int) {
 	}
 	started := time.Now()
 	output, runError := runIntegrateJobScript(job.scratch, script, performanceArguments(job.merge, mainBinary))
-	tree, measured, measureCode := landMeasurement(job.repository, job.merge, job.mergeTree, job.running,
+	record, measured, measureCode := landMeasurement(job.merge, job.running, baseline,
 		performanceTaken{output: output, runError: runError, started: started, mainBinary: mainBinary})
 	if measureCode != 0 {
 		return "", measureCode
 	}
-	job.integratedTree, job.measured = tree, measured
-	if tree != "" && strings.HasPrefix(measured, "Not measured: ") {
+	contents, renderError := renderPerformance(record)
+	if renderError == nil {
+		renderError = os.MkdirAll(filepath.Dir(job.record), 0o755)
+	}
+	if renderError == nil {
+		renderError = os.WriteFile(job.record, contents, 0o644)
+	}
+	if renderError != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: writing the measurement's record to %s: %v\n", job.record,
+			renderError)
+		return "", 1
+	}
+	job.measured = measured
+	if !record.Measured {
 		job.say("measure skipped: %s", measured)
 	}
 	return measured, 0
@@ -980,35 +1003,22 @@ func (job *integrateJobRun) cacheSaid() string {
 }
 
 // landingLines are the integrate job's last lines, all Loom's finisher needs to make the landing on Kirk's Mac, in
-// order: the performance file, base64, or `unchanged` when the tested tree is the merge's own; the tested tree's hash,
-// the merge's tree with that file spliced in; the landing's whole message between its begin and end lines, its subject
-// `Land #<task>: <what>`, its body the gate's account, the measurement and every step's seconds; and last
-// `integrated <tree>`.
-func (job *integrateJobRun) landingLines() (string, error) {
+// order: `performance unchanged`, since nothing is written into the tree any more (#6v8r4nn) and the finisher's
+// grammar still reads the line; the tested tree's hash, the merge's own tree; the landing's whole message between its
+// begin and end lines, its subject `Land #<task>: <what>`, its body the gate's account, the measurement and every
+// step's seconds; and last `integrated <tree>`.
+func (job *integrateJobRun) landingLines() string {
 	var lines strings.Builder
-	performance := "unchanged"
-	if job.integratedTree != job.mergeTree {
-		reading := exec.Command("git", "cat-file", "blob", job.integratedTree+":"+performanceFileName)
-		reading.Dir = job.repository
-		var readingErrors bytes.Buffer
-		reading.Stderr = &readingErrors
-		contents, readError := reading.Output()
-		if readError != nil {
-			return "", fmt.Errorf("reading the tested tree's %s: %w: %s", performanceFileName, readError,
-				strings.TrimSpace(readingErrors.String()))
-		}
-		performance = base64.StdEncoding.EncodeToString(contents)
-	}
 	gated := fmt.Sprintf("Gated by cohere-dev integrate-job on %s in %s: %s. %s.", integrateJobBox,
 		time.Since(job.started).Round(time.Second), strings.Join(job.ran, ", "), needs.SwiftUnlaid)
 	account := gated + "\n\n" + job.measured + "\n\nSteps: " + strings.Join(job.steps, ", ") + "."
 	message := landingMessage(job.subject, "", job.candidate, job.running, job.commits, account, "")
-	fmt.Fprintf(&lines, "%sperformance %s\n", integrateJobMarker, performance)
-	fmt.Fprintf(&lines, "%stree %s\n", integrateJobMarker, job.integratedTree)
+	fmt.Fprintf(&lines, "%sperformance unchanged\n", integrateJobMarker)
+	fmt.Fprintf(&lines, "%stree %s\n", integrateJobMarker, job.mergeTree)
 	fmt.Fprintf(&lines, "%smessage begin\n%s\n%smessage end\n", integrateJobMarker, strings.TrimRight(message, "\n"),
 		integrateJobMarker)
-	fmt.Fprintf(&lines, "integrated %s\n", job.integratedTree)
-	return lines.String(), nil
+	fmt.Fprintf(&lines, "integrated %s\n", job.mergeTree)
+	return lines.String()
 }
 
 // checks runs the gate's other checks here, each through the gate's own function and in its environment: go vet, the
