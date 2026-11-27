@@ -45,3 +45,10 @@ type starter struct{}
 func (starter) start() { go func() {}() }
 
 func TestThroughAMethod(test *testing.T) { starter{}.start() }
+
+type runner struct{}
+
+// Run shares its name with testing's own, so a test calling test.Run never reaches it.
+func (runner) Run() { go func() {}() }
+
+func TestCallsTestingsRun(test *testing.T) { test.Run("sub", func(*testing.T) {}) }
