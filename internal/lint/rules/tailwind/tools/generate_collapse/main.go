@@ -17,7 +17,8 @@
 //	go run ./internal/lint/rules/tailwind/tools/generate_collapse \
 //	    -entry-point internal/lint/rules/tailwind/tools/generate_descriptor_base/testdata/independent_theme.css \
 //	    -resolve-root <directory holding node_modules/tailwindcss> \
-//	    -verify-invariance-against internal/lint/rules/tailwind/collapse/testdata/public_theme/theme.css:<the same directory> \
+//	    -verify-invariance-against \
+//	        internal/lint/rules/tailwind/collapse/testdata/public_theme/theme.css:<the same directory> \
 //	    [-check]
 //
 // The theme matters to more than the header. A consumer's theme puts its custom variants into
