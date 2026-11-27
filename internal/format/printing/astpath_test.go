@@ -73,8 +73,8 @@ func searchAncestors(path *AstPath[*toyNode, toySettings], predicate func(*toyNo
 
 // TestPathReadsItsFrames walks a small tree by hand and checks every answer that reads the frames: the key
 // and index of a list element, its siblings and neighbours, Match's names and indexes, CallParent,
-// CallElement and the stack each restores. The differential never asks most of these, and a stack that
-// read one frame off answered the JavaScript oracles identically while it moved 12 files of a real corpus.
+// CallElement and the stack each restores. The walks over generated trees above ask only for ancestors,
+// so these answers are checked here against a tree whose every frame is known.
 func TestPathReadsItsFrames(test *testing.T) {
 	test.Parallel()
 	first := &toyNode{Kind: "Atom", Value: "a"}

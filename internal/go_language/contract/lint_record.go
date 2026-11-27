@@ -196,7 +196,8 @@ type BuildRecord struct {
 	// package read of others to end, before any could start. ShareGateWaitMilliseconds, additive within contract 3,
 	// is an extra build's alone (#ghb3rcn): how long its first load waited at the share gate before its type check, in
 	// a run without a findings store, for every build to arrive and then its turn, which LoadMilliseconds leaves out,
-	// so a build's load time is its own whatever its position. Each is written only when not 0.
+	// so a build's load time is its own whatever its position. Each is rounded up to a whole millisecond, so a time
+	// measured is never 0, and is written only when not 0 (#cqqs9tp).
 	LoadMilliseconds          int `json:"loadMilliseconds,omitempty"`
 	LintMilliseconds          int `json:"lintMilliseconds,omitempty"`
 	DecideMilliseconds        int `json:"decideMilliseconds,omitempty"`

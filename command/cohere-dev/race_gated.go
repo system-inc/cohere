@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // raceGated are the packages whose tests the land gate runs a second time under -race (#bnabymg). A concurrency test
@@ -36,8 +37,20 @@ var raceGated = []raceEntry{
 	{
 		directory: "internal/go_language",
 		// The guard's own words (concurrencyTestName), so the run selects every test whose name says it runs code at
-		// once, and none of the package's others.
-		run: "Concurrent|AtOnce|InParallel|Simultaneous|SideBySide|BesideTheLoad",
+		// once, and the tests that start goroutines in their own bodies, which the guard reads from the code
+		// (bodyConcurrentTests, #q1v0ern), and none of the package's others.
+		run: "Concurrent|AtOnce|InParallel|Simultaneous|SideBySide|BesideTheLoad|^(" + strings.Join([]string{
+			"TestABuildAfterOneThatFailedIsRefusedAtTheShareGate",
+			"TestABuildsWaitAtTheShareGateIsNotItsLoadTime",
+			"TestAFailingMiddleBuildWritesWhatOneAtATimeWrites",
+			"TestAReloadingBuildIsAdmittedAtTheShareGateOnce",
+			"TestBuildsPassTheShareGateInTheOrderTheyStarted",
+			"TestEachBuildWritesItsMustCheckSet",
+			"TestEachBuildsDependenceIsTheLibrarysJudgment",
+			"TestTheBuildsReadFromTheDescriptionsReadsAreTheDisks",
+			"TestTheBuildsSelectionReturnsWhenAReadNeverComes",
+			"TestTheExtraBuildsReadTheHostsReadsWhole",
+		}, "|") + ")$",
 		reason: "the early start writes the host's go env while a load it was handed reads it (early_start_test.go: " +
 			"TestTheHostsGoEnvironmentIsWholeWhenALoadReadsItAtOnceWithTheEarlyStart, #e8w514b), extra builds run " +
 			"side by side (pipeline_builds_beside_test.go), and the lint runs beside the load " +
@@ -60,22 +73,268 @@ var raceGated = []raceEntry{
 		reason: "TestConcurrentPutsOfOneKeyLeaveAWholeEntry writes one key from " +
 			"several goroutines",
 	},
-	{directory: "internal/go_language/check", reason: "dependence sets and type graph digests are computed at once " +
-		"over one host (dependence_concurrency_test.go, type_graph_concurrency_test.go), and a run beside the load " +
-		"saves and keeps only what the load has made final (cache_session_beside_load_test.go: " +
-		"TestARunBesideTheLoadSavesAPackageOnlyOnceTheLoadHasMadeItFinal, " +
-		"TestARunBesideTheLoadKeepsAPackageOnlyOnceTheLoadHasMadeItFinal, #641hyrh)"},
+	{
+		directory: "internal/go_language/check",
+		reason: "dependence sets and type graph digests are computed at once over one host " +
+			"(dependence_concurrency_test.go, type_graph_concurrency_test.go), a run beside the load saves and keeps " +
+			"only what the load has made final (cache_session_beside_load_test.go, #641hyrh), and the cache " +
+			"session fans its restores, decides and writes out over the run's pool. Its -race run keeps the tests " +
+			"the guard calls concurrent and two for each place check starts goroutines, each driving it at least " +
+			"two goroutines wide, by the census's count (#q1v0ern): the whole package took about 800 s under -race " +
+			"on Shackler",
+		kept: &raceKept{
+			census: "J-jt23dev",
+			concurrent: []raceKeptTest{
+				{
+					test:   "TestADependenceSetIsComputedOncePerPackage",
+					reason: "it starts goroutines itself (reads_build_dependence_test.go)",
+				},
+				{
+					test:   "TestALoadThatFindsNothingFailsTheObjectDifferential",
+					reason: "it starts goroutines itself (object_broken_load_test.go)",
+				},
+				{
+					test:   "TestAPackageLoadedWithErrorsFailsTheObjectDifferential",
+					reason: "it starts goroutines itself (object_broken_load_test.go)",
+				},
+				{
+					test:   "TestARunBesideTheLoadKeepsAPackageOnlyOnceTheLoadHasMadeItFinal",
+					reason: "its name or file says it runs code at once and it starts goroutines itself (cache_session_beside_load_test.go)",
+				},
+				{
+					test:   "TestARunBesideTheLoadSavesAPackageOnlyOnceTheLoadHasMadeItFinal",
+					reason: "its name or file says it runs code at once and it starts goroutines itself (cache_session_beside_load_test.go)",
+				},
+				{
+					test:   "TestBlockOnesWalkEndsOverAnInstanceThatExpandsWithoutEnd",
+					reason: "it starts goroutines itself (object_architecture_test.go)",
+				},
+				{
+					test:   "TestDependenceSetsComputedAtOnceOverOneHostAgree",
+					reason: "its name or file says it runs code at once and it starts goroutines itself (dependence_concurrency_test.go)",
+				},
+				{
+					test:   "TestEveryObjectWhoseLinesDifferByArchitectureHasItsBitSet",
+					reason: "it starts goroutines itself (object_architecture_test.go)",
+				},
+				{
+					test:   "TestEveryObjectWhoseLinesDifferHasItsBitSet",
+					reason: "it starts goroutines itself (object_differential_test.go)",
+				},
+				{
+					test:   "TestEveryStandardLibraryObjectWhoseLinesDifferHasItsBitSet",
+					reason: "it starts goroutines itself (object_differential_test.go)",
+				},
+				{
+					test:   "TestKeptExportDataHoldsOnlyThePackagesTypes",
+					reason: "it starts goroutines itself (host_run_test.go)",
+				},
+				{
+					test:   "TestStandingBodiesTakenAndCountedAtOnceCountAsOneAfterAnother",
+					reason: "its name or file says it runs code at once and it starts goroutines itself (host_standing_test.go)",
+				},
+				{
+					test:   "TestTheClosureDigestLegFailsWhereNoNameItReachesHasABit",
+					reason: "it starts goroutines itself (object_differential_test.go)",
+				},
+				{
+					test:   "TestTheClosureIndexAnswersAsTheWalks",
+					reason: "it starts goroutines itself (closure_index_test.go)",
+				},
+				{
+					test:   "TestTheDecideIsGrantedSlotsBeforeAnalysis",
+					reason: "it starts goroutines itself (cache_session_fan_out_deciding_test.go)",
+				},
+				{
+					test:   "TestTheFieldSetLegFailsWhereAPromotedFieldMovesUnderAnUnsetNameBit",
+					reason: "it starts goroutines itself (object_differential_test.go)",
+				},
+				{
+					test:   "TestTheFixturesJudgmentReportsABuildTheFixtureIsBrokenUnder",
+					reason: "it starts goroutines itself (object_broken_load_test.go)",
+				},
+				{
+					test:   "TestVerdictsDigestingAtOnceFinishWithTheDigestsOfOne",
+					reason: "its name or file says it runs code at once and it starts goroutines itself (type_graph_concurrency_test.go)",
+				},
+			},
+			sites: []raceSite{
+				{site: "cache_session.go:CacheSession.fanOut#1", claims: []raceClaim{
+					{test: "TestAPackageAboveADeclinedOneIsJudgedAgainstItsOwnRendering", width: 4},
+					{test: "TestTheHostRestoresDecidedOnEveryCoreAreTheOnesDecidedOnOne", width: 8},
+				}},
+				{site: "cache_session.go:CacheSession.fanOut#2", claims: []raceClaim{
+					{test: "TestADeclineForAnswersSaysWhetherOneDiffersOrWentUnnamed", width: 6},
+					{test: "TestAHitIsAMissForEveryColumnPlacedRefuses", width: 2},
+				}},
+				{site: "cache_session.go:CacheSession.fanOutDeciding#1", claims: []raceClaim{
+					{test: "TestTheHostRestoresDecidedOnEveryCoreAreTheOnesDecidedOnOne", width: 8},
+					{test: "TestEveryReaderOfAnAnswerTheBuildCannotAskIsDeclinedOnEverySlot", width: 4},
+					{test: "TestEveryRestoreThatHoldsIsWrittenThroughOnEverySlot", width: 4},
+				}},
+				{site: "cache_session.go:CacheSession.fanOutDeciding#2", claims: []raceClaim{
+					{test: "TestARecordWrittenThroughWhoseHostRecordMovedIsAMiss", width: 8},
+					{test: "TestARestoreReadingAnOwnerTheBuildRanNothingOnIsDeclined", width: 6},
+				}},
+				{site: "cache_session.go:CacheSession.fanOutWriting#1", claims: []raceClaim{
+					{test: "TestEveryEntryRewrittenWithItsAnswersIsReadWholeBesideTheOthers", width: 4},
+					{test: "TestEveryEntryWhosePlacedAnswersGrewIsWrittenAgainBesideTheOthers", width: 4},
+					{test: "TestEveryRestoreThatHoldsIsWrittenThroughOnEverySlot", width: 2},
+				}},
+				{site: "cache_session.go:CacheSession.fanOutWriting#2", claims: []raceClaim{
+					{test: "TestADeclineForAnswersSaysWhetherOneDiffersOrWentUnnamed", width: 8},
+					{test: "TestAPackageWithoutReadsIsUntouchedOnlyWhenItsClosureIsClean", width: 2},
+				}},
+				{site: "cache_session_answers.go:CacheSession.rewriteEarlier#1", claims: []raceClaim{
+					{test: "TestEveryEntryRewrittenWithItsAnswersIsReadWholeBesideTheOthers", width: 8},
+					{test: "TestEveryEntryWhosePlacedAnswersGrewIsWrittenAgainBesideTheOthers", width: 8},
+				}},
+				{site: "check.go:recordUnreachedTypes#1", claims: []raceClaim{
+					{test: "TestEveryNeverMarkedDependencyNoActionReachedIsHandedItsDeclarations", width: 2},
+					{test: "TestEveryNeverMarkedRootTheRunDoesNotAnalyzeIsHandedItsDeclarations", width: 2},
+				}},
+				{site: "check.go:recordUnreachedTypes#2", claims: []raceClaim{
+					{test: "TestAPackagesTypeReadsAreEveryForeignObjectItReached", width: 8},
+					{test: "TestARunBesideTheLoadKeepsAPackageOnlyOnceTheLoadHasMadeItFinal", width: 8},
+				}},
+				{site: "host_run.go:HostRun.computeDependence#1", claims: []raceClaim{
+					{test: "TestADeclineForAnswersSaysWhetherOneDiffersOrWentUnnamed", width: 77},
+					{test: "TestAPackageWithoutReadsIsUntouchedOnlyWhenItsClosureIsClean", width: 3},
+				}},
+			},
+		},
+	},
 	{directory: "internal/go_language/check/checker", reason: "the scheduler runs groups and actions at once, up to " +
 		"its slots and workers"},
-	{directory: "internal/go_language/fact_resolver", reason: "TestObjectsAskedAtOnceAreNamedAsObjectpathNamesThem " +
-		"asks the resolver's objectpath encoders from several goroutines while each indexes its package " +
-		"(object_path_test.go, #8d9r2rh)"},
+	{
+		directory: "internal/go_language/fact_resolver",
+		reason: "TestObjectsAskedAtOnceAreNamedAsObjectpathNamesThem asks the resolver's objectpath encoders from " +
+			"several goroutines while each indexes its package (object_path_test.go, #8d9r2rh). The resolver's own " +
+			"code starts no goroutines, so its -race run is that test alone (#q1v0ern)",
+		kept: &raceKept{
+			census: "J-yqn9arq",
+			concurrent: []raceKeptTest{
+				{
+					test:   "TestObjectsAskedAtOnceAreNamedAsObjectpathNamesThem",
+					reason: "its encoders are asked from several goroutines at once (object_path_test.go)",
+				},
+			},
+		},
+	},
 	{
 		directory: "internal/go_language/intermediate_representation",
 		reason: "the intermediate representation is built " +
 			"in parallel (parallel_build_test.go)",
 	},
-	{directory: "internal/go_language/load", reason: "the loader lists and type-checks packages side by side"},
+	{
+		directory: "internal/go_language/load",
+		reason: "the loader lists, reads and parses packages side by side, and its in-process lister fans out over " +
+			"directories and the standard library. Its -race run keeps the tests the guard calls concurrent and two " +
+			"for each place the loader starts goroutines, each driving it at least two goroutines wide, by the " +
+			"census's count (#q1v0ern): the whole package took about 600 s under -race on Shackler",
+		kept: &raceKept{
+			census: "J-yqn9arq",
+			concurrent: []raceKeptTest{
+				{
+					test:   "TestAListingFingerprintIsReadOnceARunForEachSetOfInputs",
+					reason: "it starts goroutines itself (listing_share_test.go)",
+				},
+				{
+					test:   "TestALoadsInputsAreCollectedWithEverySlotHeld",
+					reason: "it starts goroutines itself (inputs_beside_test.go)",
+				},
+				{
+					test:   "TestASharedHeadIsNeverWrittenOverByALaterRead",
+					reason: "it starts goroutines itself (shared_file_test.go)",
+				},
+				{
+					test:   "TestATakenReadIsGoBuildsOwn",
+					reason: "it starts goroutines itself (package_reads_test.go)",
+				},
+				{
+					test:   "TestATestVariantKeepsItsPackagesOrderWhicheverClaimsFirst",
+					reason: "it starts goroutines itself (file_positions_test.go)",
+				},
+				{
+					test:   "TestAWalkIsGrantedALoadSlotOnlyAfterEveryPackagesWork",
+					reason: "it starts goroutines itself (walk_slots_test.go)",
+				},
+				{
+					test:   "TestAnAnalysisBesideTheLoadMeetsADependencysCgoDeclarationsWithheld",
+					reason: "its name or file says it runs code at once and it starts goroutines itself (overlap_test.go)",
+				},
+				{
+					test:   "TestEveryDirectoryReadsAsGoBuildReadsItOnCoheresBuilds",
+					reason: "it starts goroutines itself (header_share_test.go)",
+				},
+				{
+					test:   "TestTheLoadParsesTheLongestPathFirst",
+					reason: "it starts goroutines itself (load_order_test.go)",
+				},
+			},
+			sites: []raceSite{
+				{site: "in_process_lister.go:inProcessLister.match#1", claims: []raceClaim{
+					{test: "TestInProcessListingIsGoListsAnswer", width: 3},
+					{test: "TestAListingFingerprintIsReadOnceARunForEachSetOfInputs", width: 2},
+				}},
+				{site: "in_process_lister.go:inProcessLister.packagesIn#1", claims: []raceClaim{
+					{test: "TestADeclinedRestoreLeavesItsImportsScopesAsChecked", width: 4},
+					{test: "TestAModuleFileTheRunsGoCanRewriteIsReadAgainAtEveryAsk", width: 3},
+				}},
+				{site: "in_process_lister.go:inProcessLister.prefetchStandardLibrary#1", claims: []raceClaim{
+					{test: "TestAListingFingerprintIsReadOnceARunForEachSetOfInputs", width: 4},
+					{test: "TestEveryDirectoryReadsAsGoBuildReadsItOnCoheresBuilds", width: 7},
+				}},
+				{site: "in_process_lister.go:inProcessLister.prefetchStandardLibrary#2", claims: []raceClaim{
+					{test: "TestADeclinedRestoreLeavesItsImportsScopesAsChecked", width: 13},
+					{test: "TestAModuleFileTheRunsGoCanRewriteIsReadAgainAtEveryAsk", width: 189},
+				}},
+				{site: "in_process_lister.go:inProcessLister.load#1", claims: []raceClaim{
+					{test: "TestADeclinedRestoreLeavesItsImportsScopesAsChecked", width: 2},
+					{test: "TestAModuleFileTheRunsGoCanRewriteIsReadAgainAtEveryAsk", width: 12},
+				}},
+				{site: "kept_listing.go:steadyFingerprint#1", claims: []raceClaim{
+					{test: "TestAModuleFileTheRunsGoCanRewriteIsReadAgainAtEveryAsk", width: 3},
+					{test: "TestASteadyFingerprintIsKeyedByEachListAlone", width: 2},
+				}},
+				{site: "lister_state.go:listerState.fetch#1", claims: []raceClaim{
+					{test: "TestADeclinedRestoreLeavesItsImportsScopesAsChecked", width: 2},
+					{test: "TestAGoCommandThatCannotRunAsideSaysItMayRewriteTheSum", width: 2},
+				}},
+				{site: "loader.go:loader.load#1", claims: []raceClaim{
+					{test: "TestACgoProjectsPackageIsRestoredFromExportData", width: 2},
+					{test: "TestRestoredPackagesCheckedFromSourceClaimInTheSameOrderEveryLoad", width: 2},
+					// Both claimants above may skip on a gate box, one without cgo translation and one on one core, so
+					// check's restores, which drive the same restore here under check's own run, hold it.
+					{test: "TestADeclineForAnswersSaysWhetherOneDiffersOrWentUnnamed", width: 32,
+						from:   "internal/go_language/check",
+						census: "J-jt23dev"},
+					{test: "TestARecordWrittenThroughWhoseHostRecordMovedIsAMiss", width: 33,
+						from:   "internal/go_language/check",
+						census: "J-jt23dev"},
+				}},
+				{site: "load.go:loadUnder#1", claims: []raceClaim{
+					// bounded.Beside starts one goroutine and returns at once, so its caller goes on beside it: two
+					// live, the census's one started there and the load returning. Each claimant's collection runs
+					// there, once its beforeInputs lets it go, while the test's own goroutines wait on it.
+					{test: "TestALoadReturnsBeforeItsInputsAreCollected", width: 2},
+					{test: "TestALoadsInputsAreCollectedWithEverySlotHeld", width: 2},
+				}},
+				{site: "loader.go:loader.load#2", claims: []raceClaim{
+					{test: "TestADeclinedRestoreLeavesItsImportsScopesAsChecked", width: 2},
+					{test: "TestAGoCommandThatCannotRunAsideSaysItMayRewriteTheSum", width: 2},
+				}},
+				{site: "loader.go:loader.parseClaimed#1", claims: []raceClaim{
+					{test: "TestADeclinedRestoreLeavesItsImportsScopesAsChecked", width: 2},
+					{test: "TestAGoCommandThatCannotRunAsideSaysItMayRewriteTheSum", width: 2},
+				}},
+				{site: "loader.go:loader.parseClaimed#2", claims: []raceClaim{
+					{test: "TestADeclinedRestoreLeavesItsImportsScopesAsChecked", width: 2},
+					{test: "TestAGoCommandThatCannotRunAsideSaysItMayRewriteTheSum", width: 2},
+				}},
+			},
+		},
+	},
 	{
 		directory: "internal/go_language/rules/marker",
 		reason: "TestAnIndexAskedAtOnceAnswersAsOneBuiltUpFront asks one " +
@@ -101,14 +360,6 @@ var raceGated = []raceEntry{
 		"library_parses_test.go, run_cache_test.go, rule_walk_concurrency_test.go, #qb5xxj1)"},
 }
 
-// raceEntry is one package the gate runs under -race, by its directory under the module root, and why. Its run is a
-// go test -run pattern selecting the tests of the package the -race run runs, empty for all of them.
-type raceEntry struct {
-	directory string
-	run       string
-	reason    string
-}
-
 // raceRunSeparator divides a race token's directory from its run, as racePatterns writes it and the gate's scripts
 // read it.
 const raceRunSeparator = "@"
@@ -123,8 +374,8 @@ func racePatterns(root string) []string {
 		if information, statError := os.Stat(filepath.Join(root, entry.directory)); statError == nil &&
 			information.IsDir() {
 			token := "./" + entry.directory
-			if entry.run != "" {
-				token += raceRunSeparator + entry.run
+			if run := entry.keptRun(); run != "" {
+				token += raceRunSeparator + run
 			}
 			patterns = append(patterns, token)
 		}

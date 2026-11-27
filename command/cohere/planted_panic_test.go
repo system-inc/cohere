@@ -3,13 +3,50 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/system-inc/cohere/internal/testing/build_inputs"
 )
+
+// plantedPanicBinary is this command built with the cohere_planted_panic tag, once for the package run, and removed
+// by TestMain, as sharedBinary is. Two tests run it, this file's and TestOpenCrash, and each built its own (#e9fn8ey).
+var plantedPanicBinary struct {
+	once       sync.Once
+	directory  string
+	path       string
+	output     []byte
+	buildError error
+}
+
+// buildPlantedPanicCohere returns this command's binary with the planted rule, built on the first call.
+func buildPlantedPanicCohere(test *testing.T) string {
+	test.Helper()
+	build_inputs.Record(test, ".", "-tags", "cohere_planted_panic", ".")
+	plantedPanicBinary.once.Do(func() {
+		plantedPanicBinary.directory, plantedPanicBinary.buildError = os.MkdirTemp("", "cohere-test-planted-panic-")
+		if plantedPanicBinary.buildError != nil {
+			return
+		}
+		plantedPanicBinary.path = filepath.Join(plantedPanicBinary.directory, "cohere")
+		build := exec.Command(
+			"go", "build", "-buildvcs=false", "-tags", "cohere_planted_panic", "-o", plantedPanicBinary.path, ".",
+		)
+		plantedPanicBinary.output, plantedPanicBinary.buildError = build.CombinedOutput()
+	})
+	if plantedPanicBinary.buildError != nil {
+		test.Fatalf(
+			"cannot build cohere with the planted rule: %v\n%s",
+			plantedPanicBinary.buildError,
+			plantedPanicBinary.output,
+		)
+	}
+	return plantedPanicBinary.path
+}
 
 // A rule's crash is cohere's bug, and the run that meets one fails, names it in every view, and finishes
 // everything else (#v1ah2qq). TanStack/query's run met six react-hooks crashes and ended with a footer
@@ -21,12 +58,7 @@ import (
 // alone, so nothing but the crash can fail the run.
 func TestARuleCrashFailsTheRunAndNamesItselfAsCohere(test *testing.T) {
 	test.Parallel()
-	binary := filepath.Join(test.TempDir(), "cohere")
-	build_inputs.Record(test, ".", "-tags", "cohere_planted_panic", ".")
-	build := exec.Command("go", "build", "-buildvcs=false", "-tags", "cohere_planted_panic", "-o", binary, ".")
-	if output, outputError := build.CombinedOutput(); outputError != nil {
-		test.Fatalf("cannot build cohere with the planted rule: %v\n%s", outputError, output)
-	}
+	binary := buildPlantedPanicCohere(test)
 
 	// The settings name the planted rule on top of the house's, so a body other rules have nothing to say
 	// about is the only way to leave the crash as the run's one problem.

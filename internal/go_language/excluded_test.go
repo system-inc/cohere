@@ -14,6 +14,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/go_language/contract"
 	"github.com/system-inc/cohere/internal/go_language/rules"
+	"github.com/system-inc/cohere/internal/testing/written_repository"
 )
 
 // excludedRun is what these tests read of one run: its project, types and lint records, and the files a planted rule
@@ -38,7 +39,7 @@ func excludedModule(test *testing.T, files map[string]string) string {
 	for name, contents := range files {
 		writeTextRulesFile(test, directory, name, []byte(contents))
 	}
-	if writeError := writeRepository(directory); writeError != nil {
+	if writeError := written_repository.Write(directory); writeError != nil {
 		test.Fatalf("writing %s's repository: %v", directory, writeError)
 	}
 	return directory

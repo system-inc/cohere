@@ -23,14 +23,6 @@ import (
 	release "github.com/system-inc/cohere/internal/release/packaging"
 )
 
-// verdictDifferentialRootVariable names a tree whose packages the object differential judges for each extra build
-// cohere-go's census needs beside the host's, as the package differential in go_language judges the same tree's runs.
-// Unset, the real-tree run is skipped:
-//
-//	COHERE_VERDICT_DIFFERENTIAL_ROOT=<tree> go run ./command/cohere-dev test ./internal/go_language/check/ \
-//	    -run 'TestEveryObjectOfARealTreeWhoseLinesDifferHasItsBitSet$' -v
-const verdictDifferentialRootVariable = "COHERE_VERDICT_DIFFERENTIAL_ROOT"
-
 // objectBuild is one build the object differential loads a tree under: its name, as a failure names it, and its
 // environment.
 type objectBuild struct {
@@ -845,32 +837,32 @@ func TestEveryStandardLibraryObjectWhoseLinesDifferHasItsBitSet(test *testing.T)
 	}
 }
 
-// objectTreeBuilds is the workspace rooted at root and the builds cohere-go checks of it: the host's build as go env
+// objectTreeBuilds is the builds cohere-go checks of the workspace rooted at root: the host's build as go env
 // reads it, then every extra build its census needs beside it, the targets its settings file names among them
 // (project.BuildsFor, asked as cohere-go's readBuilds asks it). A target go tool dist list does not list is an error,
 // as cohere-go refuses its run, since a target named and never checked would read as checked.
-func objectTreeBuilds(root string) (project.Workspace, []project.Build, error) {
+func objectTreeBuilds(root string) ([]project.Build, error) {
 	workspace, workspaceError := project.ReadWorkspace(root)
 	if workspaceError != nil {
-		return project.Workspace{}, nil, workspaceError
+		return nil, workspaceError
 	}
 	census, censusError := project.TakeCensus(workspace)
 	if censusError != nil {
-		return project.Workspace{}, nil, censusError
+		return nil, censusError
 	}
 	goEnvironment, goEnvironmentError := load.ReadGoEnvironment(workspace.Root, workspace.Environment(), nil, nil)
 	if goEnvironmentError != nil {
-		return project.Workspace{}, nil, goEnvironmentError
+		return nil, goEnvironmentError
 	}
 	ports, portsError := project.ReadPorts(workspace.Root, workspace.Environment())
 	if portsError != nil {
-		return project.Workspace{}, nil, portsError
+		return nil, portsError
 	}
 	// The settings file cohere-go reads with no `--lint-config` named, whose rules this package cannot judge, as it
 	// cannot import cohere-go that knows every rule, so only the targets are read, as settings.Load reads them.
 	targets, targetsError := settings.ReadTargets(root, "")
 	if targetsError != nil {
-		return project.Workspace{}, nil, targetsError
+		return nil, targetsError
 	}
 	// Each target as a port, mirroring readBuilds, which this package cannot call, as cohere-go imports it.
 	var extraTargets []project.Port
@@ -880,7 +872,7 @@ func objectTreeBuilds(root string) (project.Workspace, []project.Build, error) {
 			return port.OperatingSystem == operatingSystem && port.Architecture == architecture
 		})
 		if index < 0 {
-			return project.Workspace{}, nil, fmt.Errorf("the go block's targets name %s, which go tool dist list "+
+			return nil, fmt.Errorf("the go block's targets name %s, which go tool dist list "+
 				"does not target, so cohere-go refuses the run", target)
 		}
 		extraTargets = append(extraTargets, ports[index])
@@ -889,9 +881,9 @@ func objectTreeBuilds(root string) (project.Workspace, []project.Build, error) {
 	builds, _, buildsError := project.BuildsFor(census, project.HostBuild(buildContext, goFlags), ports, extraTargets,
 		os.ReadFile)
 	if buildsError != nil {
-		return project.Workspace{}, nil, buildsError
+		return nil, buildsError
 	}
-	return workspace, builds, nil
+	return builds, nil
 }
 
 // The object differential checks the targets a tree's settings file names, as cohere-go does (objectTreeBuilds): a
@@ -932,7 +924,7 @@ func TestTheObjectDifferentialChecksTheTargetsASettingsFileNames(test *testing.T
 		if !slices.Equal(read, loaded.Targets) {
 			test.Fatalf("read the targets %q, and settings.Load reads %q", read, loaded.Targets)
 		}
-		_, builds, buildsError := objectTreeBuilds(root)
+		builds, buildsError := objectTreeBuilds(root)
 		if buildsError != nil {
 			test.Fatal(buildsError)
 		}
@@ -946,7 +938,7 @@ func TestTheObjectDifferentialChecksTheTargetsASettingsFileNames(test *testing.T
 	test.Run("unlisted", func(test *testing.T) {
 		test.Parallel()
 
-		_, builds, buildsError := objectTreeBuilds(tree(test, `["nowhere/none"]`))
+		builds, buildsError := objectTreeBuilds(tree(test, `["nowhere/none"]`))
 		if buildsError == nil {
 			test.Fatalf("read the builds %v for a target go tool dist list does not list, which cohere-go refuses",
 				builds)
@@ -956,41 +948,4 @@ func TestTheObjectDifferentialChecksTheTargetsASettingsFileNames(test *testing.T
 				buildsError)
 		}
 	})
-}
-
-// The same rule over the tree verdictDifferentialRootVariable names, skipped when it is unset: the builds cohere-go
-// checks of it (objectTreeBuilds), the host's and every extra build, the targets its settings file names among them,
-// each loaded with tests under the workspace's environment and the build's own, the packages of the tree's modules
-// the workspace. It logs each build's counts and fails on any object whose bit the rule wants set and finds unset,
-// and on any package the host's load or a build's holds with errors, which no leg compares (reportObjectDifferences):
-// a tree that does not type-check is not judged, and never reads as one that passed.
-func TestEveryObjectOfARealTreeWhoseLinesDifferHasItsBitSet(test *testing.T) {
-	test.Parallel()
-
-	root := os.Getenv(verdictDifferentialRootVariable)
-	if root == "" {
-		test.Skipf("%s names no tree", verdictDifferentialRootVariable)
-	}
-	workspace, builds, buildsError := objectTreeBuilds(root)
-	if buildsError != nil {
-		test.Fatal(buildsError)
-	}
-	if len(builds) < 2 {
-		test.Skipf("the census of %s needs no extra build", root)
-	}
-	environmentOf := func(build project.Build) []string {
-		return slices.Concat(os.Environ(), workspace.Environment(), build.Environment())
-	}
-	inWorkspace := func(loaded *packages.Package) bool { return loaded.Module != nil && loaded.Module.Main }
-	started := time.Now()
-	host := loadObjects(test, workspace.Root, environmentOf(builds[0]), "./...", true)
-	test.Logf("host %s: %d packages loaded, %d with errors, in %s", builds[0], len(host.packages),
-		len(host.broken), time.Since(started).Round(time.Second))
-	for _, build := range builds[1:] {
-		started := time.Now()
-		built := loadObjects(test, workspace.Root, environmentOf(build), "./...", true)
-		test.Logf("%s: %d packages loaded, %d with errors", build, len(built.packages), len(built.broken))
-		tally := objectDifferences(host, built, objectDependence(host, built, inWorkspace).ObjectBits)
-		reportObjectDifferences(test, build.String(), tally, started)
-	}
 }

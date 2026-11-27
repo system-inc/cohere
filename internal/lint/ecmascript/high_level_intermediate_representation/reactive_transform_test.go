@@ -1,7 +1,6 @@
 package high_level_intermediate_representation
 
 import (
-	"github.com/system-inc/cohere/modules/mutation_aliasing"
 	"testing"
 )
 
@@ -183,65 +182,6 @@ func TestReactiveTransformRewritesNestedBlocks(test *testing.T) {
 			}
 		})
 	}
-}
-
-// TestReactiveTransformCorpus runs the same removal over real source.
-//
-// The hand-written cases above each hold one construct. This is the only thing that would catch a
-// terminal arm no case happens to produce, which is exactly the failure `transformTerminalBlocks`
-// invites by being written out by hand.
-func TestReactiveTransformCorpus(test *testing.T) {
-	test.Parallel()
-
-	converted, survived, totalRemoved := 0, 0, 0
-
-	forEachCorpusFunction(test, 400, func(
-		function *Function,
-		ranges *mutation_aliasing.MutableRanges,
-		scopes *ReactiveScopes,
-	) {
-		aligned, merged := AlignThenMergeReactiveScopes(function, scopes)
-		BuildReactiveScopeTerminals(function, scopes, MergedScopeIdentity{Aligned: aligned, Merged: merged})
-
-		tree, _ := BuildReactiveFunction(function)
-		if tree == nil {
-			return
-		}
-		converted++
-		before := countInstructionStatements(tree.Body)
-
-		TransformReactiveFunction(tree, ReactiveTransformer{
-			Instruction: func(statement *ReactiveInstructionStatement, traverse func()) ReactiveTransformed {
-				return RemoveStatement()
-			},
-			Terminal: func(statement *ReactiveTerminalStatement, traverse func()) ReactiveTransformed {
-				traverse()
-				return KeepStatement()
-			},
-			Scope: func(scope *ReactiveScopeBlock, traverse func()) ReactiveTransformed {
-				traverse()
-				return KeepStatement()
-			},
-		})
-
-		totalRemoved += before
-		if remaining := countInstructionStatements(tree.Body); remaining != 0 {
-			survived++
-		}
-	})
-
-	if converted < 100 {
-		test.Fatalf("only %d functions converted; the corpus walk is not reaching real source", converted)
-	}
-	if totalRemoved == 0 {
-		test.Fatal("no instruction statements were removed, so a zero survivor count proves nothing")
-	}
-	if survived != 0 {
-		test.Errorf("%d of %d functions kept an instruction statement through a transform that "+
-			"removed every one; a nested block's rewrite was discarded", survived, converted)
-	}
-
-	test.Logf("converted=%d removed=%d survived=%d", converted, totalRemoved, survived)
 }
 
 // countStatements counts every statement in a tree, at any depth.

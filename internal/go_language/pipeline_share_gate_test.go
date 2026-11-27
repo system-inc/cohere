@@ -585,9 +585,9 @@ func TestAReloadingBuildIsAdmittedAtTheShareGateOnce(test *testing.T) {
 // (#ghb3rcn), so load times read alike whatever a build's position. At a width of one the first build holds itself at
 // its end until the second waits behind it at the gate, so every build after the first waits there: each build's
 // record splits its loads' whole wall time, as cohere-go told it (buildLoadTimes), into loadMilliseconds and
-// shareGateWaitMilliseconds, which sum to it within the millisecond each figure's rounding down may lose, and every
-// build after the first was told a wait. The wait is read from what cohere-go told, not the record's milliseconds,
-// since a wait under one rounds to none there.
+// shareGateWaitMilliseconds, which sum to it rounded up or one more, since each figure is rounded up on its own
+// (millisecondsRoundedUp), and every build after the first was told a wait. The wait is read from what cohere-go told,
+// not the record's milliseconds, which round any wait up.
 func TestABuildsWaitAtTheShareGateIsNotItsLoadTime(test *testing.T) {
 	test.Parallel()
 	secondHeld := make(chan struct{})
@@ -637,9 +637,9 @@ func TestABuildsWaitAtTheShareGateIsNotItsLoadTime(test *testing.T) {
 			continue
 		}
 		split := build.LoadMilliseconds + build.ShareGateWaitMilliseconds
-		if whole := int(wall.Milliseconds()); split != whole && split != whole-1 {
+		if whole := millisecondsRoundedUp(wall); split != whole && split != whole+1 {
 			test.Errorf("the build %s recorded a load of %d ms and a wait at the share gate of %d ms, %d together, "+
-				"want its loads' %d ms whole, within the millisecond rounding may lose", build.Target,
+				"want its loads' %d ms whole, or one more from rounding each up", build.Target,
 				build.LoadMilliseconds, build.ShareGateWaitMilliseconds, split, whole)
 		}
 		if positions[build.Target] > 0 && waits[build.Target] <= 0 {

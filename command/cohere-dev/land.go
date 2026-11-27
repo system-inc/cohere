@@ -547,29 +547,12 @@ func gate(worktree string, commit string, task string) (int, string) {
 	reportWorkspace(covered, streams.Errors)
 	patterns := covered.Patterns()
 	started := time.Now()
-	// The modules by directory, as the gate's report names them, not the package patterns, which in cohere run to
-	// about 900 characters of shim paths.
-	tested := "go test of the module"
-	if covered.FromWorkspace {
-		directories := make([]string, 0, len(covered.Modules))
-		for _, module := range covered.Modules {
-			directories = append(directories, module.Directory)
-		}
-		tested = fmt.Sprintf("go test of %d modules from go.work (%s)", len(directories),
-			strings.Join(directories, ", "))
-	}
-	ran := []string{"go vet", tested}
+	ran := []string{"go vet", testedNamed(covered)}
 	// Each command takes its share as the pool is when it starts (tokenRun.step): a gate that waited for its
 	// token on a busy pool widens for its tests or its docs check once the pool goes idle.
 	code := withSteppedToken("land gate on "+shortCommit(commit)+" in "+worktree, func(step func(string) []string) int {
-		vet := exec.Command("go", append([]string{"vet"}, patterns...)...)
-		vet.Dir, vet.Env = worktree, gateEnvironment(step("go vet"))
-		vet.Stdout, vet.Stderr = os.Stdout, os.Stderr
-		// The command writes to the terminal itself, so what this run said first is delivered first.
-		streams.Show(streams.Output)
-		streams.Show(streams.Errors)
-		if runError := vet.Run(); runError != nil {
-			return exitCodeOf(runError)
+		if code := goVet(worktree, patterns, gateEnvironment(step("go vet"))); code != 0 {
+			return code
 		}
 		code, checked := checkRuleCpu(
 			worktree,
@@ -581,13 +564,7 @@ func gate(worktree string, commit string, task string) (int, string) {
 		if checked {
 			ran = append(ran, "the rule CPU budget")
 		}
-		// The same environment cohere-dev test gives the module's tests, corpora included (corpora.go).
-		testing, uncovered, testEnvironmentError := testEnvironment(gateEnvironment(step("the test run")))
-		if testEnvironmentError != nil {
-			fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", testEnvironmentError)
-			return 2
-		}
-		defer printUncovered(streams.Errors, uncovered)
+		testing := gateEnvironment(step("the test run"))
 		// On a gate box, a house Mac (box_verdict.go, mac_box_gate.go), or as a land-gate job (land_gate_job.go),
 		// either one's no verdict refusing the landing, or on Kirk's Mac alone when the gate says off.
 		testCode, where := runModuleTests(worktree, commit, task, covered, testing)
@@ -612,6 +589,7 @@ func gate(worktree string, commit string, task string) (int, string) {
 		}
 		code, checked = checkCohere(
 			worktree,
+			gateCohereArguments,
 			func() []string { return gateEnvironment(step("building cohere")) },
 			func() []string { return gateEnvironment(step("cohere on the tree")) },
 		)
@@ -622,6 +600,34 @@ func gate(worktree string, commit string, task string) (int, string) {
 	})
 	return code, fmt.Sprintf("Gated by cohere-dev land in %s: %s.", time.Since(started).Round(time.Second),
 		strings.Join(ran, ", "))
+}
+
+// testedNamed is what the gate's account says it tested: the module, or go.work's modules by directory, as the gate's
+// report names them, not the package patterns, which in cohere run to about 900 characters of shim paths.
+func testedNamed(covered project.Workspace) string {
+	if !covered.FromWorkspace {
+		return "go test of the module"
+	}
+	directories := make([]string, 0, len(covered.Modules))
+	for _, module := range covered.Modules {
+		directories = append(directories, module.Directory)
+	}
+	return fmt.Sprintf("go test of %d modules from go.work (%s)", len(directories), strings.Join(directories, ", "))
+}
+
+// goVet runs go vet of patterns in the worktree, in environment, writing to the terminal, and returns its exit code:
+// the gate's first step, and one of the integrate job's checks (integrate_job_run.go).
+func goVet(worktree string, patterns []string, environment []string) int {
+	vet := exec.Command("go", append([]string{"vet"}, patterns...)...)
+	vet.Dir, vet.Env = worktree, environment
+	vet.Stdout, vet.Stderr = os.Stdout, os.Stderr
+	// The command writes to the terminal itself, so what this run said first is delivered first.
+	streams.Show(streams.Output)
+	streams.Show(streams.Errors)
+	if runError := vet.Run(); runError != nil {
+		return exitCodeOf(runError)
+	}
+	return 0
 }
 
 // ruleCpuCheck is the repository-local, generated stress corpus and its budget test.

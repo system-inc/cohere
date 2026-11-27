@@ -30,6 +30,10 @@ var usersCacheDirectory string
 // the table is keyed by the project root, so no two tests share a table; a test that needs a cold run
 // says `--no-cache`, and TestRunCacheEndToEnd sets a home of its own for its runs.
 func TestMain(suite *testing.M) {
+	// A child a test started from this binary plays its role and runs no test (own_child_test.go).
+	if role, isOwnChild := os.LookupEnv(ownChildVariable); isOwnChild {
+		os.Exit(playOwnChild(ownChildRole(role), os.Args[1:]))
+	}
 	// In-process, the tests read the verbose account, as the binary tests do through verboseArguments.
 	activeOutput = outputSettings{Mode: outputVerbose}
 	pinGoEnvironment()
@@ -45,7 +49,7 @@ func TestMain(suite *testing.M) {
 	_ = os.Setenv("XDG_CACHE_HOME", "") // Ignored: as the line above.
 	// See held_output_guard_test.go: a command whose output never closes fails the binary with its holder
 	// named, rather than at -timeout with nothing said.
-	stopWatching := watchForHeldOutput(heldOutputDeadline, 10*time.Second, failHeldOutput)
+	stopWatching := watchForHeldOutput(heldOutputDeadline, 10*time.Second, pipeHolders, failHeldOutput)
 	// cohere-go's system cache, a directory of this test binary's own, whatever the shell set (#syscache).
 	removeSystemCache, isolateError := system_cache_testing.Isolate()
 	if isolateError != nil {
@@ -59,6 +63,9 @@ func TestMain(suite *testing.M) {
 	_ = os.RemoveAll(home)
 	if sharedBinary.directory != "" {
 		_ = os.RemoveAll(sharedBinary.directory) // Ignored: as home's, above.
+	}
+	if plantedPanicBinary.directory != "" {
+		_ = os.RemoveAll(plantedPanicBinary.directory) // Ignored: as home's, above.
 	}
 	for _, stamped := range stampedBinaries.byVersion {
 		if stamped.directory != "" {
