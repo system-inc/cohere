@@ -315,7 +315,8 @@ func formatFile(file string, options Options) outcome {
 // gofmtPrinterMode and gofmtTabWidth are go/format's printer settings, which are cmd/gofmt's, copied since go/format
 // keeps them to itself. gofmtNormalizeNumbers is go/format's printerNormalizeNumbers, a mode go/printer reserves for
 // go/format and cmd/gofmt and exports no name for: it prints number literals' prefixes and exponents in their one
-// canonical spelling. TestGofmtSourceIsGoFormatsOutputForEveryGoFile holds these to go/format's output.
+// canonical spelling. TestGofmtSourceIsGoFormatsOutputWherePrintingDiffers holds these to go/format's output, and
+// repository_corpus's TestGofmtSourceIsGoFormatsOutputForEveryGoFile holds a run to it over every Go file of cohere.
 const (
 	gofmtNormalizeNumbers = 1 << 30
 	gofmtPrinterMode      = printer.UseSpaces | printer.TabIndent | gofmtNormalizeNumbers

@@ -4,55 +4,23 @@ import (
 	"bytes"
 	"fmt"
 	goformat "go/format"
-	"go/parser"
-	"go/token"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"testing"
-
-	"github.com/system-inc/cohere/internal/go_language/bounded"
 )
 
 // gofmtSource prints with go/format's settings copied, a private bit among them, so it is held to go/format.Source byte
-// for byte over every Go file of this repository, its testdata included, that formatFile would hand it: one whose
-// package clause parses. A file that does not parse fails alike in both, with the same error.
-func TestGofmtSourceIsGoFormatsOutputForEveryGoFile(test *testing.T) {
+// for byte over sources the repository holds none of, since the repository is gofmt's already and its files print as
+// they are: these are printed differently, the private bit's number literals among them, and a file that does not
+// parse, which fails alike in both, with the same error. Every Go file of the repository is held to go/format.Source by
+// a run of its own, in repository_corpus, which reads the whole tree on purpose so that only it reruns on an edit
+// anywhere in cohere.
+func TestGofmtSourceIsGoFormatsOutputWherePrintingDiffers(test *testing.T) {
 	test.Parallel()
 
-	root := repositoryRoot(test)
-	var files []string
-	walkError := filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkError error) error {
-		if walkError != nil {
-			return walkError
-		}
-		if entry.IsDir() {
-			// TypeScript is the checkout of another project the repository links, not this repository's code; a
-			// worktree's is a link, which the walk does not follow, and the shared checkout's a directory.
-			if path == filepath.Join(root, "TypeScript") || entry.Name() == ".git" || entry.Name() == "node_modules" {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if entry.Type().IsRegular() && strings.HasSuffix(path, ".go") {
-			files = append(files, path)
-		}
-		return nil
-	})
-	if walkError != nil {
-		test.Fatal(walkError)
-	}
-	// Thousands of files are the repository's; a walk that found few started somewhere else.
-	if len(files) < 1000 {
-		test.Fatalf("found %d Go files under %s, want the repository's thousands", len(files), root)
-	}
-
-	// The repository is gofmt's already, so its files print as they are: these are printed differently, the private
-	// bit's number literals among them, and a file that does not parse.
 	planted := map[string]string{
 		"unformatted":      unformattedSource,
 		"broken":           brokenSource,
@@ -67,34 +35,6 @@ func TestGofmtSourceIsGoFormatsOutputForEveryGoFile(test *testing.T) {
 			test.Error(difference)
 		}
 	}
-
-	differences := make([]string, len(files))
-	var compared atomic.Int64
-	var failedAlike atomic.Int64
-	bounded.ForEach(len(files), false, func(index int) {
-		original, readError := os.ReadFile(files[index])
-		if readError != nil {
-			differences[index] = fmt.Sprintf("%s: %v", files[index], readError)
-			return
-		}
-		// formatFile never hands gofmtSource a file whose package clause does not parse.
-		headerMode := parser.PackageClauseOnly | parser.ParseComments | parser.SkipObjectResolution
-		if _, headerError := parser.ParseFile(token.NewFileSet(), "", original, headerMode); headerError != nil {
-			return
-		}
-		compared.Add(1)
-		difference, failed := gofmtDifference(files[index], original)
-		differences[index] = difference
-		if failed && difference == "" {
-			failedAlike.Add(1)
-		}
-	})
-	for _, difference := range differences {
-		if difference != "" {
-			test.Error(difference)
-		}
-	}
-	test.Logf("compared %d of %d files, %d of them failing alike", compared.Load(), len(files), failedAlike.Load())
 }
 
 // gofmtDifference says how gofmtSource's output for original, the file name, differs from go/format.Source's, empty
@@ -214,25 +154,5 @@ func TestWrittenFilesAreEachTheirOwnGofmtOutput(test *testing.T) {
 	}
 	for index, file := range files {
 		requireContents(test, file, string(wants[index]))
-	}
-}
-
-// repositoryRoot is the directory holding the repository's go.work, found from the package's own directory, where a
-// test runs, upward.
-func repositoryRoot(test *testing.T) string {
-	test.Helper()
-	directory, directoryError := os.Getwd()
-	if directoryError != nil {
-		test.Fatal(directoryError)
-	}
-	for {
-		if _, statError := os.Stat(filepath.Join(directory, "go.work")); statError == nil {
-			return directory
-		}
-		parent := filepath.Dir(directory)
-		if parent == directory {
-			test.Fatal("no go.work above the package's directory")
-		}
-		directory = parent
 	}
 }
