@@ -169,21 +169,29 @@ land pushes the gated commit to Loom's feed and, in Shackler's gap, under `~/scr
 lays the root at that commit and deeafbf4 once, checks the pinned Go toolchain, and builds cohere as a release's Go
 build, `CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags='-s -w'`, on a Go cache she keeps. Over an empty system store for
 that binary it runs cohere-go with a clean environment under `/usr/bin/time -l`: the cold row at the root, 2 fills
-and 3 rounds, deeafbf4's, 2 and 2, a warm run after one that fills the project store, and one `--timeline` run. It
-writes `Performance.jsonc` at the root of the tree that lands: each time a `median` with its `minimum` and
-`maximum` in milliseconds, every key spelled whole and the measurement under `checks` (schema 3), what each row
-`checked` by cohere-go's own records (its lint record's files walked and its findings, which every round of the row
-must agree on, or the landing refuses), her cpu, cores and load before and after, that she was held quiet, the build,
-the timeline's wall areas, and a note against main's file before it. A row reads "slower by" or "faster by" so much
-only when its range clears the old one, otherwise "level", and another machine or build, or a row that checked other
-files or findings than main's, is a line of its own, never compared: a run that checks less reads faster. The file is
-awareness, never a gate on speed: a
-landing that makes cohere slower lands with its note saying so (Kirk, Nov 21). `cohere-dev measure [<commit>]` runs
-the measurement alone, landing nothing. The file is land's alone: never write or edit it, and nothing that
-builds or tests may read it, which `internal/testing/guard` holds, since it is written after the gate. While another holds
-Shackler, land waits holding the lock, saying whose claim and since when, and after `COHERE_DEV_PERFORMANCE_WAIT`
-(2h unless it says) refuses, naming the holder; a measurement that fails refuses the landing in her words. A tree
-with no `command/cohere` has nothing to measure and lands saying so. Each phase's seconds are on the land line.
+and 3 rounds, deeafbf4's, 2 and 2, a warm run after one that fills the project store, and one `--timeline` run. What
+it measured is a JSON record: each time a `median` with its `minimum` and `maximum` in milliseconds, every key spelled
+whole and the measurement under `checks` (schema 3), what each row `checked` by cohere-go's own records (its lint
+record's files walked and its findings, which every round of the row must agree on, or the landing refuses), her cpu,
+cores and load before and after, that she was held quiet, the build, the timeline's wall areas, the commit measured
+and its `parent`, and a note against the baseline, main's last landed record, whose commit it names as `against`. A
+row reads "slower by" or "faster by" so much only when its range clears the old one, otherwise "level", and another
+machine or build, or a row that checked other files or findings than main's, is a line of its own, never compared: a
+run that checks less reads faster. A measurement whose box wasn't quiet takes no numbers, and its record says
+`measured: false` and why it `skipped`; in the integrate job alone, since only it hands the script the baseline's
+binary, so does one that builds that binary again, the gap's road always measuring. A baseline that measured nothing,
+was taken on a box that wasn't quiet, or on another box is never compared against, nor its binary trusted. The record
+is awareness, never a gate on speed: a landing that makes cohere slower lands with its note saying so (Kirk, Nov 21).
+The record lives beside main, never in its tree, so the tree that lands is the gated tree (#6v8r4nn; until then it was
+spliced in as `Performance.jsonc`): Loom hands the integrate job its baseline in `COHERE_PERFORMANCE_BASELINE`, the
+record's JSON in base64, and the job prints its own record the same way on its last lines once its checks pass,
+`land-job: performance <base64>`, which Loom reads from the job's log and keeps by main's commit. There is no kept
+file, and a job that refuses, or a fill, prints no record. `land` on a Mac is handed no baseline, so its note says none was handed and compares with nothing, and its
+record is said in the landing's body and kept nowhere. `cohere-dev measure [<commit>]` runs the measurement alone and
+prints its record, landing nothing. While another holds Shackler, land waits holding the lock, saying whose claim and
+since when, and after `COHERE_DEV_PERFORMANCE_WAIT` (2h unless it says) refuses, naming the holder; a measurement that
+fails refuses the landing in her words. A tree with no `command/cohere` has nothing to measure and lands saying so.
+Each phase's seconds are on the land line.
 
 A commit's subject reads `area: what changed (#task)`, up to 72 characters, and the story goes in the
 body. The area is a folder in the tree, by its name or its path (`go_language`, `release/dispatch`), or a
@@ -510,7 +518,7 @@ it names (two `--no-cache` runs and one cold run each), merges cohere-go's profi
 `command/cohere/default.pgo` and prints the digest, and the profile lands in a commit of its own that quotes what it
 printed. Rerun it to regenerate the profile. It never trains on a tree the benchmarks time, since that would write a
 fitted gain into the record: not cohere's root, which the bar row and bench/ measure, and not deeafbf4, which every
-landing's Performance.jsonc times. A third held-out tree that nothing times may join the two. A checkout without the
+landing's performance record times. A third held-out tree that nothing times may join the two. A checkout without the
 file builds with `-pgo=off` and its summary says so, and `cohere --version` names the profile by its sha256 prefix,
 or says `none`.
 
