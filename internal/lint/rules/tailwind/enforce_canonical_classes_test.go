@@ -56,6 +56,20 @@ func runCanonicalFixtureWithStylesheet(
 	options *EnforceCanonicalClassesOptions,
 ) rule_testing.Result {
 	test.Helper()
+	return runCanonicalFixtureWithStylesheets(
+		test, fileName, source, map[string]string{unknownFixtureStylesheetPath: stylesheet}, options)
+}
+
+// runCanonicalFixtureWithStylesheets is runCanonicalFixtureWithStylesheet over several stylesheets, each
+// at its path in the fixture, for a theme split across files that import one another.
+func runCanonicalFixtureWithStylesheets(
+	test *testing.T,
+	fileName string,
+	source string,
+	stylesheets map[string]string,
+	options *EnforceCanonicalClassesOptions,
+) rule_testing.Result {
+	test.Helper()
 
 	packageRoot := unknownFixturePackageRoot(test)
 	if packageRoot == "" {
@@ -63,9 +77,9 @@ func runCanonicalFixtureWithStylesheet(
 			"built and these fixtures would measure a decline rather than a collapse")
 	}
 
-	files := map[string]string{
-		fileName:                     source,
-		unknownFixtureStylesheetPath: stylesheet,
+	files := map[string]string{fileName: source}
+	for path, stylesheet := range stylesheets {
+		files[path] = stylesheet
 	}
 	plantPackage := func(root string) {
 		modules := filepath.Join(root, "node_modules")
@@ -479,8 +493,8 @@ func TestRebuiltClassIsWritable(test *testing.T) {
 
 		for _, className := range []string{
 			"grid-cols-[1fr_auto]",
-			"ring-(--color-content--2)",
-			"hover:bg-(--background--1)",
+			"ring-(--color-ring-tone)",
+			"hover:bg-(--surface-tone)",
 			"px-4",
 			"bg-black/20",
 			"-translate-x-1/2",

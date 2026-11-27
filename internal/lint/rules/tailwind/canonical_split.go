@@ -74,9 +74,21 @@ func splitCandidateIn(
 	// group classes that never merge.
 	candidate := parsed[0]
 
-	// A static utility has no root-plus-value structure to merge on. `flex` and `items-center`
-	// reach here and are correctly excluded: the collapse families are relationships between
-	// functional roots, and a static has no value for the merge precondition to compare.
+	// A static utility has no root-plus-value structure of its own, but `w-px`, `ml-auto` and
+	// `inset-x-full` are statics that also read as a functional root and a value, and upstream's
+	// collapse reads them so: its dynamicUtilities takes the first functional reading that has a value
+	// (#sbb2hke). `flex` and `items-center` have none and stay excluded. A merge read this way is
+	// checked by signature in mergeOnce, since the family table holds functional roots only.
+	firstReadingStatic := false
+	if candidate.Kind == tailwindcollapse.ParsedCandidateKindStatic {
+		for _, reading := range parsed[1:] {
+			if reading.Kind == tailwindcollapse.ParsedCandidateKindFunctional && reading.Value != nil {
+				candidate = reading
+				firstReadingStatic = true
+				break
+			}
+		}
+	}
 	if candidate.Kind != tailwindcollapse.ParsedCandidateKindFunctional {
 		return candidateParts{}, false
 	}
@@ -89,12 +101,13 @@ func splitCandidateIn(
 	prefix, _, _ := dissectClass(className)
 
 	return candidateParts{
-		ClassName:   className,
-		Prefix:      prefix,
-		Root:        candidate.Root,
-		Value:       candidateValueText(candidate),
-		SourceValue: sourceValueAfterRoot(className, candidate.Root),
-		Important:   candidate.Important,
+		ClassName:          className,
+		Prefix:             prefix,
+		Root:               candidate.Root,
+		Value:              candidateValueText(candidate),
+		SourceValue:        sourceValueAfterRoot(className, candidate.Root),
+		Important:          candidate.Important,
+		FirstReadingStatic: firstReadingStatic,
 	}, true
 }
 

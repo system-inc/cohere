@@ -57,6 +57,9 @@ type Canonicalizer struct {
 	// of properties arbitraryUtilities has searched.
 	signatures sync.Map
 	pools      sync.Map
+	// combinations memoizes collapsedSignature by the pair, since one family pair at two values, `px-4
+	// py-2`, recurs across a tree's literals and each asks for it.
+	combinations sync.Map
 }
 
 // NewCanonicalizer returns a canonicalizer over one design system, comparing under the plugin's default
