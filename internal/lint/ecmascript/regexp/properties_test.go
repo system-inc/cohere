@@ -1,69 +1,73 @@
 package regexp
 
 import (
-	"bytes"
 	_ "embed"
 	"encoding/json"
 	"fmt"
 	"os/exec"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"unicode"
 
 	"github.com/system-inc/cohere/internal/testing/build_inputs"
-	"github.com/system-inc/cohere/internal/testing/needs"
 	"github.com/system-inc/cohere/modules/unicode_properties"
 )
 
-type inventoryRange struct{ Lo, Hi rune }
-type propertyProbe struct {
-	Name   string
-	Points []rune
-}
+// propertyAnswer is Node's recorded answer for one property spelling, from testdata/node_property_members.txt:
+// whether `\p{spelling}` compiles under `u`, and for each code point asked about, a digit adding 1 when \p matches
+// it under u, 2 when \p matches it under iu, and 4 when \P matches it under iu.
 type propertyAnswer struct {
 	Name     string
 	Accepted bool
-	Bits     []string
+	Points   []rune
+	Digits   []byte
 }
 
-const propertyOracle = `
-const fs = require('fs');
-if (process.versions.unicode !== '17.0') throw Error('Node Unicode: '+process.versions.unicode+'; want 17.0');
-const out = JSON.parse(fs.readFileSync(0,'utf8')).map(({Name,Points}) => {
- try {new RegExp('\\p{'+Name+'}', 'u')} catch {return {Name,Accepted:false}}
- const Bits=[];
- for(const flags of ['u','iu']) for(const escape of ['p','P']) for(const shape of [0,1,2]) {
- const atom='\\'+escape+'{'+Name+'}';
- const source='^(?:'+(shape===0?atom:shape===1?'['+atom+']':'[^'+atom+']')+')$';
- const re=new RegExp(source,flags);
- Bits.push(Points.map(c=>re.test(String.fromCodePoint(c))?'1':'0').join(''));
- }
- return {Name,Accepted:true,Bits};
-});
-process.stdout.write(JSON.stringify(out));`
+// nodePropertyMembers is Node's RegExp on a sample of code points per property spelling, recorded by
+// tools/record_node_answers, whose sample says how the code points were chosen. The test reads it and never starts
+// Node.
+//
+//go:embed testdata/node_property_members.txt
+var nodePropertyMembers string
 
-func propertyPoints(rs []inventoryRange) []rune {
-	points := []rune{0, 0x10ffff, 0xD7ff, 0xD800, 0xDfff, 0xE000, 0xB5, 0x3BC}
-	for _, inventoryRange := range rs {
-		for _, character := range []rune{
-			inventoryRange.Lo - 1,
-			inventoryRange.Lo,
-			inventoryRange.Hi,
-			inventoryRange.Hi + 1,
-		} {
-			if character >= 0 && character <= 0x10ffff {
-				points = append(points, character)
-			}
+// readPropertyAnswers parses nodePropertyMembers, returning the Unicode version its header names.
+func readPropertyAnswers(test *testing.T) (string, []propertyAnswer) {
+	test.Helper()
+	recordedUnicode := ""
+	var answers []propertyAnswer
+	for line := range strings.Lines(nodePropertyMembers) {
+		line = strings.TrimSuffix(line, "\n")
+		if version, found := strings.CutPrefix(line, "# unicode: "); found {
+			recordedUnicode = version
 		}
+		if strings.HasPrefix(line, "#") {
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) == 0 {
+			continue
+		}
+		if len(fields) == 2 && fields[1] == "refused" {
+			answers = append(answers, propertyAnswer{Name: fields[0]})
+			continue
+		}
+		answer := propertyAnswer{Name: fields[0], Accepted: true}
+		for _, field := range fields[1:] {
+			hexadecimal, digit, found := strings.Cut(field, ":")
+			point, parseError := strconv.ParseInt(hexadecimal, 16, 32)
+			if !found || parseError != nil || len(digit) != 1 || digit[0] < '0' || digit[0] > '7' {
+				test.Fatalf("%s: %q is not <hex>:<digit>", answer.Name, field)
+			}
+			answer.Points = append(answer.Points, rune(point))
+			answer.Digits = append(answer.Digits, digit[0]-'0')
+		}
+		answers = append(answers, answer)
 	}
-	// Every fold member is probed as well; a fold can cross an interval boundary.
-	for _, group := range CaseEquivalenceGroups(true) {
-		points = append(points, group...)
-	}
-	slices.Sort(points)
-	return slices.Compact(points)
+	return recordedUnicode, answers
 }
+
 func propertySource(name, escape string, shape int) string {
 	atom := `\` + escape + `{` + name + `}`
 	if shape == 1 {
@@ -74,59 +78,60 @@ func propertySource(name, escape string, shape int) string {
 	}
 	return "^(?:" + atom + ")$"
 }
-func oracleProperties(test *testing.T, probes []propertyProbe) []propertyAnswer {
-	test.Helper()
-	needs.Tool(test, "node", "node's RegExp is the oracle each property's members are held to")
-	input, encodeError := json.Marshal(probes)
-	if encodeError != nil {
-		test.Fatal(encodeError)
+
+// propertyWant is what Node answers for one profile from the three answers recorded. In ECMAScript an escape inside
+// a class matches what it matches bare, a negated class matches what the class does not, and without i, \P matches
+// what \p does not. The recorder checked Node's own answers for every profile agree with this before writing.
+func propertyWant(digit byte, ignoreCase bool, escape string, shape int) bool {
+	var matched bool
+	switch {
+	case !ignoreCase && escape == "p":
+		matched = digit&1 != 0
+	case !ignoreCase:
+		matched = digit&1 == 0
+	case escape == "p":
+		matched = digit&2 != 0
+	default:
+		matched = digit&4 != 0
 	}
-	command := exec.Command("node", "-e", propertyOracle)
-	command.Stdin = bytes.NewReader(input)
-	var stderr bytes.Buffer
-	command.Stderr = &stderr
-	output, outputError := command.Output()
-	if outputError != nil {
-		test.Fatalf("Node oracle: %v: %s", outputError, stderr.String())
+	if shape == 2 {
+		return !matched
 	}
-	var answers []propertyAnswer
-	if decodeError := json.Unmarshal(output, &answers); decodeError != nil {
-		test.Fatal(decodeError)
-	}
-	return answers
+	return matched
 }
-func compareProperty(name string, points []rune, bits []string) (int, string) {
-	count, index := 0, 0
+
+// compareProperty holds the tables, then the compiled escape in each of the twelve profiles, to Node's answers.
+func compareProperty(answer propertyAnswer) string {
+	property, found := unicode_properties.Lookup(answer.Name)
+	if !found {
+		return "the tables have no such spelling"
+	}
+	for index, point := range answer.Points {
+		if inTable, node := propertyRangesCover(property.Ranges, point), answer.Digits[index]&1 != 0; inTable != node {
+			return fmt.Sprintf("table U+%04X: tables=%t Node=%t", point, inTable, node)
+		}
+	}
 	for _, flags := range []string{"u", "iu"} {
 		for _, escape := range []string{"p", "P"} {
 			for shape := range 3 {
-				source := propertySource(name, escape, shape)
+				source := propertySource(answer.Name, escape, shape)
 				re, compileError := Compile(source, flags)
 				if compileError != nil {
-					return count, fmt.Sprintf("%s /%s: %v", source, flags, compileError)
+					return fmt.Sprintf("%s /%s: %v", source, flags, compileError)
 				}
-				for pointIndex, point := range points {
+				for index, point := range answer.Points {
 					match, matchRunesError := re.Unwrap().MatchRunes([]rune{point})
-					count++
 					if matchRunesError != nil {
-						return count, matchRunesError.Error()
+						return matchRunesError.Error()
 					}
-					if match != (bits[index][pointIndex] == '1') {
-						return count, fmt.Sprintf(
-							"%s /%s U+%04X: Go=%t Node=%t",
-							source,
-							flags,
-							point,
-							match,
-							bits[index][pointIndex] == '1',
-						)
+					if node := propertyWant(answer.Digits[index], flags == "iu", escape, shape); match != node {
+						return fmt.Sprintf("%s /%s U+%04X: Go=%t Node=%t", source, flags, point, match, node)
 					}
 				}
-				index++
 			}
 		}
 	}
-	return count, ""
+	return ""
 }
 
 // The accepted-name fixture was recorded during the old-code inventory, independently of
@@ -135,48 +140,41 @@ func compareProperty(name string, points []rune, bits []string) (int, string) {
 //go:embed testdata/unicode-property-names.txt
 var acceptedPropertyNames string
 
-func TestUnicodePropertiesNode(test *testing.T) {
+func TestUnicodePropertiesMatchNode(test *testing.T) {
 	test.Parallel()
+	recordedUnicode, answers := readPropertyAnswers(test)
 	if unicode.Version != unicode_properties.Version {
 		test.Fatalf("Go Unicode %s; property tables %s", unicode.Version, unicode_properties.Version)
+	}
+	if !strings.HasPrefix(unicode_properties.Version, recordedUnicode+".") {
+		test.Fatalf(
+			"Node's answers were recorded on Unicode %q; property tables %s: run tools/record_node_answers",
+			recordedUnicode,
+			unicode_properties.Version,
+		)
 	}
 	names := strings.Fields(acceptedPropertyNames)
 	if !slices.Equal(names, unicode_properties.Names()) {
 		test.Fatal("generated names differ from the pinned Node-accepted inventory")
 	}
-
-	probes := []propertyProbe{}
-	for _, name := range names {
-		property, _ := unicode_properties.Lookup(name)
-		rs := make([]inventoryRange, len(property.Ranges))
-		for index, span := range property.Ranges {
-			rs[index] = inventoryRange{span.Lo, span.Hi}
-		}
-		probes = append(probes, propertyProbe{name, propertyPoints(rs)})
-	}
-	answers := oracleProperties(test, probes)
-	checks, tested := 0, 0
+	recordedNames := make([]string, len(answers))
 	for index, answer := range answers {
-		// Not parallel: each subtest updates counts that the parent logs after the loop.
+		recordedNames[index] = answer.Name
+	}
+	if !slices.Equal(recordedNames, names) {
+		test.Fatal("Node's recorded answers name other spellings than the tables: run tools/record_node_answers")
+	}
+	for _, answer := range answers {
 		test.Run(answer.Name, func(test *testing.T) {
-			tested++
+			test.Parallel()
 			if !answer.Accepted {
 				test.Fatal("table admits a property Node rejects")
 			}
-			checked, why := compareProperty(answer.Name, probes[index].Points, answer.Bits)
-			checks += checked
-			if why != "" {
+			if why := compareProperty(answer); why != "" {
 				test.Fatal(why)
 			}
 		})
 	}
-	test.Logf(
-		"table spellings=%d tested spellings=%d patterns=%d membership checks=%d",
-		len(names),
-		tested,
-		tested*12,
-		checks,
-	)
 }
 
 func TestUnicodePropertiesFresh(test *testing.T) {
@@ -196,112 +194,61 @@ func TestUnicodePropertiesFresh(test *testing.T) {
 	}
 }
 
-func TestUnicodePropertySyntaxNode(test *testing.T) {
+// nodePropertySyntax is whether Node accepts each property escape fixture and what it matches, recorded by
+// tools/record_node_answers, which holds the fixtures. The test reads it and never starts Node.
+//
+//go:embed testdata/node_property_syntax.json
+var nodePropertySyntax []byte
+
+func TestUnicodePropertySyntaxMatchesNode(test *testing.T) {
 	test.Parallel()
-	type fixture struct{ Source, Flags string }
-	fixtures := []fixture{
-		{`^[\p{Script=Greek}-]$`, "u"},
-		{`^[\p{Script=Greek}-A]$`, "u"},
-		{`^[A-\p{Script=Greek}]$`, "u"},
-		{`^[\P{ASCII}A]$`, "u"},
-		{`^[^\P{ASCII}A]$`, "iu"},
-		{`^[\P{Lt}\d\D\s\S\w\W]$`, "iu"},
-		{`^[\p{Script=Greek}\s\d_]$`, "iu"},
-		{`^(?i:\P{Script=Greek})$`, "u"},
-		{`^(?i:\p{Script=Greek})(?-i:a)$`, "u"},
-		{`^\P{Any}*$`, "u"},
-		{`^[^\P{Any}]$`, "u"},
-		{`^\p{Any}{2}$`, "u"},
-		{`^\p{IsGreek}$`, "u"},
-		{`^\p{script=Greek}$`, "u"},
-		{`^\p{Script=greek}$`, "u"},
-		{`^\p{Script=Hrkt}$`, "u"},
-		{`^\p{Script=Katakana_Or_Hiragana}$`, "u"},
-		{`^\p{Greek}$`, "u"},
-		{`^\p{gc = Lu}$`, "u"},
-		{`^\p{lowercase_letter}$`, "u"},
-		{`^\p{Letter=yes}$`, "u"},
-		{`^\p{Basic_Emoji}$`, "u"},
-		{`^\p{Script=Greek}$`, ""},
-		{`^\\p\{Script=Greek\}$`, "u"},
+	var recorded struct {
+		Unicode  string   `json:"unicode"`
+		Subjects []string `json:"subjects"`
+		Fixtures []struct {
+			Source   string `json:"source"`
+			Flags    string `json:"flags"`
+			Accepted bool   `json:"accepted"`
+			Matches  string `json:"matches"`
+		} `json:"fixtures"`
 	}
-	subjects := []string{
-		"",
-		"A",
-		"a",
-		"α",
-		"Α",
-		"µ",
-		"μ",
-		"-",
-		"_",
-		"0",
-		" ",
-		"\u0085",
-		"\ufeff",
-		"AA",
-		"αa",
-		"αA",
-		"p{Script=Greek}",
-		`\p{Script=Greek}`,
-	}
-	needs.Tool(test, "node", "node's RegExp is the oracle each property escape's syntax is held to")
-	input, encodeError := json.Marshal(struct {
-		Fixtures []fixture
-		Subjects []string
-	}{fixtures, subjects})
-	if encodeError != nil {
-		test.Fatal(encodeError)
-	}
-	command := exec.Command(
-		"node",
-		"-e",
-		`const fs=require('fs');if(process.versions.unicode!=='17.0')throw Error('Unicode version mismatch');const {Fixtures,Subjects}=JSON.parse(fs.readFileSync(0,'utf8'));process.stdout.write(JSON.stringify(Fixtures.map(({Source,Flags})=>{try{const r=new RegExp(Source,Flags);return {Accepted:true,Bits:Subjects.map(s=>r.test(s))}}catch{return {Accepted:false}}})))`,
-	)
-	command.Stdin = bytes.NewReader(input)
-	output, outputError := command.CombinedOutput()
-	if outputError != nil {
-		test.Fatalf("Node: %v: %s", outputError, output)
-	}
-	var answers []struct {
-		Accepted bool
-		Bits     []bool
-	}
-	if decodeError := json.Unmarshal(output, &answers); decodeError != nil {
+	if decodeError := json.Unmarshal(nodePropertySyntax, &recorded); decodeError != nil {
 		test.Fatal(decodeError)
 	}
-	checks := 0
-	for fixtureIndex, fixture := range fixtures {
-		// Not parallel: each subtest updates the membership count that the parent logs after the loop.
-		test.Run(fmt.Sprintf("%d", fixtureIndex), func(test *testing.T) {
+	if !strings.HasPrefix(unicode_properties.Version, recorded.Unicode+".") {
+		test.Fatalf(
+			"Node's answers were recorded on Unicode %q; property tables %s: run tools/record_node_answers",
+			recorded.Unicode,
+			unicode_properties.Version,
+		)
+	}
+	if len(recorded.Fixtures) == 0 {
+		test.Fatal("no fixtures recorded")
+	}
+	for fixtureIndex, fixture := range recorded.Fixtures {
+		test.Run(strconv.Itoa(fixtureIndex), func(test *testing.T) {
+			test.Parallel()
 			re, compileError := Compile(fixture.Source, fixture.Flags)
-			if (compileError == nil) != answers[fixtureIndex].Accepted {
+			if (compileError == nil) != fixture.Accepted {
 				test.Fatalf(
 					"/%s/%s compile=%v Node accepted=%t",
 					fixture.Source,
 					fixture.Flags,
 					compileError,
-					answers[fixtureIndex].Accepted,
+					fixture.Accepted,
 				)
 			}
 			if compileError != nil {
 				return
 			}
-			for subjectIndex, subject := range subjects {
-				got := re.Test(subject, nil)
-				checks++
-				if got != answers[fixtureIndex].Bits[subjectIndex] {
-					test.Fatalf(
-						"/%s/%s vs %q: Go=%t Node=%t",
-						fixture.Source,
-						fixture.Flags,
-						subject,
-						got,
-						answers[fixtureIndex].Bits[subjectIndex],
-					)
+			if len(fixture.Matches) != len(recorded.Subjects) {
+				test.Fatalf("%d answers recorded for %d subjects", len(fixture.Matches), len(recorded.Subjects))
+			}
+			for subjectIndex, subject := range recorded.Subjects {
+				if got, node := re.Test(subject, nil), fixture.Matches[subjectIndex] == '1'; got != node {
+					test.Fatalf("/%s/%s vs %q: Go=%t Node=%t", fixture.Source, fixture.Flags, subject, got, node)
 				}
 			}
 		})
 	}
-	test.Logf("syntax fixtures=%d subjects=%d membership checks=%d", len(fixtures), len(subjects), checks)
 }

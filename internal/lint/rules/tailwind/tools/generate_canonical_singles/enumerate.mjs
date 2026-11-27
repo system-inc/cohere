@@ -16,7 +16,10 @@
  *
  *   - `cases.json`: upstream's own test inputs for the single-class passes, by describe block, each also
  *     asked under `focus:` and with a trailing `!` as the test file's strategies do, plus the consumer
- *     sites #3dpwm9b and #15swfzq were filed on and the clean cases their bars name.
+ *     sites #3dpwm9b and #15swfzq were filed on and the clean cases their bars name. A consumer site
+ *     that named its design system's own tokens keeps its shape under invented names (#gd38z12): a
+ *     custom property set to a var of a double-dash colour key, a root ending in a dash, a colour key
+ *     no theme here declares.
  *
  *   - `--harvest <root>`: every whitespace-separated token inside a quoted string in a repository's
  *     source, kept when Tailwind compiles it. A token from outside a class literal is harmless here, since

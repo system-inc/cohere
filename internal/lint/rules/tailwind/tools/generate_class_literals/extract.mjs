@@ -17,8 +17,9 @@
  *
  * Usage: node extract.mjs <packages> <cases.json>
  *
- * <packages> is a directory, or a corpus spelling such as ahra:., where eslint, the plugin and
- * typescript-eslint's parser resolve. Writes the JSON to standard output.
+ * <packages> is a directory where eslint, the plugin and typescript-eslint's parser resolve;
+ * ../corpus.mjs refuses the "<name>:<path>" spelling that once named one. Writes the JSON to
+ * standard output.
  */
 
 import * as NodeFileSystem from 'node:fs';

@@ -58,11 +58,11 @@ func referenceIsJoinedIdentifier(run string) bool {
 }
 
 // The hand scans find exactly what nexus's patterns find, the runs where uppercaseRun puts them and the tokens they
-// leave where findUppercaseTokens puts them, over the shapes above and every string of up to four bytes from an
-// alphabet of each kind of byte a run's edges tell apart.
+// leave where findUppercaseTokens puts them, over the shapes above, the comments the mask gates are compared over, and
+// every string of up to four bytes from an alphabet of each kind of byte a run's edges tell apart.
 func TestNextUppercaseRunMatchesThePattern(test *testing.T) {
 	test.Parallel()
-	texts := slices.Concat(tokenScanCases, runScanCases)
+	texts := slices.Concat(tokenScanCases, runScanCases, gateFixtureTexts())
 	alphabet := []string{"A", "Z", "a", "1", "_", " ", "-", "&", "'", "\xc3\xa9"}
 	generated := []string{""}
 	for range 4 {

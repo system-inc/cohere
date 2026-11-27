@@ -156,13 +156,29 @@ public struct PackageModel: Equatable, Sendable {
      With a known `toolchain`, answers come from `PackageDescriptionCache` when every fingerprint still holds,
      and a cold description refills it. Without one (the parity harness, or a toolchain `swift --version`
      could not name) every run describes cold, because an entry keyed on an unknown toolchain could survive
-     a toolchain change.
+     a toolchain change. Each SwiftPM call adds the options `laidResolvedSet` gives it (`LaidResolvedSet`).
      */
     public static func load(
         root: URL,
         scratchPath: URL,
         runner: ProcessRunner = ProcessRunner(),
         toolchain: String? = nil,
+    ) throws -> PackageModel {
+        try load(
+            root: root,
+            scratchPath: scratchPath,
+            runner: runner,
+            toolchain: toolchain,
+            laidResolvedSet: LaidResolvedSet.process,
+        )
+    }
+
+    static func load(
+        root: URL,
+        scratchPath: URL,
+        runner: ProcessRunner,
+        toolchain: String?,
+        laidResolvedSet: LaidResolvedSet,
     ) throws -> PackageModel {
         let cache = PackageDescriptionCache(scratchPath: scratchPath)
         let cacheable = toolchain.map { !$0.hasPrefix("unknown") } ?? false
@@ -184,12 +200,14 @@ public struct PackageModel: Equatable, Sendable {
                     root: packageRoot,
                     scratchPath: packageScratch,
                     runner: runner,
+                    laidResolvedSet: laidResolvedSet,
                 ),
                 try runPackageCommand(
                     ["dump-package"],
                     root: packageRoot,
                     scratchPath: packageScratch,
                     runner: runner,
+                    laidResolvedSet: laidResolvedSet,
                 ),
             )
         }
@@ -329,11 +347,29 @@ public struct PackageModel: Equatable, Sendable {
         root: URL,
         scratchPath: URL,
         runner: ProcessRunner,
+        laidResolvedSet: LaidResolvedSet,
     ) throws -> Data {
-        let result = try runner.run("swift", ["package", "--scratch-path", scratchPath.path] + arguments, in: root)
+        let result = try runner.run(
+            "swift",
+            packageCommandArguments(arguments, root: root, scratchPath: scratchPath, laidResolvedSet: laidResolvedSet),
+            in: root,
+        )
         guard result.succeeded else {
             throw DescriptionFailure(command: arguments.joined(separator: " "), standardError: result.standardError)
         }
         return result.standardOutput
+    }
+    /*
+     What follows `swift` in one call: the scratch, the laid set's global options when one is named, then the command.
+     Apart from running it, so a test can read the list without a toolchain.
+     */
+    static func packageCommandArguments(
+        _ arguments: [String],
+        root: URL,
+        scratchPath: URL,
+        laidResolvedSet: LaidResolvedSet,
+    ) throws(LaidResolvedSet.Failure) -> [String] {
+        let options = try laidResolvedSet.swiftPackageOptions(packageRoot: root, scratchPath: scratchPath)
+        return ["package", "--scratch-path", scratchPath.path] + options + arguments
     }
 }

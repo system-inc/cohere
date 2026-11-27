@@ -1,0 +1,3 @@
+source bb79c127bb34dde1632cd2c8909b371debe8bdf121c1963b05d468ca568a4748
+exit 1
+stderr TypeError: Cannot read properties of undefined (reading 'toFixed')

@@ -14,9 +14,31 @@
 // number. goja, measured the same way, is flat at 61 KB/s from twelve files to thirty-six, because
 // it has no JIT at all. That asymmetry is the real finding: the gap is not one ratio, it is a cold
 // gap of roughly 14x and a steady-state gap of roughly 34x.
+//
+// Nothing in the repository runs it; it is run by hand, with the Prettier fork named by the same
+// variable the Go formatter reads in disk mode (ForkPathVariable in formatter.go), so both sides
+// time the same bundles:
+//
+//   COHERE_PRETTIER_FORK=<fork checkout> node internal/format/prettier/testdata/node_inprocess.js <file list>
+//
+// The file list holds one path per line.
 const fs = require('fs');
 const path = require('path');
-const prettier = require('/Users/kirkouimet/Projects/system/prettier/dist/prettier/index.cjs');
+
+const forkPath = (process.env.COHERE_PRETTIER_FORK || '').trim();
+if (!forkPath || !process.argv[2]) {
+  process.stderr.write(
+    'usage: COHERE_PRETTIER_FORK=<prettier fork checkout> node node_inprocess.js <file list>\n' +
+      'COHERE_PRETTIER_FORK names the checkout whose dist/prettier holds the built bundles, as the Go formatter reads it.\n',
+  );
+  process.exit(2);
+}
+const bundlePath = path.resolve(forkPath, 'dist', 'prettier', 'index.cjs');
+if (!fs.existsSync(bundlePath)) {
+  process.stderr.write(`node_inprocess.js: no built Prettier bundle at ${bundlePath}; build the fork first\n`);
+  process.exit(2);
+}
+const prettier = require(bundlePath);
 
 const list = fs.readFileSync(process.argv[2], 'utf8').trim().split('\n').filter(Boolean);
 const parserFor = (p) => {

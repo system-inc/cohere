@@ -1,0 +1,44 @@
+{
+    "tailwindVersion": "4.3.3",
+    "entryPoint": "internal/lint/rules/tailwind/collapse/testdata/planted_repository/styles/theme.css",
+    "lists": 1200,
+    "classes": 6021,
+    "deadClasses": [
+        "line--4",
+        "odd:line--4",
+        "stack-4",
+        "marker:stack-4",
+        "wash--4",
+        "valid:wash--4"
+    ],
+    "collapses": [
+        {
+            "inputs": [
+                "ml-px",
+                "mr-px"
+            ],
+            "output": "mx-px"
+        },
+        {
+            "inputs": [
+                "pt-px",
+                "pb-px"
+            ],
+            "output": "py-px"
+        },
+        {
+            "inputs": [
+                "w-rail",
+                "h-rail"
+            ],
+            "output": "size-14"
+        },
+        {
+            "inputs": [
+                "w-px",
+                "h-px"
+            ],
+            "output": "size-px"
+        }
+    ]
+}

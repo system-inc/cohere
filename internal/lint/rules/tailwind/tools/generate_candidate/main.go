@@ -8,6 +8,17 @@
 //	    -package-root <tailwindcss package> [-corpus-root <repo>] [-theme-entry <entry.css>] [-output <file.json>] \
 //	    [-check]
 //
+// The committed fixture is captured on the planted theme, with its repository classes harvested from
+// the tree generated beside it, both written in cohere, from the repository root. $R is any
+// directory whose node_modules holds tailwindcss 4.3.3:
+//
+//	go run ./command/cohere-dev exec -- go run ./internal/lint/rules/tailwind/tools/generate_candidate \
+//	    -package-root $R/node_modules/tailwindcss \
+//	    -corpus-root internal/lint/rules/tailwind/collapse/testdata/planted_repository/source \
+//	    -theme-entry internal/lint/rules/tailwind/collapse/testdata/planted_repository/styles/theme.css
+//
+// The theme's own roots it must find are named in enumerate.mjs as its markers.
+//
 // The distinction this tool enforces is order. `parseCandidate` is a generator, roughly a fifth of
 // the classes a real repository writes yield more than one candidate, and the first that compiles
 // wins. A port that yields the same set in a different order produces a different final answer with
@@ -53,7 +64,7 @@ func main() {
 	)
 	output := flag.String(
 		"output",
-		filepath.Join("internal", "tailwind", "testdata", "candidate_fixtures.json"),
+		filepath.Join("internal", "lint", "rules", "tailwind", "collapse", "testdata", "candidate_fixtures.json"),
 		"where to write the fixture",
 	)
 	check := flag.Bool("check", false, "regenerate and fail if the committed fixture disagrees")

@@ -14,13 +14,18 @@
 // `keysInNamespaces(['--color'])` returns 558. A port that missed the map returns nine extra keys
 // under a namespace, which is plausible on inspection and wrong on every lookup that walks them.
 //
-// `-stylesheets` names a JSON array of `{name, path}` so the corpus carries real repositories'
-// themes and their whole `@import` graphs, which is what the exit criterion asks for: the argument
-// for this port is that two repositories on the same Tailwind resolve different themes, and that is
-// only checkable against two of them. Without it only the synthetic branch-coverage cases are
-// captured, and the Go test skips its repository half rather than passing vacuously. A `path` spelled
-// inside a corpus, such as `ahra:app/_theme/styles/theme.css`, is found through the corpus's variable or
-// the corpora file and recorded as spelled, so the fixture reads the same on every machine (#sycrdr6).
+// `-stylesheets` names a JSON array of `{name, path}` so the corpus carries whole design systems'
+// themes and their `@import` graphs, which is what the exit criterion asks for: the argument for this
+// port is that two repositories on the same Tailwind resolve different themes, and that is only
+// checkable against two of them. Without it only the synthetic branch-coverage cases are captured, and
+// the fixture holds no repository case to compare. stylesheets.json beside this file names the two
+// themes written in cohere, the public theme and the planted repository's (#pg78xtp), by paths relative
+// to the repository root, which is where the tool runs from; a path inside this repository is recorded
+// relative to its root, so the fixture reads the same on every machine (#sycrdr6). Regenerate
+// collapse/testdata/theme_fixtures.json from the repository root with:
+//
+//	go run ./internal/lint/rules/tailwind/tools/generate_theme -package-root <tailwindcss package> \
+//	    -stylesheets internal/lint/rules/tailwind/tools/generate_theme/stylesheets.json
 //
 // `-check` regenerates and fails when the committed fixture disagrees, which is what makes a
 // Tailwind upgrade that changes theme resolution show up as a failing gate instead of a silent
@@ -53,7 +58,7 @@ func main() {
 	)
 	output := flag.String(
 		"output",
-		filepath.Join("internal", "tailwind", "testdata", "theme_fixtures.json"),
+		filepath.Join("internal", "lint", "rules", "tailwind", "collapse", "testdata", "theme_fixtures.json"),
 		"where to write the fixture",
 	)
 	check := flag.Bool("check", false, "regenerate and fail if the committed fixture disagrees")

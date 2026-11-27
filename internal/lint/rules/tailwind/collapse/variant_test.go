@@ -3,12 +3,16 @@ package tailwind
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"math/big"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/testing/repository"
 )
 
 // The fixture is what the shipped Tailwind 4.3.3 answered about variant ordering, captured
@@ -22,12 +26,16 @@ import (
 // corpus whose variant set matches the one it was generated from, which is why a table generated
 // from this repository passed on this repository for as long as it did.
 //
-// The corpus has two halves and needs both. The synthetic half reaches the pairs a real class list
-// rarely writes, and one of those pairs is what answers this component's open question. The
+// The corpus has three halves and needs all three. The repository half is the exit criterion: 2,400
+// class lists from two repositories written in cohere, each a theme under testdata and a source tree
+// tools/generate_planted_repository draws from it, sorted by Tailwind and compared class by class. One
+// of them, the planted theme, adds variants and breakpoints of its own, the per-repository fact this
+// port exists to respect. They replaced the lists two consumer repositories wrote when cohere's tests
+// stopped reading other repositories (#5wj23dd, #pg78xtp). The synthetic half reaches the pairs a class
+// list rarely writes, and one of those pairs is what answers this component's open question. The
 // `@custom-variant` half separates a custom variant that appends a new position from one that
 // overwrites a framework name in place, which look the same in a stylesheet and behave differently
-// in the sort. The class lists two consumer repositories wrote left the fixture when cohere's tests
-// stopped reading other repositories (#5wj23dd).
+// in the sort.
 
 type variantOrderCorpus struct {
 	TailwindVersion     string             `json:"tailwindVersion"`
@@ -228,7 +236,7 @@ func TestVariantOrderMatchesTailwind(test *testing.T) {
 		if registryFixture == nil {
 			continue
 		}
-		resolveBreakpoint := variantOrderBreakpointResolverFor(aCase, corpus)
+		resolveBreakpoint := variantOrderBreakpointResolverFor(variantOrderScalesFor(test, aCase))
 		registry := variantOrderRegistryFrom(test, registryFixture, resolveBreakpoint)
 
 		if aCase.VariantOrd != nil {
@@ -262,9 +270,12 @@ func TestVariantOrderMatchesTailwind(test *testing.T) {
 	)
 }
 
-// variantOrderRegistryForCase finds the registry a case should be compared under: its own, or else
-// the framework's. Falling back to the framework registry rather than skipping is deliberate: a
-// synthetic case is built on a default design system and has no registry of its own.
+// variantOrderRegistryForCase finds the registry a case should be compared under.
+//
+// A repository's class lists live in a case of their own, separate from the case carrying that
+// repository's registry, so the lists are matched back to their repository by name prefix. Falling
+// back to the framework registry rather than skipping is deliberate: a synthetic case is built on a
+// default design system and has no registry of its own.
 func variantOrderRegistryForCase(
 	test *testing.T,
 	corpus variantOrderCorpus,
@@ -279,6 +290,12 @@ func variantOrderRegistryForCase(
 		return nil
 	}
 
+	repositoryName := strings.TrimSuffix(aCase.Name, "/class-lists")
+	for _, candidate := range corpus.Cases {
+		if candidate.Registry != nil && candidate.Name == repositoryName {
+			return candidate.Registry
+		}
+	}
 	for _, candidate := range corpus.Cases {
 		if candidate.Registry != nil && candidate.Name == "framework-default" {
 			return candidate.Registry
@@ -289,7 +306,7 @@ func variantOrderRegistryForCase(
 }
 
 // variantOrderDefaultBreakpointScale is Tailwind 4.3.3's own `--breakpoint-*`, which every case in the
-// fixture inherits unchanged.
+// fixture inherits, and which a repository case extends with the breakpoints its stylesheet declares.
 //
 // Hardcoded here and only here, in the test's resolver, never in variant_registry.go. The port reads
 // breakpoints from the theme; this table exists so the differential can answer the same question
@@ -305,21 +322,70 @@ var variantOrderDefaultContainerScale = map[string]string{
 	"5xl": "64rem", "6xl": "72rem", "7xl": "80rem",
 }
 
+// variantOrderScaleDeclarationPattern finds a `--breakpoint-*` or `--container-*` declaration in a stylesheet.
+var variantOrderScaleDeclarationPattern = regexp.MustCompile(`--(breakpoint|container)-([A-Za-z0-9_-]+)\s*:\s*([^;]+);`)
+
+// variantOrderRelativeImportPattern finds an `@import` of a stylesheet beside the one importing it.
+var variantOrderRelativeImportPattern = regexp.MustCompile(`@import\s+['"](\.[^'"]+)['"]`)
+
+// variantOrderScalesFor is the breakpoint and container scales a case was sorted under: the framework's,
+// and for a repository case the names its stylesheet adds (the planted theme's `tablet`, `desk` and
+// `--container-column`).
+//
+// Read off the stylesheet's own text, following its relative imports, rather than through the theme port,
+// for the reason the default scales are hardcoded: the differential stays independent of the sibling
+// component it would otherwise be measuring as well. Text is enough here because a repository case's
+// stylesheet is written in cohere and declares these as plain `@theme` keys.
+func variantOrderScalesFor(test *testing.T, aCase variantOrderCase) (map[string]string, map[string]string) {
+	test.Helper()
+
+	breakpoints := maps.Clone(variantOrderDefaultBreakpointScale)
+	containers := maps.Clone(variantOrderDefaultContainerScale)
+	if aCase.Source != "repository" || aCase.EntryPath == "" {
+		return breakpoints, containers
+	}
+
+	visited := map[string]bool{}
+	var read func(path string)
+	read = func(path string) {
+		if visited[path] {
+			return
+		}
+		visited[path] = true
+		contents, readError := os.ReadFile(path)
+		if readError != nil {
+			test.Fatalf("%s: reading %s: %v", aCase.Name, path, readError)
+		}
+		for _, match := range variantOrderScaleDeclarationPattern.FindAllStringSubmatch(string(contents), -1) {
+			scale := breakpoints
+			if match[1] == "container" {
+				scale = containers
+			}
+			scale[match[2]] = strings.TrimSpace(match[3])
+		}
+		for _, match := range variantOrderRelativeImportPattern.FindAllStringSubmatch(string(contents), -1) {
+			read(filepath.Join(filepath.Dir(path), filepath.FromSlash(match[1])))
+		}
+	}
+	read(repository.Path(test, aCase.EntryPath))
+	return breakpoints, containers
+}
+
 // variantOrderBreakpointResolverFor answers what a breakpoint variant resolves to, from the fixture's own data.
 //
 // Tailwind resolves these through the theme's `--breakpoint` and `--container` namespaces, which
 // is a sibling component. Rather than depend on it, the resolver reads the value straight off the
-// variant when it is arbitrary and falls back to the default scale by name, which is what every case
-// in the fixture uses. A name this cannot resolve reports false, which is upstream's own `null` branch
-// and is ordered rather than skipped.
+// variant when it is arbitrary and falls back to the case's scale by name, which variantOrderScalesFor
+// reads. A name this cannot resolve reports false, which is upstream's own `null` branch and is ordered
+// rather than skipped.
 func variantOrderBreakpointResolverFor(
-	aCase variantOrderCase,
-	corpus variantOrderCorpus,
+	breakpoints map[string]string,
+	containers map[string]string,
 ) func(ParsedVariant) (string, bool) {
 	return func(variant ParsedVariant) (string, bool) {
 		switch variant.Kind {
 		case ParsedVariantKindStatic:
-			value, isNamed := variantOrderDefaultBreakpointScale[variant.Root]
+			value, isNamed := breakpoints[variant.Root]
 			return value, isNamed
 		case ParsedVariantKindFunctional:
 			if variant.Value == nil || variant.Modifier != nil && !strings.HasPrefix(variant.Root, "@") {
@@ -331,9 +397,9 @@ func variantOrderBreakpointResolverFor(
 				}
 				return variant.Value.Value, true
 			}
-			scale := variantOrderDefaultBreakpointScale
+			scale := breakpoints
 			if strings.HasPrefix(variant.Root, "@") {
-				scale = variantOrderDefaultContainerScale
+				scale = containers
 			}
 			value, isNamed := scale[variant.Value.Value]
 			return value, isNamed
@@ -851,6 +917,43 @@ func TestCustomVariantOverridingAFrameworkNameKeepsItsOrder(test *testing.T) {
 			highestFramework, appendedOrder,
 		)
 	}
+
+	// The repositories, asserted rather than assumed: this is the claim that a per-repository port is
+	// needed at all. The planted theme overrides `dark`, which stays where the framework put it, adds
+	// `compact` and `pressed`, which append past the framework's last order, and adds the breakpoints
+	// `tablet` and `desk`, which join the framework's breakpoint group rather than appending. The public
+	// theme declares no variant, so its registry is the framework's.
+	planted := registries["planted"]
+	public := registries["public"]
+	if planted == nil || public == nil {
+		test.Fatal("the fixture no longer holds the planted and public repository registries")
+	}
+	plantedOrders := map[string]int{}
+	for _, entry := range planted.Entries {
+		plantedOrders[entry.Name] = entry.Order
+	}
+	for name, order := range frameworkOrders {
+		if plantedOrders[name] != order {
+			test.Errorf("the planted theme moved %q from order %d to %d", name, order, plantedOrders[name])
+		}
+	}
+	for _, name := range []string{"compact", "pressed"} {
+		if plantedOrders[name] <= highestFramework {
+			test.Errorf("the planted theme's %q holds order %d, not past the framework's last %d",
+				name, plantedOrders[name], highestFramework)
+		}
+	}
+	for _, name := range []string{"tablet", "desk"} {
+		if order, isRegistered := plantedOrders[name]; !isRegistered || order != frameworkOrders["sm"] {
+			test.Errorf("the planted theme's breakpoint %q holds order %d, not the breakpoint group's %d",
+				name, order, frameworkOrders["sm"])
+		}
+	}
+	if len(planted.Entries) != len(framework.Entries)+4 || len(public.Entries) != len(framework.Entries) {
+		test.Errorf("the planted theme registers %d variants and the public theme %d against the framework's %d; "+
+			"want four more on the planted theme and none on the public one",
+			len(planted.Entries), len(public.Entries), len(framework.Entries))
+	}
 }
 
 // TestVariantOrderIsRunScoped is the known-dirty control for the shipped table.
@@ -1168,5 +1271,90 @@ func TestBitmaskExceedsSixtyFourBits(test *testing.T) {
 	}
 	if mask.Sign() == 0 {
 		test.Error("the mask is zero, which is what a uint64 shift past the word width would produce")
+	}
+}
+
+// variantOrderCorpusSourceTrees are the source trees the repository cases were harvested from, by case name,
+// each holding the planted.json tools/generate_planted_repository wrote beside it.
+var variantOrderCorpusSourceTrees = map[string]string{
+	"planted": filepath.Join("testdata", "planted_repository", "source"),
+	"public":  filepath.Join("testdata", "public_repository", "source"),
+}
+
+// variantOrderPlantedManifest is what tools/generate_planted_repository records about a tree it wrote.
+type variantOrderPlantedManifest struct {
+	EntryPoint  string   `json:"entryPoint"`
+	Lists       int      `json:"lists"`
+	Classes     int      `json:"classes"`
+	DeadClasses []string `json:"deadClasses"`
+}
+
+// TestCorpusHoldsTheRepositoryClassLists guards the population every count above is a count of.
+//
+// A fixture that regenerated to zero repository class lists would leave every differential passing
+// vacuously and every logged percentage a percentage of nothing. The repositories are generated, so the
+// population is known exactly: each repository case holds every list and every class its tree's
+// planted.json records, from the theme it records, dead classes included. A fixture harvested from a
+// stale tree, or truncated by the harvester's limit, fails here by name.
+func TestCorpusHoldsTheRepositoryClassLists(test *testing.T) {
+	test.Parallel()
+	corpus := loadVariantOrderCorpus(test)
+
+	classListsByRepository := map[string]int{}
+	classesByRepository := map[string]int{}
+	writtenByRepository := map[string]map[string]bool{}
+	entryPathByRepository := map[string]string{}
+	for _, aCase := range corpus.Cases {
+		if aCase.Source != "repository" || len(aCase.ClassLists) == 0 {
+			continue
+		}
+		repositoryName := strings.TrimSuffix(aCase.Name, "/class-lists")
+		entryPathByRepository[repositoryName] = aCase.EntryPath
+		writtenByRepository[repositoryName] = map[string]bool{}
+		for _, classList := range aCase.ClassLists {
+			classListsByRepository[repositoryName]++
+			classesByRepository[repositoryName] += len(classList.Classes)
+			for _, className := range classList.Classes {
+				writtenByRepository[repositoryName][className] = true
+			}
+		}
+	}
+
+	if len(classListsByRepository) != len(variantOrderCorpusSourceTrees) {
+		test.Fatalf("the corpus holds class lists from %d repositories and the generated corpus is %d",
+			len(classListsByRepository), len(variantOrderCorpusSourceTrees))
+	}
+	for repositoryName, sourceTree := range variantOrderCorpusSourceTrees {
+		path := filepath.Join(sourceTree, "planted.json")
+		contents, readError := os.ReadFile(path)
+		if readError != nil {
+			test.Fatalf("read %s: %v", path, readError)
+		}
+		var manifest variantOrderPlantedManifest
+		if decodeError := json.Unmarshal(contents, &manifest); decodeError != nil {
+			test.Fatalf("parse %s: %v", path, decodeError)
+		}
+
+		test.Logf("%s: %d class lists, %d classes", repositoryName, classListsByRepository[repositoryName],
+			classesByRepository[repositoryName])
+		if manifest.Lists < 1000 {
+			test.Errorf("%s records only %d class lists, which is too few to measure agreement on",
+				path, manifest.Lists)
+		}
+		if classListsByRepository[repositoryName] != manifest.Lists ||
+			classesByRepository[repositoryName] != manifest.Classes {
+			test.Errorf("%s holds %d class lists and %d classes, and its tree holds %d and %d",
+				repositoryName, classListsByRepository[repositoryName], classesByRepository[repositoryName],
+				manifest.Lists, manifest.Classes)
+		}
+		if entryPathByRepository[repositoryName] != manifest.EntryPoint {
+			test.Errorf("%s was sorted against %s, and its tree was drawn from %s",
+				repositoryName, entryPathByRepository[repositoryName], manifest.EntryPoint)
+		}
+		for _, dead := range manifest.DeadClasses {
+			if !writtenByRepository[repositoryName][dead] {
+				test.Errorf("%s planted the dead class %q and the fixture never harvested it", repositoryName, dead)
+			}
+		}
 	}
 }

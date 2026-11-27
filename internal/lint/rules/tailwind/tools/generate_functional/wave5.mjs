@@ -51,18 +51,24 @@ const { designSystem, tailwindVersion, entryPoint, recordedEntryPoint } = await 
 /*
  * The roots this wave carries as table rows.
  *
- * Thirty-four roots were removed after measurement rather than ported: the border sides, the mask
- * gradient stops, `from`, `to`, `via`, `block` and `inline`. Each partitions its reading on the
- * value's TYPE rather than on a named literal, so `border-[3px]` reads a width and `border-red-500`
- * reads a colour, and a single Reading field with a literal map cannot express that. `Table.Lookup`
- * already answers all of them exactly, which is what wave 3 measured over 8,096 cases.
+ * Thirty-two roots were removed after measurement rather than ported: the border sides, the mask
+ * gradient stops, `from`, `to` and `via`. Each partitions its reading on the value's type rather than
+ * on a named literal, so `border-[3px]` reads a width and `border-red-500` reads a colour, and a
+ * single Reading field with a literal map cannot express that. `Table.Lookup` already answers all of
+ * them exactly, which is what wave 3 measured over 8,096 cases.
+ *
+ * `block` and `inline` are rows here. Their bare class is the static `display` utility and every value
+ * form is the `spacingUtility` at utilities.ts:1147 and :1150, one reading for all of them, so they
+ * are rows the same way `min-inline` and `max-block` are.
  */
 const roots = [
+    'block',
     'bottom',
     'end',
     'flex-grow',
     'flex-shrink',
     'h',
+    'inline',
     'inset',
     'inset-be',
     'inset-bs',

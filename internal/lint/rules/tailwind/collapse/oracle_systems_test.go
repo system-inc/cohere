@@ -30,6 +30,7 @@ import (
 //	    --no-corpus > /dev/null
 //	node $T/generate_descriptor_table/context.mjs $P --resolve-root $R > $D/descriptor_context_public.json
 //	node $T/generate_utility/enumerate.mjs $P --resolve-root $R > $D/utility_fixtures_public.json
+//	node $T/generate_functional/enumerate.mjs $P --resolve-root $R > $D/functional_fixtures_public.json
 var oracleCopies = []struct {
 	name   string
 	suffix string

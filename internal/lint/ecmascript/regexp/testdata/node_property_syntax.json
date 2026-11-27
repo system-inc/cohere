@@ -1,0 +1,171 @@
+{
+    "recordedBy": "go run ./internal/lint/ecmascript/regexp/tools/record_node_answers",
+    "node": "v24.14.1",
+    "unicode": "17.0",
+    "subjects": [
+        "",
+        "A",
+        "a",
+        "α",
+        "Α",
+        "µ",
+        "μ",
+        "-",
+        "_",
+        "0",
+        " ",
+        "",
+        "﻿",
+        "AA",
+        "αa",
+        "αA",
+        "p{Script=Greek}",
+        "\\p{Script=Greek}"
+    ],
+    "fixtures": [
+        {
+            "source": "^[\\p{Script=Greek}-]$",
+            "flags": "u",
+            "accepted": true,
+            "matches": "000110110000000000"
+        },
+        {
+            "source": "^[\\p{Script=Greek}-A]$",
+            "flags": "u",
+            "accepted": false,
+            "matches": ""
+        },
+        {
+            "source": "^[A-\\p{Script=Greek}]$",
+            "flags": "u",
+            "accepted": false,
+            "matches": ""
+        },
+        {
+            "source": "^[\\P{ASCII}A]$",
+            "flags": "u",
+            "accepted": true,
+            "matches": "010111100001100000"
+        },
+        {
+            "source": "^[^\\P{ASCII}A]$",
+            "flags": "iu",
+            "accepted": true,
+            "matches": "000000011110000000"
+        },
+        {
+            "source": "^[\\P{Lt}\\d\\D\\s\\S\\w\\W]$",
+            "flags": "iu",
+            "accepted": true,
+            "matches": "011111111111100000"
+        },
+        {
+            "source": "^[\\p{Script=Greek}\\s\\d_]$",
+            "flags": "iu",
+            "accepted": true,
+            "matches": "000111101110100000"
+        },
+        {
+            "source": "^(?i:\\P{Script=Greek})$",
+            "flags": "u",
+            "accepted": true,
+            "matches": "011001111111100000"
+        },
+        {
+            "source": "^(?i:\\p{Script=Greek})(?-i:a)$",
+            "flags": "u",
+            "accepted": true,
+            "matches": "000000000000001000"
+        },
+        {
+            "source": "^\\P{Any}*$",
+            "flags": "u",
+            "accepted": true,
+            "matches": "100000000000000000"
+        },
+        {
+            "source": "^[^\\P{Any}]$",
+            "flags": "u",
+            "accepted": true,
+            "matches": "011111111111100000"
+        },
+        {
+            "source": "^\\p{Any}{2}$",
+            "flags": "u",
+            "accepted": true,
+            "matches": "000000000000011100"
+        },
+        {
+            "source": "^\\p{IsGreek}$",
+            "flags": "u",
+            "accepted": false,
+            "matches": ""
+        },
+        {
+            "source": "^\\p{script=Greek}$",
+            "flags": "u",
+            "accepted": false,
+            "matches": ""
+        },
+        {
+            "source": "^\\p{Script=greek}$",
+            "flags": "u",
+            "accepted": false,
+            "matches": ""
+        },
+        {
+            "source": "^\\p{Script=Hrkt}$",
+            "flags": "u",
+            "accepted": false,
+            "matches": ""
+        },
+        {
+            "source": "^\\p{Script=Katakana_Or_Hiragana}$",
+            "flags": "u",
+            "accepted": false,
+            "matches": ""
+        },
+        {
+            "source": "^\\p{Greek}$",
+            "flags": "u",
+            "accepted": false,
+            "matches": ""
+        },
+        {
+            "source": "^\\p{gc = Lu}$",
+            "flags": "u",
+            "accepted": false,
+            "matches": ""
+        },
+        {
+            "source": "^\\p{lowercase_letter}$",
+            "flags": "u",
+            "accepted": false,
+            "matches": ""
+        },
+        {
+            "source": "^\\p{Letter=yes}$",
+            "flags": "u",
+            "accepted": false,
+            "matches": ""
+        },
+        {
+            "source": "^\\p{Basic_Emoji}$",
+            "flags": "u",
+            "accepted": false,
+            "matches": ""
+        },
+        {
+            "source": "^\\p{Script=Greek}$",
+            "flags": "",
+            "accepted": true,
+            "matches": "000000000000000010"
+        },
+        {
+            "source": "^\\\\p\\{Script=Greek\\}$",
+            "flags": "u",
+            "accepted": true,
+            "matches": "000000000000000001"
+        }
+    ]
+}

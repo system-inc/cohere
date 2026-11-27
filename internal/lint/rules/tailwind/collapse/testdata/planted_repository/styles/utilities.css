@@ -1,0 +1,47 @@
+/* Static, declaring two properties. */
+@utility card-frame {
+    display: grid;
+    border-radius: var(--radius-chip);
+}
+
+/* Static, with nested rules only: a class that exists though it declares nothing at its own level. */
+@utility scroll-quiet {
+    scrollbar-width: none;
+    &::-webkit-scrollbar {
+        display: none;
+    }
+}
+
+/* Static, declaring only a custom property. */
+@utility halo-on {
+    --halo-alpha: 0.6;
+}
+
+/* Numbered scales whose root ends in a dash: `wash--3` is root `wash-` with value `3`. */
+@utility wash--* {
+    background-color: --value(--color-wash-*, [color]);
+}
+@utility line--* {
+    color: --value(--color-wash-*, [color]);
+}
+
+/* One root declared both ways, functional first, and one static first. */
+@utility stack-* {
+    gap: --value(--spacing-*, [length]);
+}
+@utility stack {
+    display: flex;
+    flex-direction: column;
+}
+@utility cluster {
+    display: flex;
+    flex-wrap: wrap;
+}
+@utility cluster-* {
+    gap: calc(var(--spacing) * --value(integer));
+}
+
+/* A functional root reading a value and a modifier: `tint-moss/40` mixes the colour at forty percent. */
+@utility tint-* {
+    background-color: color-mix(in oklab, --value(--color-*, [color]) calc(--modifier(integer) * 1%), transparent);
+}
