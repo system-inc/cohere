@@ -1039,7 +1039,7 @@ func (job *integrateJobRun) measure() (string, int) {
 		return "", measureCode
 	}
 	job.integratedTree, job.measured = tree, measured
-	if mainBinary != "" && tree != "" && strings.HasPrefix(measured, "Not measured: ") {
+	if tree != "" && strings.HasPrefix(measured, "Not measured: ") {
 		job.say("measure skipped: %s", measured)
 	}
 	return measured, 0

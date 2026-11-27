@@ -495,6 +495,50 @@ func TestAnIntegrateJobKeepsMainsFileForTheSameBinary(test *testing.T) {
 	}
 }
 
+// A measurement on a box that wasn't quiet records nothing (#6ex523f, system_cohere's ruling): her one-minute load over
+// a quarter of her cores before or after, as J-ge4cc9w's 8.75 on Shackler's 16, and the landing keeps main's file
+// byte for byte, or with none on main lands with none, saying her load and that a later landing measures.
+func TestAnIntegrateJobRecordsNothingFromABusyBox(test *testing.T) {
+	test.Parallel()
+	for _, row := range []struct {
+		name       string
+		mainHasOne bool
+	}{{"main holds a file", true}, {"main holds none", false}} {
+		test.Run(row.name, func(test *testing.T) {
+			test.Parallel()
+			fixture := newIntegrateJobFixture(test)
+			if row.mainHasOne {
+				previous := previousPerformance(test, performancePreviousCommit, performanceBox,
+					performanceSpreadOf(9850, 9600, 10000), performanceSpreadOf(39000, 38000, 40000))
+				writeFixtureFile(test, filepath.Join(fixture.repository, performanceFileName), string(previous))
+				fixture.git(fixture.repository, "add", performanceFileName)
+				fixture.git(fixture.repository, "commit", "-q", "-m", "main's measurement before")
+			}
+			busy := strings.Replace(shacklerSays([]int64{9900, 9700, 9800}), "load before 0.89 0.91 1.28",
+				"load before 8.75 7.88 16.96", 1)
+			if !strings.Contains(busy, "load before 8.75") {
+				test.Fatal("the stand-in's load line wasn't found to replace")
+			}
+			fixture.reply("measure.run", busy)
+			merge := fixture.merged()
+			ran := fixture.integrateJob(merge)
+			if ran.exit != 0 || ran.integrated == "" {
+				test.Fatalf("the integrate job exited %d, its last line %q:\n%s", ran.exit, ran.lastLine, ran.errors)
+			}
+			said := readLanding(test, ran.output)
+			if !said.unchanged || said.tree != fixture.git(fixture.repository, "rev-parse", merge+"^{tree}") {
+				test.Errorf("a busy box's measurement changed the file, or landed a tree %s other than the merge's",
+					said.tree)
+			}
+			if want := "Not measured: " + performanceBox + " wasn't quiet, her one-minute load 8.75 before and " +
+				"1.10 after on 12 cores, where a quiet box stays at or under 3.00"; !strings.Contains(said.message,
+				want) {
+				test.Errorf("the landing's message doesn't say %q:\n%s", want, said.message)
+			}
+		})
+	}
+}
+
 // A red test refuses: the integrate job names the test and its output, exits 1, and says no landing.
 func TestAnIntegrateJobRefusesARedTestNamingIt(test *testing.T) {
 	test.Parallel()
