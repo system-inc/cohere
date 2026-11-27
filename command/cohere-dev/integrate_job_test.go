@@ -302,20 +302,17 @@ func (fixture *integrateJobFixture) checkMergesOwnTree(merge string, said landin
 	if tree := fixture.git(fixture.repository, "rev-parse", merge+"^{tree}"); said.tree != tree {
 		fixture.test.Errorf("the integrate job said the tree %s, not the merge's %s", said.tree, tree)
 	}
-	if listed := fixture.git(fixture.repository, "ls-tree", "--name-only", said.tree, "Performance.jsonc"); listed !=
-		"" {
-		fixture.test.Errorf("the tested tree holds %s", listed)
-	}
 }
 
 // A merge whose candidate is clean would integrate (#etpnnw1, #hnbb5vr): measured first, on a script handed no binary
 // of main's since no baseline is named, then tested, then checked, all on the merge's tree laid from the mirror.
 // Nothing is committed or pushed: the last lines say the performance is unchanged, the tested tree is the merge's own
-// (#6v8r4nn), and the landing's message, `Land #<task>: <what>` with the gate's account, the measurement's note and
-// every step's seconds, then `integrated <tree>`. With COHERE_INTEGRATE_CACHE set the tests' script keeps the integrate
-// job's cache, and unset it keeps the gate box's none; either way it reads the integrate job's own mirrors. Every git
-// the job starts is the one it says it found (#5wj23dd): its own reads and its packages', each through the stand-in,
-// and both scripts carry that git's directory first on their path.
+// (#6v8r4nn), main's old Performance.jsonc carried in it untouched, and the landing's message, `Land #<task>: <what>`
+// with the gate's account, the measurement's note and every step's seconds, then `integrated <tree>`. With
+// COHERE_INTEGRATE_CACHE set the tests' script keeps the integrate job's cache, and unset it keeps the gate box's none;
+// either way it reads the integrate job's own mirrors. Every git the job starts is the one it says it found (#5wj23dd):
+// its own reads and its packages', each through the stand-in, and both scripts carry that git's directory first on
+// their path.
 func TestAnIntegrateJobPassesAMergeAndSaysItsLanding(test *testing.T) {
 	test.Parallel()
 	for _, kept := range []bool{false, true} {
@@ -323,6 +320,7 @@ func TestAnIntegrateJobPassesAMergeAndSaysItsLanding(test *testing.T) {
 			test.Parallel()
 			fixture := newIntegrateJobFixture(test)
 			fixture.reply("measure.run", shacklerSays([]int64{9900, 9700, 9800}))
+			planted := plantRecordFile(fixture.landFixture)
 			merge := fixture.merged()
 			environment := []string{}
 			cache := filepath.Join(test.TempDir(), "integrate cache")
@@ -424,13 +422,16 @@ func TestAnIntegrateJobPassesAMergeAndSaysItsLanding(test *testing.T) {
 				}
 			}
 			fixture.checkMergesOwnTree(merge, said)
+			if kept := fixture.git(fixture.repository, "rev-parse", said.tree+":Performance.jsonc"); kept != planted {
+				test.Errorf("the tested tree's Performance.jsonc is %s, not the %s main held", kept, planted)
+			}
 			for _, want := range []string{
 				"Land #" + fixtureTask + ": a module measured and gated\n\n",
 				"Gated by cohere-dev integrate-job on Shackler in ",
 				": go test of the module on Shackler (" + runtime.GOOS + "/" + runtime.GOARCH + ", 2 packages, " +
 					"shared uid, ",
 				", go vet, cohere on the tree, 0 findings and no gaps.",
-				"Measured on Shackler: the first measurement, so nothing to compare.",
+				"Measured on Shackler: " + noBaselineNote + ".",
 				"Steps: preflight ",
 				"0 findings and no gaps. " + needs.SwiftUnlaid + ".\n",
 			} {
@@ -451,26 +452,36 @@ func TestAnIntegrateJobPassesAMergeAndSaysItsLanding(test *testing.T) {
 // An integrate job reads its note against the baseline performanceBaselineVariable holds, main's last landed record as
 // Loom hands it, and writes its record where Loom's runner collects it (#6v8r4nn): the stand-in's numbers, the merge
 // as its commit, main as its parent, measured, and the baseline's commit as what it was read against. With no baseline
-// the note says it is the first measurement and the record names none, and a baseline that doesn't read, not base64 or
-// no record, is said in the note, never fatal. Each way, the landing's tree is the merge's own and nothing is written
-// into it.
+// the note says none was handed and the record names none, and a baseline that doesn't read, not base64, no JSON,
+// JSON that names no commit, `{}` and `null`, or another schema, is said in the note, never fatal. Each way, the
+// landing's tree is the merge's own and nothing is written into it.
 func TestAnIntegrateJobWritesItsRecordAgainstItsBaseline(test *testing.T) {
 	test.Parallel()
 	baseline := previousPerformance(test, performancePreviousCommit, performanceBox,
 		performanceSpreadOf(9850, 9600, 10000), performanceSpreadOf(39000, 38000, 40000))
+	schemaTwo := baseline
+	schemaTwo.Schema = 2
+	encoded := func(json string) string {
+		return performanceBaselineVariable + "=" + base64.StdEncoding.EncodeToString([]byte(json))
+	}
 	for _, row := range []struct {
 		name, setting, against, note string
 	}{
 		{name: "a baseline", setting: baselineSetting(test, baseline), against: performancePreviousCommit,
 			note: "against 11111111: cold root wall level (9800 ms, was 9850), user level (39200 ms, was 39000); " +
 				"cold deeafbf4 wall level (4100 ms, was 4100)"},
-		{name: "no baseline", note: "the first measurement, so nothing to compare"},
+		{name: "no baseline", note: noBaselineNote},
 		{name: "a baseline that isn't base64", setting: performanceBaselineVariable + "=not base64 at all",
 			note: "the baseline record didn't read (not base64: illegal base64 data at input byte 3), so nothing is " +
 				"compared"},
-		{name: "a baseline that is no record",
-			setting: performanceBaselineVariable + "=" + base64.StdEncoding.EncodeToString([]byte("{\"schema\":")),
-			note:    "the baseline record didn't read (unexpected end of JSON input), so nothing is compared"},
+		{name: "a baseline that is no JSON", setting: encoded(`{"schema":`),
+			note: "the baseline record didn't read (unexpected end of JSON input), so nothing is compared"},
+		{name: "an empty object", setting: encoded(`{}`),
+			note: "the baseline record didn't read (it names no commit), so nothing is compared"},
+		{name: "null", setting: encoded(`null`),
+			note: "the baseline record didn't read (it names no commit), so nothing is compared"},
+		{name: "another schema", setting: baselineSetting(test, schemaTwo),
+			note: "the baseline record didn't read (it is schema 2, not 3), so nothing is compared"},
 	} {
 		test.Run(row.name, func(test *testing.T) {
 			test.Parallel()
@@ -542,6 +553,65 @@ func TestAnIntegrateJobRecordsTheSameBinaryAsSkipped(test *testing.T) {
 	}
 }
 
+// A baseline the same-binary skip can't trust hands the script no binary, so a merge that builds that very binary is
+// measured, never skipped (#6v8r4nn, the Go Square's review): a record that measured nothing, whether its box was
+// loaded or quiet, since a skipped record keeps its own binary and trusting it would leave that binary with no numbers
+// anywhere; a measured record from a box that wasn't quiet, as the seed a7867bf3 was at 12.57 on 16 cores; and a
+// measured record from another box than Shackler. Each note says why it isn't compared.
+func TestAnIntegrateJobMeasuresABinaryItsBaselineCantVouchFor(test *testing.T) {
+	test.Parallel()
+	level := sameBinaryPerformance(previousPerformance(test, performancePreviousCommit, performanceBox,
+		performanceSpreadOf(9850, 9600, 10000), performanceSpreadOf(39000, 38000, 40000)))
+	busySkipped, quietSkipped, seedLoaded, otherBox := level, level, copiedRecord(level), level
+	busySkipped.Measured, busySkipped.Checks, busySkipped.Machine.HeldQuiet = false, nil, false
+	busySkipped.Machine.LoadBefore = []float64{8.75, 7.88, 16.96}
+	busySkipped.Skipped = performanceBox + " wasn't quiet"
+	quietSkipped.Measured, quietSkipped.Checks, quietSkipped.Skipped = false, nil, "nothing measured on a quiet box"
+	seedLoaded.Machine = performanceMachine{Name: performanceBox, Cpu: "Apple M3 Max", Cores: 16,
+		LoadBefore: []float64{12.57, 5.45, 3.33}, LoadAfter: []float64{11.46, 6.23, 3.74}, HeldQuiet: true}
+	otherBox.Machine.Name = "Marin"
+	for _, row := range []struct {
+		name     string
+		baseline performanceFile
+		note     string
+	}{
+		{"a busy box's skipped record", busySkipped, "main's record at 11111111 measured nothing (Shackler wasn't " +
+			"quiet), so nothing is compared"},
+		{"a quiet box's record that measured nothing", quietSkipped, "main's record at 11111111 measured nothing " +
+			"(nothing measured on a quiet box), so nothing is compared"},
+		{
+			"a record measured on a loaded box",
+			seedLoaded,
+			"main's record at 11111111 was measured on a box its record " +
+				"doesn't show as quiet (her one-minute load 12.57 before and 11.46 after on 16 cores",
+		},
+		{"another box's record", otherBox, "measured on Shackler (Apple M2 Max, 12 cores), and main's at 11111111 " +
+			"on Marin (Apple M2 Max, 12 cores): another machine, so not compared"},
+	} {
+		test.Run(row.name, func(test *testing.T) {
+			test.Parallel()
+			fixture := newIntegrateJobFixture(test)
+			fixture.reply("measure.run", shacklerSays([]int64{9900, 9700, 9800}))
+			merge := fixture.merged()
+			ran := fixture.integrateJob(merge, baselineSetting(test, row.baseline))
+			if ran.exit != 0 || ran.integrated == "" {
+				test.Fatalf("the integrate job exited %d, its last line %q:\n%s", ran.exit, ran.lastLine, ran.errors)
+			}
+			if measured := fixture.arguments("measure"); len(measured) != 6 {
+				test.Errorf("the measurement was handed %q, want no binary of the baseline's", measured)
+			}
+			record, _, found := fixture.record()
+			if !found {
+				test.Fatalf("the integrate job wrote no record at %s", integrateJobRecordPath)
+			}
+			checkMeasuredRecord(test, record, merge, fixture.git(fixture.repository, "rev-parse", "main"))
+			if !strings.HasPrefix(record.Note, row.note) {
+				test.Errorf("the note reads\n%s\nwant it to open\n%s", record.Note, row.note)
+			}
+		})
+	}
+}
+
 // A measurement on a box that wasn't quiet records no numbers (#6ex523f, system_cohere's ruling): her one-minute load
 // over a quarter of her cores before or after, as J-ge4cc9w's 8.75 on Shackler's 16, writes a skipped record, measured
 // false with no checks, her load in it and never that she was held quiet, read against the baseline when there is
@@ -610,6 +680,10 @@ func TestAnIntegrateJobRefusesARedTestNamingIt(test *testing.T) {
 		if !strings.Contains(ran.errors, want) {
 			test.Errorf("the integrate job doesn't say %q:\n%s", want, ran.errors)
 		}
+	}
+	// The measurement passed, but its record is written only once the checks do, so a refused job leaves none.
+	if _, written, found := fixture.record(); found {
+		test.Errorf("a refused integrate job wrote a record at %s:\n%s", integrateJobRecordPath, written)
 	}
 }
 
@@ -1176,11 +1250,13 @@ func TestAFillPassesMainsTipAndSaysFilled(test *testing.T) {
 
 // A fill measures nothing (#fnrchck): performanceScript never runs, so the stand-in bash is called for the tests
 // alone, the account says once that the measurement was skipped, never a measure step's seconds, and no record is
-// written for Loom's runner to collect (#6v8r4nn).
+// written for Loom's runner to collect (#6v8r4nn), a record a job before left in the directory it starts in removed,
+// so the fill never hands that one on as its own.
 func TestAFillRunsNoMeasurement(test *testing.T) {
 	test.Parallel()
 	fixture := newIntegrateJobFixture(test)
 	fixture.landedMain()
+	writeFixtureFile(test, filepath.Join(fixture.job, integrateJobRecordPath), "a record a job before left\n")
 	ran := fixture.fill()
 	if ran.exit != 0 {
 		test.Fatalf("the fill exited %d, its last line %q:\n%s", ran.exit, ran.lastLine, ran.errors)
@@ -1192,8 +1268,8 @@ func TestAFillRunsNoMeasurement(test *testing.T) {
 	if strings.Count(ran.errors, want) != 1 || slices.Contains(accountSteps(ran.errors), "measure") {
 		test.Errorf("the account doesn't say %q once, or says a measure step:\n%s", want, ran.errors)
 	}
-	if _, written, found := fixture.record(); found {
-		test.Errorf("the fill wrote a record at %s:\n%s", integrateJobRecordPath, written)
+	if left, readError := os.ReadFile(filepath.Join(fixture.job, integrateJobRecordPath)); !os.IsNotExist(readError) {
+		test.Errorf("after the fill a record is at %s (%v):\n%s", integrateJobRecordPath, readError, left)
 	}
 }
 

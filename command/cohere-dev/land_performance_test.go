@@ -72,6 +72,9 @@ func (fixture *performanceFixture) landing(environment ...string) (bool, string,
 // performanceMainBinary is the digest of the binary main's record before the landing measured, another program's.
 const performanceMainBinary = "0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a69788796a5b4c3d2e1f0"
 
+// noBaselineNote is the note of a measurement handed no baseline.
+const noBaselineNote = "no baseline was handed (COHERE_PERFORMANCE_BASELINE unset), so nothing is compared"
+
 // performanceFixtureBinary is the digest the stand-in Shackler says her binary has.
 const performanceFixtureBinary = "5f0c3a9e1d2b4c6a8e0f1a3b5c7d9e1f2a4b6c8d0e2f4a6b8c0d2e4f6a8b0c2d"
 
@@ -159,7 +162,7 @@ func previousPerformance(test *testing.T, commit string, machine string, wall pe
 	file.Checks.Cold.Root.Wall, file.Checks.Cold.Root.User = wall, user
 	// main's binary was another program than the one being landed, as a landing that changes cohere builds.
 	file.Tools.Binary = performanceMainBinary
-	file.Note = "the first measurement, so nothing to compare"
+	file.Note = noBaselineNote
 	return file
 }
 
@@ -249,11 +252,23 @@ func checkMeasuredRecord(test *testing.T, record performanceFile, commit string,
 // performancePreviousCommit is the commit a previous record names, as main's last landed record.
 const performancePreviousCommit = "1111111111111111111111111111111111111111"
 
+// plantRecordFile commits a Performance.jsonc to the fixture's main before a landing, as main held one until
+// #6v8r4nn, and returns its blob: nothing a landing does writes or removes it any more, so the tree that lands carries
+// it unchanged.
+func plantRecordFile(fixture *landFixture) string {
+	fixture.test.Helper()
+	writeFixtureFile(fixture.test, filepath.Join(fixture.repository, "Performance.jsonc"), "{\"schema\": 3}\n")
+	fixture.git(fixture.repository, "add", "Performance.jsonc")
+	fixture.git(fixture.repository, "commit", "-q", "-m", "main's record as it was kept")
+	return fixture.git(fixture.repository, "rev-parse", "main:Performance.jsonc")
+}
+
 // A landing measured (#6wnsnq2): the push puts the gated commit in Loom's feed, Shackler's gap runs the script on it,
-// and the landing commit's tree is the gated tree itself, nothing written into it (#6v8r4nn). Its note reads against
-// the baseline performanceBaselineVariable holds: none is the first measurement, overlapping ranges read level,
-// disjoint ones moved, another machine is a line of its own, never compared, and a record with no checked counts says
-// so and compares its times. The land line and the landing's body say the note, with what each phase cost.
+// and the landing commit's tree is the gated tree itself, nothing written into it (#6v8r4nn), main's old
+// Performance.jsonc carried through untouched. Its note reads against the baseline performanceBaselineVariable holds:
+// none says none was handed, overlapping ranges read level, disjoint ones moved, another machine is a line of its own,
+// never compared, and a record with no checked counts says so and compares its times. The land line and the landing's
+// body say the note, with what each phase cost.
 func TestALandingIsMeasuredOnShacklerAndSaysItsNote(test *testing.T) {
 	test.Parallel()
 	level := previousPerformance(test, performancePreviousCommit, performanceBox,
@@ -268,7 +283,7 @@ func TestALandingIsMeasuredOnShacklerAndSaysItsNote(test *testing.T) {
 		previous *performanceFile
 		note     string
 	}{
-		{name: "the first measurement", note: "the first measurement, so nothing to compare"},
+		{name: "no baseline", note: noBaselineNote},
 		{
 			name:     "overlapping ranges read level",
 			previous: &level,
@@ -306,6 +321,7 @@ func TestALandingIsMeasuredOnShacklerAndSaysItsNote(test *testing.T) {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			fixture := newPerformanceFixture(test)
+			planted := plantRecordFile(fixture.landFixture)
 			environment := []string{}
 			if testCase.previous != nil {
 				environment = append(environment, baselineSetting(test, *testCase.previous))
@@ -320,9 +336,8 @@ func TestALandingIsMeasuredOnShacklerAndSaysItsNote(test *testing.T) {
 			if tree := fixture.git(fixture.repository, "rev-parse", "main^{tree}"); tree != gatedTree {
 				test.Errorf("main's tree is %s, not the gated %s", tree, gatedTree)
 			}
-			listed := fixture.git(fixture.repository, "ls-tree", "--name-only", "main", "Performance.jsonc")
-			if listed != "" {
-				test.Errorf("the landing's tree holds %s", listed)
+			if kept := fixture.git(fixture.repository, "rev-parse", "main:Performance.jsonc"); kept != planted {
+				test.Errorf("main's Performance.jsonc is %s after the landing, not the %s it held", kept, planted)
 			}
 			remote, readError := os.ReadFile(filepath.Join(fixture.replies, performanceBox+".remote"))
 			if readError != nil {
@@ -367,6 +382,26 @@ func TestALandingIsMeasuredOnShacklerAndSaysItsNote(test *testing.T) {
 				test.Errorf("the gap ran another script, or handed it %q", found[2])
 			}
 		})
+	}
+}
+
+// A landing's fixture never reads the baseline of the process that runs the tests (#6v8r4nn): the integrate job that
+// runs them is handed main's real record in performanceBaselineVariable, and outsideThePool strips it, so a landing
+// handed none says none was handed.
+// Not parallel: it sets the variable in this process with test.Setenv, which the fixture's environment starts from.
+func TestALandingNeverReadsTheTestsOwnBaseline(test *testing.T) {
+	test.Setenv(performanceBaselineVariable, strings.TrimPrefix(baselineSetting(test, previousPerformance(test,
+		performancePreviousCommit, performanceBox, performanceSpreadOf(9850, 9600, 10000),
+		performanceSpreadOf(39000, 38000, 40000))), performanceBaselineVariable+"="))
+	fixture := newPerformanceFixture(test)
+	writeFixtureFile(test, filepath.Join(fixture.replies, performanceBox+".run"),
+		shacklerSays([]int64{9900, 9700, 9800}))
+	landed, output, _ := fixture.landing()
+	if !landed {
+		test.Fatalf("the landing did not land:\n%s", output)
+	}
+	if !strings.Contains(output, "Measured on Shackler: "+noBaselineNote+".") {
+		test.Errorf("the landing read a baseline it was never handed:\n%s", output)
 	}
 }
 
@@ -537,8 +572,9 @@ func TestALandingWithNoCohereLandsSayingThereIsNothingToMeasure(test *testing.T)
 
 // The note's other lines: another build and another shape of measurement are each a line of their own, a row that
 // checked other files or findings than main's same row is a line of its own while the rows that checked the same
-// compare, a baseline that doesn't read is named, never compared, and so is one that measured nothing. A level range
-// touching the old one at its edge is level, and moved says by how much of the old median.
+// compare, a baseline that doesn't read is named, never compared, and so is one that measured nothing, one of another
+// schema, even with no checks, and one taken on a box that wasn't quiet, as the seed was, or that says no load. A
+// level range touching the old one at its edge is level, and moved says by how much of the old median.
 func TestThePerformanceNoteComparesOnlyLikeWithLike(test *testing.T) {
 	test.Parallel()
 	measurement, problem := readPerformance([]byte(strings.ReplaceAll(shacklerSays([]int64{9700, 9800, 9900}),
@@ -554,9 +590,18 @@ func TestThePerformanceNoteComparesOnlyLikeWithLike(test *testing.T) {
 	// A baseline that measured nothing, as a landing on a loaded box records, has no numbers to compare.
 	skipped := current
 	skipped.Measured, skipped.Checks, skipped.Skipped = false, nil, "Shackler wasn't quiet"
-	// A record written before keys were spelled whole, schema 1, reads as another shape, its min and max never read.
-	oldSpelling := current
+	// A record written before keys were spelled whole, schema 1, reads as another shape, its min and max never read,
+	// and so does one of schema 2, which names its numbers engine and so holds no checks of schema 3's.
+	oldSpelling, schemaTwo := current, current
 	oldSpelling.Schema = 1
+	schemaTwo.Schema, schemaTwo.Checks = 2, nil
+	// The seed of Loom's series, a7867bf3 as main's Performance.jsonc held it, measured at a one-minute load of 12.57
+	// before and 11.46 after on 16 cores, and a record that says no load at all.
+	seed, unloaded := copiedRecord(current), copiedRecord(current)
+	seed.Commit = "a7867bf3b8c3dc52884fe2ced31409a554d286d6"
+	seed.Machine = performanceMachine{Name: performanceBox, Cpu: "Apple M3 Max", Cores: 16,
+		LoadBefore: []float64{12.57, 5.45, 3.33}, LoadAfter: []float64{11.46, 6.23, 3.74}, HeldQuiet: true}
+	unloaded.Machine.LoadBefore, unloaded.Machine.LoadAfter = nil, nil
 	otherChecked.Checks.Cold.Deeafbf4.Checked = &performanceChecked{Files: 2210, Findings: 1100}
 	otherChecked.Tools.Binary = performanceMainBinary
 	// main's record measured the same binary a little faster at the root, and another binary just the same.
@@ -580,6 +625,14 @@ func TestThePerformanceNoteComparesOnlyLikeWithLike(test *testing.T) {
 			performanceWarmRounds)},
 		{"a baseline that doesn't read", current, "unexpected end of JSON input", "the baseline record didn't " +
 			"read (unexpected end of JSON input), so nothing is compared"},
+		{"a schema 2 record with no checks", schemaTwo, "", "main's at 11111111 was measured in another shape " +
+			"(schema 2), so not compared"},
+		{"the seed, measured on a loaded box", seed, "", "main's record at a7867bf3 was measured on a box its " +
+			"record doesn't show as quiet (her one-minute load 12.57 before and 11.46 after on 16 cores, where a " +
+			"quiet box stays at or under 4.00), so nothing is compared"},
+		{"a record that says no load", unloaded, "", "main's record at 11111111 was measured on a box its record " +
+			"doesn't show as quiet (her record says no one-minute load before and after or no cores, so she can't be " +
+			"read as quiet), so nothing is compared"},
 		{"a baseline that measured nothing", skipped, "", "main's record at 11111111 measured nothing (Shackler " +
 			"wasn't quiet), so nothing is compared"},
 		{"a row that checked otherwise", otherChecked, "", "against 11111111: cold root wall level (9800 ms, was " +

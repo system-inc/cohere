@@ -376,7 +376,8 @@ func outsideThePool(environment []string) []string {
 	kept := make([]string, 0, len(environment))
 	for _, variable := range environment {
 		// Land's own variables too: a test run inside a land gate would otherwise hand its fixture's landing the
-		// real worktree being landed, or a stand-in meant for another test.
+		// real worktree being landed, or a stand-in meant for another test. The performance baseline among them: the
+		// integrate job that runs these tests is handed main's real record, which a fixture's landing would read.
 		if !strings.HasPrefix(variable, heldTokenVariable+"=") &&
 			!strings.HasPrefix(variable, "GOMAXPROCS=") &&
 			!strings.HasPrefix(variable, "GOFLAGS=") &&
@@ -390,6 +391,7 @@ func outsideThePool(environment []string) []string {
 			!strings.HasPrefix(variable, gateSplitVariable+"=") &&
 			!strings.HasPrefix(variable, gateSplitWaitVariable+"=") &&
 			!strings.HasPrefix(variable, performanceWaitVariable+"=") &&
+			!strings.HasPrefix(variable, performanceBaselineVariable+"=") &&
 			!strings.HasPrefix(variable, loomStandInVariable+"=") &&
 			!strings.HasPrefix(variable, trainPreCheckVariable+"=") {
 			kept = append(kept, variable)

@@ -177,16 +177,20 @@ cores and load before and after, that she was held quiet, the build, the timelin
 and its `parent`, and a note against the baseline, main's last landed record, whose commit it names as `against`. A
 row reads "slower by" or "faster by" so much only when its range clears the old one, otherwise "level", and another
 machine or build, or a row that checked other files or findings than main's, is a line of its own, never compared: a
-run that checks less reads faster. A measurement that builds the baseline's binary, or whose box wasn't quiet, takes
-no numbers, and its record says `measured: false` and why it `skipped`. The record is awareness, never a gate on
-speed: a landing that makes cohere slower lands with its note saying so (Kirk, Nov 21). The record lives beside main,
-never in its tree, so the tree that lands is the gated tree (#6v8r4nn; until then it was spliced in as
-`Performance.jsonc`): Loom hands the integrate job its baseline in `COHERE_PERFORMANCE_BASELINE`, the record's JSON in
-base64, and the job writes its record to `integrate-job/performance.json` for Loom's runner to collect.
-`cohere-dev measure [<commit>]` runs the measurement alone and prints its record, landing nothing. While another holds
-Shackler, land waits holding the lock, saying whose claim and since when, and after `COHERE_DEV_PERFORMANCE_WAIT`
-(2h unless it says) refuses, naming the holder; a measurement that fails refuses the landing in her words. A tree
-with no `command/cohere` has nothing to measure and lands saying so. Each phase's seconds are on the land line.
+run that checks less reads faster. A measurement whose box wasn't quiet takes no numbers, and its record says
+`measured: false` and why it `skipped`; in the integrate job alone, since only it hands the script the baseline's
+binary, so does one that builds that binary again, the gap's road always measuring. A baseline that measured nothing,
+was taken on a box that wasn't quiet, or on another box is never compared against, nor its binary trusted. The record
+is awareness, never a gate on speed: a landing that makes cohere slower lands with its note saying so (Kirk, Nov 21).
+The record lives beside main, never in its tree, so the tree that lands is the gated tree (#6v8r4nn; until then it was
+spliced in as `Performance.jsonc`): Loom hands the integrate job its baseline in `COHERE_PERFORMANCE_BASELINE`, the
+record's JSON in base64, and the job writes its record to `integrate-job/performance.json` for Loom's runner to
+collect. `land` on a Mac is handed no baseline, so its note says none was handed and compares with nothing, and its
+record is said in the landing's body and kept nowhere. `cohere-dev measure [<commit>]` runs the measurement alone and
+prints its record, landing nothing. While another holds Shackler, land waits holding the lock, saying whose claim and
+since when, and after `COHERE_DEV_PERFORMANCE_WAIT` (2h unless it says) refuses, naming the holder; a measurement that
+fails refuses the landing in her words. A tree with no `command/cohere` has nothing to measure and lands saying so.
+Each phase's seconds are on the land line.
 
 A commit's subject reads `area: what changed (#task)`, up to 72 characters, and the story goes in the
 body. The area is a folder in the tree, by its name or its path (`go_language`, `release/dispatch`), or a

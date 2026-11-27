@@ -46,7 +46,9 @@ import (
 
 // performanceBaselineVariable holds the baseline a measurement is read against, main's last landed record, as its JSON
 // bytes in base64's standard encoding, which Loom hands the integrate job. Unset or empty, there is no baseline, and
-// the note says it is the first measurement; a value that doesn't read is said in the note and never refuses.
+// the note says none was handed: Loom's series is seeded, so for the integrate job that means the hand-off broke, and
+// land, which nothing hands one, compares with nothing. A value that doesn't read is said in the note and never
+// refuses.
 const performanceBaselineVariable = "COHERE_PERFORMANCE_BASELINE"
 
 // performanceRecordName is the name a record is printed under, which the house format reads its language from.
@@ -556,7 +558,7 @@ func landMeasurement(
 	}
 	record := performanceFileOf(measurement, gating, parent, time.Now())
 	record.Against = baselineAgainst(baseline)
-	if busy := performanceBusy(measurement); busy != "" {
+	if busy := performanceBusy(record.Machine); busy != "" {
 		// A loaded box's numbers are its load's as much as cohere's, so the record keeps her machine and her load,
 		// which say why, and none of the numbers, and never says she was held quiet.
 		record.Measured, record.Checks, record.Machine.HeldQuiet = false, nil, false
@@ -610,17 +612,23 @@ func sameBinaryAsMain(output []byte, commit string, mainBinary string, runError 
 // over fifteen minutes), both held, and J-ge4cc9w's cold deeafbf4 read 3280 ms against the record's 2050.
 const performanceQuietShare = 0.25
 
-// performanceBusy is why measurement's box wasn't quiet, empty when she was: her one-minute load before or after over
+// performanceBusy is why machine wasn't quiet, empty when she was: her one-minute load before or after over
 // performanceQuietShare of her cores. A loaded box's numbers are its load's as much as cohere's, so no record holds
-// them, never as main's (system_cohere's ruling, #6ex523f).
-func performanceBusy(measurement performanceMeasurement) string {
-	bound := performanceQuietShare * float64(measurement.cores)
-	before, after := measurement.loadBefore[0], measurement.loadAfter[0]
+// them, never as main's (system_cohere's ruling, #6ex523f). It reads a measurement's machine before its record keeps
+// any numbers, and a baseline's as its record says it, so a baseline taken on a loaded box, as the seed a7867bf3 was
+// at 12.57 on 16 cores, is never compared against nor its binary trusted. A machine whose record says no load before
+// and after, or no cores, can't be read as quiet, so that is why.
+func performanceBusy(machine performanceMachine) string {
+	if machine.Cores <= 0 || len(machine.LoadBefore) == 0 || len(machine.LoadAfter) == 0 {
+		return "her record says no one-minute load before and after or no cores, so she can't be read as quiet"
+	}
+	bound := performanceQuietShare * float64(machine.Cores)
+	before, after := machine.LoadBefore[0], machine.LoadAfter[0]
 	if before <= bound && after <= bound {
 		return ""
 	}
 	return fmt.Sprintf("her one-minute load %.2f before and %.2f after on %d cores, where a quiet box stays at or "+
-		"under %.2f", before, after, measurement.cores, bound)
+		"under %.2f", before, after, machine.Cores, bound)
 }
 
 // measure runs the measurement a landing makes, alone, at the commit its arguments name (the worktree's head unless
@@ -1029,8 +1037,8 @@ func performanceBuilt(commit string, platform string) string {
 }
 
 // performanceBaseline is the record a measurement is read against, main's last landed record, as
-// performanceBaselineVariable held it: found is false when it held none, as before the first measured landing, and
-// unread names why one it held didn't read.
+// performanceBaselineVariable held it: found is false when it held none, and unread names why one it held didn't
+// read.
 type performanceBaseline struct {
 	record performanceFile
 	found  bool
@@ -1039,7 +1047,8 @@ type performanceBaseline struct {
 
 // readPerformanceBaseline reads the baseline performanceBaselineVariable holds. A value that isn't base64 or whose
 // bytes aren't a record is unread, never fatal, since a landing's numbers stand without a comparison, and the note says
-// why it compares with nothing.
+// why it compares with nothing. JSON that parses is still no record unless it names a whole commit and is of
+// performanceSchema: `{}` and `null` parse, and would otherwise read as a record of nothing at no commit.
 func readPerformanceBaseline() performanceBaseline {
 	setting := strings.TrimSpace(os.Getenv(performanceBaselineVariable))
 	if setting == "" {
@@ -1053,7 +1062,28 @@ func readPerformanceBaseline() performanceBaseline {
 	if unmarshalError := json.Unmarshal(contents, &record); unmarshalError != nil {
 		return performanceBaseline{found: true, unread: unmarshalError.Error()}
 	}
+	if !fullCommit.MatchString(record.Commit) {
+		return performanceBaseline{found: true, unread: "it names no commit"}
+	}
+	if record.Schema != performanceSchema {
+		return performanceBaseline{found: true, unread: fmt.Sprintf("it is schema %d, not %d",
+			record.Schema, performanceSchema)}
+	}
 	return performanceBaseline{record: record, found: true}
+}
+
+// baselineBinary is the sha256 of the binary baseline's record measured, which the integrate job hands its script so
+// a merge that builds it again times nothing, or empty when the record can't stand for that binary's numbers: one
+// that didn't read, measured nothing (a skipped record keeps its own binary, so trusting it would leave that binary
+// with no numbers anywhere), was taken on a box that wasn't quiet, or on another box than performanceBox, whose numbers
+// are never Shackler's.
+func baselineBinary(baseline performanceBaseline) string {
+	record := baseline.record
+	if baselineAgainst(baseline) == "" || record.Checks == nil || performanceBusy(record.Machine) != "" ||
+		record.Machine.Name != performanceBox || !sha256Pattern.MatchString(record.Tools.Binary) {
+		return ""
+	}
+	return record.Tools.Binary
 }
 
 // baselineAgainst is the commit of baseline's record, which a record read against it names as against, empty when
@@ -1066,30 +1096,48 @@ func baselineAgainst(baseline performanceBaseline) string {
 }
 
 // performanceNote is the record's one line on how current compares with baseline, main's last landed record: level or
-// moved per row, by wall and by user time. With no baseline it says so, and when the baseline didn't read, it names
-// why. A baseline that measured nothing, a skipped record, has nothing to compare, which is its line. When the
-// baseline was measured on another machine, by another build or in another shape, that is its line, never a
-// comparison. A row whose files or findings checked differ from the baseline's same row is its own line, never
-// compared, since a row that checked less would read faster. A baseline that records no checked counts, as those
-// written before rows recorded them, is said once, and its times compared as they always were.
+// moved per row, by wall and by user time. With no baseline it says none was handed, and when the baseline didn't read,
+// it names why. A baseline in another shape is its line first, since another schema may name its numbers otherwise and
+// so read as none. A baseline that measured nothing, a skipped record, has nothing to compare, and one taken on a box
+// that wasn't quiet holds her load's numbers as much as cohere's: each is its line. When the baseline was measured on
+// another machine or by another build, that is its line, never a comparison. A row whose files or findings checked
+// differ from the baseline's same row is its own line, never compared, since a row that checked less would read faster.
+// A baseline that records no checked counts, as those written before rows recorded them, is said once, and its times
+// compared as they always were.
 func performanceNote(current performanceFile, baseline performanceBaseline) string {
 	previous := baseline.record
 	switch {
 	case !baseline.found:
-		return "the first measurement, so nothing to compare"
+		return "no baseline was handed (" + performanceBaselineVariable + " unset), so nothing is compared"
 	case baseline.unread != "":
 		return "the baseline record didn't read (" + baseline.unread + "), so nothing is compared"
 	case current.Checks == nil:
 		return "nothing measured, so nothing is compared"
-	case previous.Checks == nil:
+	}
+	against := shortCommit(previous.Commit)
+	if previous.Schema != current.Schema ||
+		(previous.Checks != nil && previous.Checks.Rounds != current.Checks.Rounds) {
+		shape := fmt.Sprintf("schema %d", previous.Schema)
+		if previous.Checks != nil {
+			shape += fmt.Sprintf(", rounds %d/%d/%d", previous.Checks.Rounds.Cold, previous.Checks.Rounds.Deeafbf4,
+				previous.Checks.Rounds.Warm)
+		}
+		return fmt.Sprintf("main's at %s was measured in another shape (%s), so not compared", against, shape)
+	}
+	if previous.Checks == nil {
 		skipped := ""
 		if previous.Skipped != "" {
 			skipped = " (" + previous.Skipped + ")"
 		}
-		return fmt.Sprintf("main's record at %s measured nothing%s, so nothing is compared",
-			shortCommit(previous.Commit), skipped)
+		return fmt.Sprintf("main's record at %s measured nothing%s, so nothing is compared", against, skipped)
 	}
-	against := shortCommit(previous.Commit)
+	if busy := performanceBusy(previous.Machine); busy != "" {
+		return fmt.Sprintf(
+			"main's record at %s was measured on a box its record doesn't show as quiet (%s), so nothing is compared",
+			against,
+			busy,
+		)
+	}
 	if machine, before := machineNamed(current.Machine), machineNamed(previous.Machine); machine != before {
 		return fmt.Sprintf("measured on %s, and main's at %s on %s: another machine, so not compared", machine,
 			against, before)
@@ -1097,11 +1145,6 @@ func performanceNote(current performanceFile, baseline performanceBaseline) stri
 	if build, before := buildNamed(current.Tools), buildNamed(previous.Tools); build != before {
 		return fmt.Sprintf("built as %s, and main's at %s as %s: another build, so not compared", build, against,
 			before)
-	}
-	if previous.Schema != current.Schema || previous.Checks.Rounds != current.Checks.Rounds {
-		return fmt.Sprintf("main's at %s was measured in another shape (schema %d, rounds %d/%d/%d), so not compared",
-			against, previous.Schema, previous.Checks.Rounds.Cold, previous.Checks.Rounds.Deeafbf4,
-			previous.Checks.Rounds.Warm)
 	}
 	// The same binary as main's ran: this landing changed nothing cohere compiles, so every difference is the
 	// box's own drift between two measurements of one program, which the note says rather than calling it slower.
