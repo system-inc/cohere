@@ -102,14 +102,23 @@ func (job *integrateJobRun) readCache() cacheReading {
 	return cacheReading{kilobytes: size, entries: entries, spent: time.Since(started), unread: sizeError}
 }
 
-// sayCache says the build cache before and after the tests, and the entries it gained, which say how much was
-// compiled against how much replayed from it, read from the entry count rather than counted compile by compile. With
-// no kept cache, the script's empty per-job cache is made and removed inside its run, so the line says so.
+// sayCache says whose build cache the tests ran on, then its size before and after the tests and the entries it
+// gained, which say how much was compiled against how much replayed from it, read from the entry count rather than
+// counted compile by compile. On the runner's declared cache (#e94a6r4) the size is its layer's, the one part the job
+// writes: a get the shared folder serves writes nothing there, so the packages' replays are on the packages line. With
+// neither a kept cache nor the runner's, the script's empty per-job cache is made and removed inside its run, so the
+// line says so, and never on the runner's: J-k20kexn's fill ran on the runner's cache and said the empty one.
 func (job *integrateJobRun) sayCache(before cacheReading, after cacheReading) {
-	if job.cache == "" {
+	if job.cache == "" && !runnerDeclaredCache() {
 		job.say("build cache an empty per-job cache, made and removed inside the run, so every package compiled " +
 			"and nothing is measured of it")
 		return
+	}
+	if job.cache == "" {
+		job.say("build cache the runner's declared Go cache, its layer %s and its program %s",
+			strings.TrimSpace(os.Getenv("GOCACHE")), strings.TrimSpace(os.Getenv("GOCACHEPROG")))
+	} else {
+		job.say("build cache the integrate job's kept Go cache, %s", filepath.Join(job.cache, "gocache"))
 	}
 	for _, reading := range []cacheReading{before, after} {
 		if reading.unread != nil {

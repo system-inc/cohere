@@ -1251,6 +1251,36 @@ func TestAnIntegrateJobsAccountLinesParse(test *testing.T) {
 	}
 }
 
+// On the runner's declared Go cache (#e94a6r4), with no kept one, the account says it was the runner's, its layer and
+// its program, and the layer's size before and after with the entries it gained, never the empty per-job sentence:
+// J-k20kexn's fill ran on the runner's cache and its account said the cache was empty and removed.
+func TestAnIntegrateJobsAccountNamesTheRunnersCache(test *testing.T) {
+	test.Parallel()
+	fixture := newIntegrateJobFixture(test)
+	fixture.reply("measure.run", shacklerSays([]int64{9900, 9700, 9800}))
+	layer := test.TempDir()
+	writeFixtureFile(test, filepath.Join(layer, "kept-entry"), "entry\n")
+	fixture.reply("tests.grows", filepath.Join(layer, "new-entry"))
+	program := "loom-job-runner gocacheprog shared layer"
+	ran := fixture.integrateJob(fixture.merged(), append(own_go_cache.Environment(nil, layer),
+		"GOCACHEPROG="+program)...)
+	if ran.exit != 0 {
+		test.Fatalf("the integrate job exited %d:\n%s", ran.exit, ran.errors)
+	}
+	for _, want := range []string{
+		integrateJobMarker + "build cache the runner's declared Go cache, its layer " + layer + " and its program " +
+			program + "\n",
+		integrateJobMarker + "build cache gained 1 entries",
+	} {
+		if !strings.Contains(ran.errors, want) {
+			test.Errorf("the account doesn't say %q:\n%s", want, ran.errors)
+		}
+	}
+	if strings.Contains(ran.errors, "an empty per-job cache") {
+		test.Errorf("the account on the runner's cache says the empty per-job one:\n%s", ran.errors)
+	}
+}
+
 // accountSteps are the names of the steps an integrate job's account says, in order: each `step <name> ...` line's
 // name, a box step's `box`.
 func accountSteps(errors string) []string {
