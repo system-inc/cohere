@@ -7,7 +7,9 @@ import "slices"
 // scenario is lost (#q1v0ern, the Go Square's ruling). A site is a place the package's own code starts goroutines:
 // code of the package that runs at once only because it is handed to another package's workers, a closure the
 // checker's scheduler or the type-read walks run, is no site of its own, and is watched under -race only as far as
-// the kept tests reach it.
+// the kept tests reach it. Nor does a test count as running code at once because its subtests call Parallel: every
+// test of a package runs in parallel with the others, which the guard has never called concurrent either, and counting
+// parallel subtests would keep nearly every table test, since most of them are.
 type raceKept struct {
 	// census is the Loom job that counted each claim's width, so the widths can be read back.
 	census string
@@ -27,7 +29,10 @@ type raceKeptTest struct {
 // `<file>:<function>#<ordinal>`, the ordinal counting the function's sites in source order from 1. Each claim is a
 // test that drives it at least two goroutines wide.
 type raceSite struct {
-	site   string
+	site string
+	// digest is the site's launching code as its claims were counted at (siteDigest), so a site taken out and another
+	// put in under the same key reads red rather than inheriting the old one's claims.
+	digest string
 	claims []raceClaim
 }
 

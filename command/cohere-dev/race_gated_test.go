@@ -1,13 +1,19 @@
 package main
 
 import (
+	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"go/ast"
+	"go/build"
 	"go/parser"
+	"go/printer"
 	"go/token"
 	"io/fs"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"slices"
 	"strings"
@@ -100,6 +106,26 @@ func concurrencyTestDirectories(test *testing.T, root string) map[string]string 
 	return found
 }
 
+// raceGateContext is the build a gate's -race run compiles a package's tests under: macBoxPlatform, the platform of
+// the toolchain the integrate job's script pins, with cgo on and the race tag the race detector sets.
+var raceGateContext = func() build.Context {
+	context := build.Default
+	operatingSystem, architecture, _ := strings.Cut(macBoxPlatform, "/")
+	context.GOOS, context.GOARCH, context.CgoEnabled = operatingSystem, architecture, true
+	context.BuildTags = []string{"race"}
+	return context
+}()
+
+// raceGateCompiles is whether the gate's -race run compiles the file name of directory: not one go ignores by its
+// name's leading underscore or dot, nor one whose name or build constraints leave out darwin/arm64 or the race tag. A
+// test in a file it doesn't compile is no test the run can select, so it is never held, kept or called concurrent by
+// the readers of test files (#q1v0ern, the Go Square's S7). A file that can't be read counts as compiled, so the
+// reader that parses it next fails on it.
+func raceGateCompiles(directory string, name string) bool {
+	matches, matchError := raceGateContext.MatchFile(directory, name)
+	return matches || matchError != nil
+}
+
 // concurrencyTestsInFile is every top-level test in the test file at path that the guard calls concurrent: each whose
 // name says it runs code at once, and every one when the file's name says its tests do.
 func concurrencyTestsInFile(path string) ([]string, error) {
@@ -131,7 +157,7 @@ func concurrencyTestsInDirectory(test *testing.T, directory string) []string {
 	}
 	tests := []string{}
 	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), "_test.go") {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), "_test.go") || !raceGateCompiles(directory, entry.Name()) {
 			continue
 		}
 		found, foundError := concurrencyTestsInFile(filepath.Join(directory, entry.Name()))
@@ -466,23 +492,31 @@ func declarationName(function *ast.FuncDecl) string {
 // outside any function, a package variable's literal, named for the file's package scope. Every file is read,
 // whatever its build constraints, so a site only another platform compiles still needs its claims.
 func concurrencySites(directory string) ([]string, error) {
+	sites, _, sitesError := readConcurrencySites(directory)
+	return sites, sitesError
+}
+
+// readConcurrencySites is concurrencySites, each with the digest of its own launching code (siteDigest), by key.
+func readConcurrencySites(directory string) ([]string, map[string]string, error) {
 	if _, namesError := concurrencyCallNames(); namesError != nil {
-		return nil, namesError
+		return nil, nil, namesError
 	}
 	entries, readError := os.ReadDir(directory)
 	if readError != nil {
-		return nil, readError
+		return nil, nil, readError
 	}
 	sites := []string{}
+	digests := map[string]string{}
 	for _, entry := range entries {
 		name := entry.Name()
 		if entry.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
 			continue
 		}
-		parsed, parseError := parser.ParseFile(token.NewFileSet(), filepath.Join(directory, name), nil,
+		fileSet := token.NewFileSet()
+		parsed, parseError := parser.ParseFile(fileSet, filepath.Join(directory, name), nil,
 			parser.SkipObjectResolution)
 		if parseError != nil {
-			return nil, parseError
+			return nil, nil, parseError
 		}
 		// Counted per owner across the file's declarations, so two of one name, two init functions or two package
 		// variables' literals, still give each site a key of its own.
@@ -495,13 +529,55 @@ func concurrencySites(directory string) ([]string, error) {
 			ast.Inspect(declaration, func(node ast.Node) bool {
 				if node != nil && startsGoroutines(node) {
 					ordinals[owner]++
-					sites = append(sites, fmt.Sprintf("%s:%s#%d", name, owner, ordinals[owner]))
+					key := fmt.Sprintf("%s:%s#%d", name, owner, ordinals[owner])
+					sites = append(sites, key)
+					digests[key] = siteDigest(fileSet, node)
 				}
 				return true
 			})
 		}
 	}
-	return sites, nil
+	return sites, digests, nil
+}
+
+// siteDigest is the first eight hex digits of the sha256 of a site's launching code as go/printer prints it, a go
+// statement's call or a call's own, with the body of every function literal it is handed left out (#ta06ckf). A site's
+// claims name it by its ordinal in its function, which moves when a site is taken out and another put in, so a claim
+// also holds the digest of the code it was counted at: a site replaced reads red, and editing what a goroutine does
+// inside its literal leaves its claims standing. The trade: two literal launches digest alike, so one replaced by
+// another in the same function keeps the claims the first was counted at.
+func siteDigest(fileSet *token.FileSet, node ast.Node) string {
+	launch := node
+	if statement, isGo := node.(*ast.GoStmt); isGo {
+		launch = statement.Call
+	}
+	call, isCall := launch.(*ast.CallExpr)
+	if !isCall {
+		return ""
+	}
+	// A shallow copy, so the file's own syntax keeps its literals' bodies.
+	headless := *call
+	headless.Fun = withoutLiteralBody(call.Fun)
+	headless.Args = make([]ast.Expr, len(call.Args))
+	for index, argument := range call.Args {
+		headless.Args[index] = withoutLiteralBody(argument)
+	}
+	var printed bytes.Buffer
+	// Ignored: printing an expression to a buffer fails only on a node the printer doesn't know, which a parsed call
+	// never holds, and an empty print digests as it is.
+	_ = printer.Fprint(&printed, fileSet, &headless)
+	sum := sha256.Sum256(printed.Bytes())
+	return hex.EncodeToString(sum[:4])
+}
+
+// withoutLiteralBody is expression with the body of a function literal emptied, its signature kept, and expression
+// itself when it is no literal.
+func withoutLiteralBody(expression ast.Expr) ast.Expr {
+	literal, isLiteral := expression.(*ast.FuncLit)
+	if !isLiteral {
+		return expression
+	}
+	return &ast.FuncLit{Type: literal.Type, Body: &ast.BlockStmt{}}
 }
 
 // bodyConcurrentTests is every top-level test of directory's test files that starts goroutines itself: a go statement
@@ -530,8 +606,21 @@ func skippingTests(directory string) ([]string, error) {
 	})
 }
 
+// testingMethodNames is the method set of testing's *T, *B and *F, read from the package itself, so testsReaching
+// never follows test.Run to a test-file method that happens to share its name (#943pf72, the Go Square's should).
+var testingMethodNames = sync.OnceValue(func() map[string]bool {
+	names := map[string]bool{}
+	for _, kind := range []reflect.Type{reflect.TypeFor[*testing.T](), reflect.TypeFor[*testing.B](),
+		reflect.TypeFor[*testing.F]()} {
+		for method := range kind.Methods() {
+			names[method.Name] = true
+		}
+	}
+	return names
+})
+
 // testsReaching is every top-level test of directory's test files whose body holds a node matches is true of, or
-// calls a function of the package's test files that does, followed to a fixed point, by its bare name.
+// calls a function or method of the package's test files that does, followed to a fixed point, by its bare name.
 func testsReaching(directory string, matches func(ast.Node) bool) ([]string, error) {
 	entries, readError := os.ReadDir(directory)
 	if readError != nil {
@@ -542,7 +631,7 @@ func testsReaching(directory string, matches func(ast.Node) bool) ([]string, err
 	tests := []string{}
 	for _, entry := range entries {
 		name := entry.Name()
-		if entry.IsDir() || !strings.HasSuffix(name, "_test.go") {
+		if entry.IsDir() || !strings.HasSuffix(name, "_test.go") || !raceGateCompiles(directory, name) {
 			continue
 		}
 		parsed, parseError := parser.ParseFile(token.NewFileSet(), filepath.Join(directory, name), nil,
@@ -552,11 +641,14 @@ func testsReaching(directory string, matches func(ast.Node) bool) ([]string, err
 		}
 		for _, declaration := range parsed.Decls {
 			function, isFunction := declaration.(*ast.FuncDecl)
-			if !isFunction || function.Recv != nil || function.Body == nil {
+			if !isFunction || function.Body == nil {
 				continue
 			}
+			// A method is keyed by its bare name, as a call reaches it through a selector (calleeName), so a method
+			// helper of the test files that starts goroutines marks every test that calls a method of that name, which
+			// fails toward keeping more.
 			caller := function.Name.Name
-			if strings.HasPrefix(caller, "Test") && caller != "TestMain" {
+			if function.Recv == nil && strings.HasPrefix(caller, "Test") && caller != "TestMain" {
 				tests = append(tests, caller)
 			}
 			ast.Inspect(function.Body, func(node ast.Node) bool {
@@ -567,7 +659,9 @@ func testsReaching(directory string, matches func(ast.Node) bool) ([]string, err
 					reaches[caller] = true
 				}
 				if call, isCall := node.(*ast.CallExpr); isCall {
-					if callee := calleeName(call); callee != "" {
+					// A call named as a method of testing's own is never followed to a test-file method of that name:
+					// every test calls test.Run or test.Helper, and a helper named so would mark them all.
+					if callee := calleeName(call); callee != "" && !testingMethodNames()[callee] {
 						calls[caller] = append(calls[caller], callee)
 					}
 				}
@@ -602,7 +696,7 @@ func testsOfDirectory(test *testing.T, directory string) []string {
 	}
 	tests := []string{}
 	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), "_test.go") {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), "_test.go") || !raceGateCompiles(directory, entry.Name()) {
 			continue
 		}
 		parsed, parseError := parser.ParseFile(token.NewFileSet(), filepath.Join(directory, entry.Name()), nil,
@@ -671,7 +765,7 @@ func narrowedRaceRunRefusals(test *testing.T, entry raceEntry, root string) []st
 			refusals = append(refusals, fmt.Sprintf("it leaves out %s, which the guard calls concurrent", name))
 		}
 	}
-	sites, sitesError := concurrencySites(directory)
+	sites, digests, sitesError := readConcurrencySites(directory)
 	if sitesError != nil {
 		test.Fatal(sitesError)
 	}
@@ -681,6 +775,10 @@ func narrowedRaceRunRefusals(test *testing.T, entry raceEntry, root string) []st
 		if !slices.Contains(sites, site.site) {
 			refusals = append(refusals, fmt.Sprintf("it claims %s, which the package's code no longer holds",
 				site.site))
+		} else if site.digest != digests[site.site] {
+			refusals = append(refusals, fmt.Sprintf("its code at %s is not the code its claims were counted at "+
+				"(digest %q, now %q): count them again, as %s did", site.site, site.digest, digests[site.site],
+				kept.census))
 		}
 		wide := []string{}
 		for _, claim := range site.claims {
@@ -786,7 +884,7 @@ func TestConcurrencySitesAndBodyConcurrentTestsAreReadFromTheCode(test *testing.
 	if bodyError != nil {
 		test.Fatal(bodyError)
 	}
-	if want := []string{"TestDirect", "TestThroughHelpers"}; !slices.Equal(byBody, want) {
+	if want := []string{"TestDirect", "TestThroughHelpers", "TestThroughAMethod"}; !slices.Equal(byBody, want) {
 		test.Errorf("the fixture's tests that start goroutines themselves read %v, want %v", byBody, want)
 	}
 }
@@ -815,9 +913,10 @@ func TestStartersAndSkippersAreFollowedThroughTheirPackagesHelpers(test *testing
 
 // A narrowed entry's list is refused for each way it can fail its package, and a whole list is taken: so dropping a
 // claimed test, a site claimed once or one goroutine wide, a claimant that may skip counted as one of the two, a new
-// site, a stale one, a concurrent test left out, a run beside the list, an empty list, and a claim from no other
-// narrowed entry each read red. The fixture's sites include a call of a starter by its bounded name, two init
-// functions, a method of a generic type and a package variable's literal, each keyed apart.
+// site, a stale one, a concurrent test left out, a run beside the list, an empty list, a claim from no other narrowed
+// entry, and a claimant in a test file the gate's -race run doesn't compile each read red, while a test that starts
+// goroutines in such a file is never asked for. The fixture's sites include a call of a starter by its bounded name,
+// two init functions, a method of a generic type and a package variable's literal, each keyed apart.
 func TestANarrowedRaceRunIsRefusedForEachWayItFailsItsPackage(test *testing.T) {
 	test.Parallel()
 	// Read from the module root, as the guard reads the list, so a claim from check reads check's own package.
@@ -832,6 +931,7 @@ func TestANarrowedRaceRunIsRefusedForEachWayItFailsItsPackage(test *testing.T) {
 			concurrent: []raceKeptTest{
 				{test: "TestDirect", reason: "starts a goroutine"},
 				{test: "TestThroughHelpers", reason: "starts one through helpers"},
+				{test: "TestThroughAMethod", reason: "starts one through a method of the test files"},
 			},
 			sites: []raceSite{
 				{site: "sites.go:fanOut#1", claims: []raceClaim{{test: "TestFansOut", width: 2},
@@ -849,11 +949,19 @@ func TestANarrowedRaceRunIsRefusedForEachWayItFailsItsPackage(test *testing.T) {
 			},
 		}
 	}
+	// Each site's digest as its code reads now, so the whole list is one its claims were counted at.
+	_, digests, digestsError := readConcurrencySites(filepath.Join("..", "..", directory))
+	if digestsError != nil {
+		test.Fatal(digestsError)
+	}
 	for name, change := range map[string]struct {
 		change  func(entry *raceEntry)
 		refusal string
 	}{
 		"whole": {func(*raceEntry) { /* The whole list, unchanged, which nothing refuses. */ }, ""},
+		"a site whose code is not what its claims were counted at": {func(entry *raceEntry) {
+			entry.kept.sites[1].digest = "00000000"
+		}, "its code at sites.go:fanOut#2 is not the code its claims were counted at"},
 		"a claimed test dropped": {func(entry *raceEntry) {
 			entry.kept.sites[2].claims = entry.kept.sites[2].claims[:1]
 		}, "sites.go:pool.run#1 has 1 kept tests"},
@@ -887,7 +995,17 @@ func TestANarrowedRaceRunIsRefusedForEachWayItFailsItsPackage(test *testing.T) {
 			entry.kept.sites[0].claims = append(entry.kept.sites[0].claims, raceClaim{test: "TestGone", width: 2})
 		}, "doesn't hold"},
 		"a census that is no job": {func(entry *raceEntry) { entry.kept.census = "by hand" }, "no Loom job's id"},
-		"a run beside the list":   {func(entry *raceEntry) { entry.run = "Direct" }, "names a run beside"},
+		"a claimant only linux compiles": {func(entry *raceEntry) {
+			entry.kept.sites[0].claims = append(entry.kept.sites[0].claims, raceClaim{test: "TestOnLinux", width: 2})
+		}, "it keeps TestOnLinux, which the package doesn't hold"},
+		"a claimant the race tag leaves out": {func(entry *raceEntry) {
+			entry.kept.sites[0].claims = append(entry.kept.sites[0].claims, raceClaim{test: "TestNotUnderRace",
+				width: 2})
+		}, "it keeps TestNotUnderRace, which the package doesn't hold"},
+		"a claimant go ignores": {func(entry *raceEntry) {
+			entry.kept.sites[0].claims = append(entry.kept.sites[0].claims, raceClaim{test: "TestIgnored", width: 2})
+		}, "it keeps TestIgnored, which the package doesn't hold"},
+		"a run beside the list": {func(entry *raceEntry) { entry.run = "Direct" }, "names a run beside"},
 		"an empty list": {func(entry *raceEntry) { entry.kept = &raceKept{census: "J-0000000"} },
 			"keeps no test"},
 		"a claim from no other narrowed entry": {func(entry *raceEntry) {
@@ -896,10 +1014,58 @@ func TestANarrowedRaceRunIsRefusedForEachWayItFailsItsPackage(test *testing.T) {
 		}, "names internal/edit, which is no other narrowed entry"},
 	} {
 		entry := raceEntry{directory: directory, kept: whole()}
+		for index := range entry.kept.sites {
+			entry.kept.sites[index].digest = digests[entry.kept.sites[index].site]
+		}
 		change.change(&entry)
 		refusals := strings.Join(narrowedRaceRunRefusals(test, entry, filepath.Join("..", "..")), "; ")
 		if (change.refusal == "") != (refusals == "") || !strings.Contains(refusals, change.refusal) {
 			test.Errorf("%s: the list is refused as %q, want %q", name, refusals, change.refusal)
 		}
+	}
+}
+
+// The race guard reads test files under the platform the gate's -race run compiles for, macBoxPlatform, and that is
+// the platform of the run only while the integrate job's tests step runs macBoxScript and that script pins
+// macBoxToolchainDigest, whose platform macBoxPlatform names (#f3m0x6j). Moving the race run to another script or
+// another toolchain reads red here until macBoxPlatform moves with it.
+func TestTheRaceGuardsPlatformIsTheGateScriptsToolchain(test *testing.T) {
+	test.Parallel()
+	if !strings.Contains(macBoxScript, `digest="`+macBoxToolchainDigest+`"`) {
+		test.Errorf("macBoxScript pins no toolchain by macBoxToolchainDigest, so macBoxPlatform may not be its " +
+			"platform")
+	}
+	parsed, parseError := parser.ParseFile(token.NewFileSet(), "integrate_job_run.go", nil, parser.SkipObjectResolution)
+	if parseError != nil {
+		test.Fatal(parseError)
+	}
+	scripts := []string{}
+	// The tests step's own method, as the measure step hands another script to the same call.
+	index := slices.IndexFunc(parsed.Decls, func(declaration ast.Decl) bool {
+		function, isFunction := declaration.(*ast.FuncDecl)
+		return isFunction && function.Recv != nil && function.Name.Name == "tests"
+	})
+	if index < 0 {
+		test.Fatal("integrate_job_run.go holds no tests method of the integrate job")
+	}
+	ast.Inspect(parsed.Decls[index], func(node ast.Node) bool {
+		if call, isCall := node.(*ast.CallExpr); isCall && calleeName(call) == "withIntegrateJobMirrors" &&
+			len(call.Args) > 0 {
+			if script, isIdentifier := call.Args[0].(*ast.Ident); isIdentifier {
+				scripts = append(scripts, script.Name)
+			} else {
+				scripts = append(scripts, "an expression")
+			}
+		}
+		return true
+	})
+	if !slices.Equal(scripts, []string{"macBoxScript"}) {
+		test.Errorf("the integrate job's tests step runs %v, want macBoxScript alone, whose toolchain macBoxPlatform "+
+			"names", scripts)
+	}
+	if operatingSystem, architecture, _ := strings.Cut(macBoxPlatform, "/"); raceGateContext.GOOS != operatingSystem ||
+		raceGateContext.GOARCH != architecture {
+		test.Errorf("the race guard reads test files as %s/%s, want macBoxPlatform, %s", raceGateContext.GOOS,
+			raceGateContext.GOARCH, macBoxPlatform)
 	}
 }
