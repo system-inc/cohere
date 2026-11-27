@@ -1020,6 +1020,19 @@ func TestTheIntegrateJobsCacheIsKeptAndDropsCountOne(test *testing.T) {
 				test.Errorf("the gate asked go mod for %q and %q, want each with %q, saying %q:\n%s", asked[0],
 					asked[1], modules, said, output)
 			}
+			// An integrate job's run says the environment its tests start with, a path's value whole and any other's
+			// only as a hash, and a gate box's says none of it (#ntrewm3).
+			logHash := sha256.Sum256([]byte(log))
+			environment := []string{boxEnvironmentMarker + "TMPDIR " + temporary + "\n",
+				boxEnvironmentMarker + "GATE_LOG sha256 " + hex.EncodeToString(logHash[:])[:12] + "\n"}
+			for _, want := range environment {
+				if said := strings.Contains(string(output), want); said != row.integrateJob {
+					test.Errorf("the run says %q %v, want %v:\n%s", want, said, row.integrateJob, output)
+				}
+			}
+			if strings.Contains(string(output), boxEnvironmentMarker+"GATE_LOG "+log) {
+				test.Errorf("the run says a variable's value that isn't a path:\n%s", output)
+			}
 			if row.runner && row.integrateJob {
 				if strings.Contains(asked[2], "-count") || !strings.Contains(asked[2], "| cache "+layer+" empty yes "+
 					"| cache program loom-job-runner gocacheprog shared layer |") {
@@ -1278,6 +1291,20 @@ func TestAnIntegrateJobsAccountNamesTheRunnersCache(test *testing.T) {
 	}
 	if strings.Contains(ran.errors, "an empty per-job cache") {
 		test.Errorf("the account on the runner's cache says the empty per-job one:\n%s", ran.errors)
+	}
+}
+
+// The account's test environment lines are the run's boxEnvironmentMarker lines without the marker, in order, and no
+// other line of the run, a test's own output among them (#ntrewm3).
+func TestTheTestEnvironmentIsTheRunsEnvironmentLines(test *testing.T) {
+	test.Parallel()
+	output := []byte(boxMarker + "abc on darwin/arm64\n" +
+		boxEnvironmentMarker + "HOME /var/lib/loomjob/integrate/home\n" +
+		`{"Action":"output","Output":"` + boxEnvironmentMarker + `PLANTED sha256 000000000000\n"}` + "\n" +
+		boxEnvironmentMarker + "LOOM_JOB_ID sha256 4f2a9c81d0e3\n")
+	want := []string{"HOME /var/lib/loomjob/integrate/home", "LOOM_JOB_ID sha256 4f2a9c81d0e3"}
+	if got := testEnvironment(output); !slices.Equal(got, want) {
+		test.Errorf("the test environment reads %q, want %q", got, want)
 	}
 }
 
