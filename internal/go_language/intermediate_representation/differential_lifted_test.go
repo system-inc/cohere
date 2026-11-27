@@ -14,7 +14,6 @@ package intermediate_representation_test
 import (
 	"fmt"
 	"maps"
-	"os"
 	"path/filepath"
 	"slices"
 	"sort"
@@ -87,28 +86,15 @@ func differentialMergeLifted(tally differentialLiftedTally, other differentialLi
 	}
 }
 
-// TestLiftedDifferential compares the ordinary corpus lifted, or the one COHERE_GO_IR_DIFFERENTIAL names, and
-// fails on any difference.
+// TestLiftedDifferential compares the corpus lifted and fails on any difference.
 func TestLiftedDifferential(test *testing.T) {
 	test.Parallel()
-	corpus := os.Getenv(differentialCorpusVariable)
 	started := time.Now()
 	var tally differentialLiftedTally
-	if corpus == "" {
-		for _, unit := range differentialTestdataUnits(test) {
-			tally = differentialMergeLifted(tally, differentialCompareLiftedUnit(test, unit, "None"))
-		}
-		tally = differentialMergeLifted(tally, differentialCompareLiftedLoaded(test, differentialStandardPackages))
-	} else {
-		pattern := corpus
-		switch corpus {
-		case "root":
-			pattern = "./..."
-		case "std":
-			pattern = "std"
-		}
-		tally = differentialMergeLifted(tally, differentialCompareLiftedLoaded(test, []string{pattern}))
+	for _, unit := range differentialTestdataUnits(test) {
+		tally = differentialMergeLifted(tally, differentialCompareLiftedUnit(test, unit, "None"))
 	}
+	tally = differentialMergeLifted(tally, differentialCompareLiftedLoaded(test, differentialStandardPackages))
 	deltas := slices.Sorted(maps.Keys(tally.phiDeltas))
 	var rendered []string
 	for _, delta := range deltas {
@@ -122,7 +108,7 @@ func TestLiftedDifferential(test *testing.T) {
 		"phis with referrers less ours: %s; %d rounds of our lifting verified, %d instructions with a place "+
 		"found in their placed views", tally.theirPhis, tally.theirPhisWithoutReferrers, tally.ourPhis,
 		strings.Join(rendered, ", "), tally.verifiedRounds, tally.placesChecked)
-	differentialReport(test, "lifted "+differentialCorpusName(corpus), tally.differentialTally, time.Since(started))
+	differentialReport(test, "lifted", tally.differentialTally, time.Since(started))
 }
 
 // TestLiftedDifferentialFailsOnASkippedStore plants a mutant in our lifting of a fixed function: the first Store
@@ -176,14 +162,6 @@ func Overwritten(first int, second int) int {
 	if compared == 0 {
 		test.Fatal("the comparator, apart from the guard and the verifier, found nothing in the mutant")
 	}
-}
-
-// differentialCorpusName is the corpus a run names, ordinary when it names none.
-func differentialCorpusName(corpus string) string {
-	if corpus == "" {
-		return "ordinary"
-	}
-	return corpus
 }
 
 // differentialCompareLiftedLoaded is differentialCompareLoaded for the lifted comparison.

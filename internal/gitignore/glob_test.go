@@ -1,17 +1,13 @@
 package gitignore
 
 import (
-	"os"
-	"os/exec"
-	"path/filepath"
 	"strings"
 	"testing"
-
-	"github.com/system-inc/cohere/internal/testing/needs"
 )
 
 // The glob cases gitignore(5) and fnmatch(3) describe, one per rule, so a regression names the rule it
-// broke.
+// broke. path true is how an anchored pattern matches a path (fnmatch's FNM_PATHNAME), and false how a
+// base-name pattern matches; a case whose answer differs between the two is written both ways.
 func TestGlobFollowsTheDocumentedRules(test *testing.T) {
 	test.Parallel()
 	cases := []struct {
@@ -22,44 +18,167 @@ func TestGlobFollowsTheDocumentedRules(test *testing.T) {
 	}{
 		{"foo", "foo", true, true},
 		{"foo", "fo", true, false},
+
+		// `?` and `*` stay within one segment of a path, and cross a `/` in a base-name match.
 		{"f?o", "fxo", true, true},
 		{"f?o", "f/o", true, false},
 		{"f?o", "f/o", false, true},
+		{"?", "/", true, false},
+		{"?", "/", false, true},
 		{"*.go", "main.go", true, true},
 		{"*.go", "a/main.go", true, false},
 		{"*.go", "a/main.go", false, true},
+		{"*", "a/b", true, false},
+		{"*", "a/b", false, true},
+		{"a*b", "a/x/b", true, false},
+		{"a*b", "a/x/b", false, true},
 		{"a/*/c", "a/b/c", true, true},
 		{"a/*/c", "a/b/x/c", true, false},
+
+		// A leading `**/` is any number of directories, none included, and only whole ones.
 		{"**/foo", "foo", true, true},
 		{"**/foo", "x/y/foo", true, true},
+		{"**/foo", "xfoo", true, false},
+		{"**/foo", "x/foo/y", true, false},
 		{"**/foo/bar", "x/foo/bar", true, true},
+		// Without a path, `**` is `*`, and the `/` after it is a literal that must be there.
+		{"**/foo", "foo", false, false},
+		{"**/foo", "x/y/foo", false, true},
+
+		// A trailing `/**` is everything below, and not the directory itself.
 		{"abc/**", "abc/x", true, true},
 		{"abc/**", "abc/x/y", true, true},
 		{"abc/**", "abc", true, false},
+		{"x/**", "y/x/z", true, false},
+
+		// `/**/` in the middle is one slash or any directories between, and two of them are no different.
 		{"a/**/b", "a/b", true, true},
 		{"a/**/b", "a/x/b", true, true},
 		{"a/**/b", "a/x/y/b", true, true},
 		{"a/**/b", "a/xb", true, false},
+		{"a/**/b", "a/b", false, false},
+		{"a/**/b", "a/x/y/b", false, true},
+		{"a/**/**/b", "a/b", true, true},
+		{"a/**/**/b", "a/x/b", true, true},
+		{"a/**/**/b", "a/x/y/z/b", true, true},
+		{"a/**/**/b", "a/xb", true, false},
+		{"a/**/**/b", "a/b", false, false},
+
+		// `**` that is not a whole segment is one `*`, which stays within a segment of a path.
 		{"foo**/bar", "foo/bar", true, true},
 		{"foo**/bar", "foox/bar", true, true},
 		{"foo**/bar", "foo/x/bar", true, false},
 		{"**foo", "x/foo", true, false},
+		{"a**b", "axyb", true, true},
+		{"a**b", "ax/yb", true, false},
+		{"a**b", "ax/yb", false, true},
+		{"a/**b", "a/xb", true, true},
+		{"a/**b", "a/x/b", true, false},
+		{"a/**b", "a/x/b", false, true},
+		{"a/b**", "a/bx/y", true, false},
+		{"a/b**", "a/bx/y", false, true},
+
+		// Bracket expressions: members, `!` or `^` to negate, ranges.
 		{"[abc]", "b", true, true},
 		{"[!abc]", "b", true, false},
+		{"[!abc]", "d", true, true},
 		{"[^abc]", "d", true, true},
+		{"[^abc]", "a", true, false},
 		{"[a-c]x", "bx", true, true},
+		{"[a-c]x", "dx", true, false},
+		// `]` first is a member, and may start a range: `]` to `a` holds `_`.
 		{"[]]", "]", true, true},
+		{"[]-a]", "_", true, true},
+		{"[]-a]", "b", true, false},
+		// A `-` before the closing `]` is a member, so `[%-]` is a set of two and the last `]` a literal.
 		{"[a-]", "-", true, true},
-		{"[[:digit:]]", "7", true, true},
-		{"[[:digit:]]", "x", true, false},
-		{"[[:nosuchclass:]]", "x", true, false},
+		{"[a-]", "b", true, false},
+		{"[%-]]", "-]", true, true},
+		{"[%-]]", "&]", true, false},
+		// A range ends in `]` only escaped; `W` to `]` holds `[`.
+		{`[W-\]]`, "[", true, true},
+		{`[W-\]]`, "^", true, false},
+		// A range may end in `-`: `+` to `-` holds `,`.
+		{"[+--]", ",", true, true},
+		{"[+--]", ".", true, false},
 		{"[/]", "/", true, false},
 		{"[/]", "/", false, true},
+
+		// Every class fnmatch names, in the C locale, one member and one byte outside it.
+		{"[[:alnum:]]", "a", true, true},
+		{"[[:alnum:]]", "5", true, true},
+		{"[[:alnum:]]", "_", true, false},
+		{"[[:alpha:]]", "Z", true, true},
+		{"[[:alpha:]]", "5", true, false},
+		{"[[:blank:]]", " ", true, true},
+		{"[[:blank:]]", "\t", true, true},
+		{"[[:blank:]]", "\n", true, false},
+		{"[[:cntrl:]]", "\x01", true, true},
+		{"[[:cntrl:]]", "\x7F", true, true},
+		{"[[:cntrl:]]", "a", true, false},
+		{"[[:digit:]]", "7", true, true},
+		{"[[:digit:]]", "x", true, false},
+		{"[[:graph:]]", "!", true, true},
+		{"[[:graph:]]", " ", true, false},
+		{"[[:lower:]]", "q", true, true},
+		{"[[:lower:]]", "Q", true, false},
+		{"[[:print:]]", " ", true, true},
+		{"[[:print:]]", "\x7F", true, false},
+		{"[[:punct:]]", "_", true, true},
+		{"[[:punct:]]", "~", true, true},
+		{"[[:punct:]]", "a", true, false},
+		{"[[:space:]]", " ", true, true},
+		{"[[:space:]]", "\n", true, true},
+		{"[[:space:]]", "\r", true, true},
+		{"[[:space:]]", "x", true, false},
+		// Git's space class is these four alone, without C's vertical tab and form feed; git 2.54 agrees.
+		{"[[:space:]]", "\v", true, false},
+		{"[[:space:]]", "\f", true, false},
+		{"[[:upper:]]", "A", true, true},
+		{"[[:upper:]]", "a", true, false},
+		{"[[:xdigit:]]", "f", true, true},
+		{"[[:xdigit:]]", "F", true, true},
+		{"[[:xdigit:]]", "g", true, false},
+		{"[[:nosuchclass:]]", "x", true, false},
+
+		// A class is one member among others, and negates with them.
+		{"[[:digit:]ab]", "a", true, true},
+		{"[[:digit:]ab]", "5", true, true},
+		{"[[:digit:]ab]", "c", true, false},
+		{"[x[:upper:]]", "x", true, true},
+		{"[x[:upper:]]", "Q", true, true},
+		{"[x[:upper:]]", "y", true, false},
+		{"[![:alpha:]]", "5", true, true},
+		{"[![:alpha:]]", "x", true, false},
+		// Outside a bracket expression `[:alpha:]` is no class, only a set of its own letters.
+		{"[:alpha:]", "l", true, true},
+
+		// A bracket that never closes makes the pattern match nothing, itself included.
 		{"[abc", "[abc", true, false},
+		{"[[:alpha:]", "a", true, false},
+		{"a[", "a[", true, false},
+
+		// A backslash makes the next byte literal, inside a bracket expression too.
 		{`\*`, "*", true, true},
 		{`\*`, "x", true, false},
+		{`\?`, "?", true, true},
+		{`\?`, "x", true, false},
+		{`\[a]`, "[a]", true, true},
+		{`\[a]`, "a", true, false},
+		{`\\`, `\`, true, true},
 		{`\a`, "a", true, true},
+		{`[\]]`, "]", true, true},
+		{`[\!a]`, "!", true, true},
+		{`[\!a]`, "b", true, false},
+		// An escaped `-` is a member, not a range.
+		{`[a\-z]`, "-", true, true},
+		{`[a\-z]`, "b", true, false},
+
+		// A trailing backslash escapes nothing, so the pattern matches nothing.
 		{`foo\`, "foo", true, false},
+		{`*\`, `a\`, true, false},
+		{`[a\`, `[a\`, true, false},
+
 		{"*a*a*a*a*a*a*a*a*b", strings.Repeat("a", 200), true, false},
 	}
 	for _, testCase := range cases {
@@ -75,141 +194,4 @@ func TestGlobFollowsTheDocumentedRules(test *testing.T) {
 			)
 		}
 	}
-}
-
-// git's own wildmatch corpus, t/t3070-wildmatch.sh, read from a git source checkout named by
-// COHERE_GIT_SOURCE. Nothing of git's is kept in this repository: the cases are read where they live.
-//
-// Each case gives four expectations. The two case-sensitive ones are asserted: wildmatch with
-// WM_PATHNAME is how an anchored pattern matches a path, and without it how a base-name pattern
-// matches. The two case-folding ones do not apply, since this matcher is case sensitive by design.
-func TestGitWildmatchCorpus(test *testing.T) {
-	test.Parallel()
-	source := gitSource(test)
-	contents, readError := os.ReadFile(filepath.Join(source, "t", "t3070-wildmatch.sh"))
-	if readError != nil {
-		test.Fatal(readError)
-	}
-
-	asserted, cases := 0, 0
-	for _, arguments := range matchLines(test, string(contents)) {
-		expectations := arguments[:4]
-		text, pattern := arguments[len(arguments)-2], arguments[len(arguments)-1]
-		cases++
-		for column, path := range map[int]bool{0: true, 2: false} {
-			want := expectations[column]
-			if want != "0" && want != "1" {
-				test.Fatalf("case %q %q has expectation %q in column %d", text, pattern, want, column+1)
-			}
-			compiled := compileGlob(pattern, path)
-			if got := compiled.matches(text, path); got != (want == "1") {
-				test.Errorf(
-					"t3070: %q against %q with path %v: got %v, git expects %v",
-					pattern,
-					text,
-					path,
-					got,
-					want == "1",
-				)
-			}
-			asserted++
-		}
-	}
-	// A corpus that parsed to nothing would pass every assertion it never made.
-	if cases < 150 {
-		test.Fatalf("read only %d cases from t3070-wildmatch.sh; the parser has lost the corpus", cases)
-	}
-	test.Logf("t3070 at git %s: %d cases, %d expectations asserted (the case-folding columns do not apply)",
-		gitCommit(test, source), cases, asserted)
-}
-
-// gitSource is the git checkout the corpus tests read, or a skip when none is named.
-func gitSource(test *testing.T) string {
-	test.Helper()
-	return needs.OptIn(test, "COHERE_GIT_SOURCE", "a differential against the corpus of a git source checkout")
-}
-
-// gitCommit names the commit a git checkout is at, so a run says which corpus it measured.
-func gitCommit(test *testing.T, repository string) string {
-	test.Helper()
-	output, outputError := exec.Command("git", "-C", repository, "rev-parse", "HEAD").Output()
-	if outputError != nil {
-		test.Fatalf("reading the commit of %s: %v", repository, outputError)
-	}
-	return strings.TrimSpace(string(output))
-}
-
-// matchLines returns the arguments of every `match` call in t3070 after its function definitions, shell
-// quoting undone and continued lines joined.
-func matchLines(test *testing.T, script string) [][]string {
-	test.Helper()
-	var calls [][]string
-	lines := strings.Split(script, "\n")
-	for index := 0; index < len(lines); index++ {
-		line := lines[index]
-		if !strings.HasPrefix(line, "match ") {
-			continue
-		}
-		for strings.HasSuffix(line, `\`) && index+1 < len(lines) {
-			index++
-			line = line[:len(line)-1] + " " + lines[index]
-		}
-		words := shellWords(test, strings.TrimPrefix(line, "match "))
-		if len(words) != 6 && len(words) != 10 {
-			test.Fatalf("t3070 line %d has %d arguments: %q", index+1, len(words), line)
-		}
-		calls = append(calls, words)
-	}
-	return calls
-}
-
-// shellWords splits a line the way sh does for the quoting t3070 uses: single quotes, double quotes with
-// backslash escapes, and unquoted backslashes.
-func shellWords(test *testing.T, line string) []string {
-	test.Helper()
-	var words []string
-	var word strings.Builder
-	inWord := false
-	for index := 0; index < len(line); index++ {
-		character := line[index]
-		switch {
-		case character == ' ' || character == '\t':
-			if inWord {
-				words = append(words, word.String())
-				word.Reset()
-				inWord = false
-			}
-		case character == '\'':
-			closing := strings.IndexByte(line[index+1:], '\'')
-			if closing < 0 {
-				test.Fatalf("unclosed single quote in %q", line)
-			}
-			word.WriteString(line[index+1 : index+1+closing])
-			index += closing + 1
-			inWord = true
-		case character == '"':
-			index++
-			for ; index < len(line) && line[index] != '"'; index++ {
-				if line[index] == '\\' && index+1 < len(line) && strings.IndexByte("$`\"\\", line[index+1]) >= 0 {
-					index++
-				}
-				word.WriteByte(line[index])
-			}
-			if index >= len(line) {
-				test.Fatalf("unclosed double quote in %q", line)
-			}
-			inWord = true
-		case character == '\\' && index+1 < len(line):
-			index++
-			word.WriteByte(line[index])
-			inWord = true
-		default:
-			word.WriteByte(character)
-			inWord = true
-		}
-	}
-	if inWord {
-		words = append(words, word.String())
-	}
-	return words
 }

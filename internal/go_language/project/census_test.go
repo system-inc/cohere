@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/testing/build_inputs"
+	"github.com/system-inc/cohere/internal/testing/written_repository"
 )
 
 // The census of a workspace is every `.go` file go would see in its owned modules, as absolute paths: inner
@@ -210,10 +211,9 @@ func TestTakeCensusCountsAForceAddedFileAsOurs(test *testing.T) {
 	}); writeError != nil {
 		test.Fatal(writeError)
 	}
-	for _, arguments := range [][]string{{"init", "-q", "-b", "main"}, {"add", "-f", "value.go"}} {
-		if gitError := runGit(repository, arguments...); gitError != nil {
-			test.Fatal(gitError)
-		}
+	// Tracked as `git add -f value.go` tracks it, its index written without git.
+	if writeError := written_repository.Write(repository, trackedFile("value.go")); writeError != nil {
+		test.Fatal(writeError)
 	}
 	covered, readError := ReadWorkspace(repository)
 	if readError != nil {

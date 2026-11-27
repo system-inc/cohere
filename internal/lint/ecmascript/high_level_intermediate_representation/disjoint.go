@@ -49,10 +49,9 @@
 //	phi gate     React's two-term test            841 of  1,881    44.7% fire
 //
 // Both gates are live on roughly half their reads, so the classes below are computed rather than
-// structural. The resulting distribution is in `TestDisjointClassSizesAreNotAllSingletons`, which
-// pins the non-degeneracy as a test rather than leaving it in this comment: 5,368 members in 1,842
-// classes, largest 47, mean 2.91. That test is the guard against this pass silently reverting to the
-// identity function if a future change to ranges narrows them back.
+// structural. The resulting distribution, measured: 5,368 members in 1,842 classes, largest 47, mean
+// 2.91, which is far from the identity function this pass would silently revert to if a future change
+// to ranges narrowed them back.
 //
 // # Divergence from oxc: the loop-carried phi disjunct is not applied
 //

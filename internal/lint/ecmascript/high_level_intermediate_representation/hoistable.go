@@ -568,7 +568,7 @@ func propagateNonNull(function *Function, blocks map[static_single_assignment.Bl
 	// corpus, whose measured maximum is 3 iterations against a bound of 100. No fixture can reach
 	// this line without constructing a graph that fails to converge, which is a shape nobody has
 	// produced. Recorded rather than covered, and the verdict expires if the convergence
-	// distribution ever moves -- which `TestHoistableCorpusDistribution` asserts on exactly.
+	// distribution ever moves.
 	return working, false, iterations
 }
 

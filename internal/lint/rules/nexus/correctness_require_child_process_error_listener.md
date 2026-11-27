@@ -96,7 +96,7 @@ were each read: 19 attach `'error'` (`.on('error', ...)`, `.once('error', ...)`,
   instead of symbol (the same-name variable fixture and five more go silent); escapes read as neither
   (handed to a function, stored, a method handed on, now fire).
 - `gofmt -l` and `go vet` clean through the overlay. The whole suite through the overlay is green apart
-  from the two expected under an overlay: `TestEveryRegisteredRuleIsReachableFromTheLiveConfig` (this rule
-  is not in the live config yet) and `TestRulesFlagListsEveryRegisteredRule` (its subprocess builds without
+  from the two expected under an overlay: `TestEveryRegisteredRuleIsReachableFromTheSets` (this rule
+  is not in a set yet) and `TestRulesFlagListsEveryRegisteredRule` (its subprocess builds without
   the overlay). A first-run timeout in `command/cohere` (`TestOneFixFormatRunSettlesAPrintedArrow`) passed
   on the rerun.

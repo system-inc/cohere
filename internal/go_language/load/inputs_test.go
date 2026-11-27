@@ -12,6 +12,8 @@ import (
 	"testing"
 
 	"golang.org/x/tools/go/packages"
+
+	"github.com/system-inc/cohere/internal/testing/own_go_cache"
 )
 
 // inputsFixtureFiles is a module whose load reads a little of everything the inputs name: a package with an embedded
@@ -63,9 +65,9 @@ var inputsFixture struct {
 }
 
 // inputsFixtureEnvironment is what the fixture loads under: `GOWORK` empty, so go looks for a go.work and finds none,
-// and `GOCACHE` inside the module.
+// and `GOCACHE` inside the module, the fixture's own with no cache program (own_go_cache).
 func inputsFixtureEnvironment() []string {
-	return []string{"GOWORK=", "CGO_ENABLED=0", "GOCACHE=" + inModule("gocache")}
+	return own_go_cache.Environment([]string{"GOWORK=", "CGO_ENABLED=0"}, inModule("gocache"))
 }
 
 // inputsFixtureCensus is the fixture module's own .go files, as the project's census would list them.

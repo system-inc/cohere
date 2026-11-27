@@ -10,27 +10,24 @@ import (
 
 	"github.com/system-inc/cohere/internal/go_language/check/analysistest"
 	"github.com/system-inc/cohere/internal/go_language/check/parity"
+	"github.com/system-inc/cohere/internal/go_language/check/parity/staticcheck_fixtures"
 )
 
 // upstreamModules are the version folders of staticcheck's testdata for SA1019, each run as a module of that Go
 // version, since the version decides which of the standard library's deprecations apply.
 var upstreamModules = []string{"go1.0", "go1.3", "go1.4", "go1.8", "go1.18", "go1.19"}
 
-// upstreamTree is a tree of the test's own holding staticcheck's testdata for SA1019 byte for byte as the module
-// cache keeps it, each version folder with the go.mod staticcheck's testutil lays over it, module example.com at that
+// upstreamTree is a tree of the test's own holding staticcheck's testdata for SA1019 byte for byte as the release
+// keeps it, each version folder with the go.mod staticcheck's testutil lays over it, module example.com at that
 // version, since the fixtures import each other by that path. One fixture is not gofmt-clean, and the repository's
-// gofmt guard walks testdata, so the copy is made here rather than kept there, and the harness, which reads fixtures
-// where a testdata holds them, is given this tree. go1.0's CheckDeprecated imports github.com/golang/protobuf/proto,
-// which neither the release nor this repository carries: staticcheck's harness supplies a stand-in, since its wants
-// read "Alas, it is deprecated.", not the real package's notice, and so does this test, testdata/protobuf, wired by a
-// replace. Both sides read the same stand-in, so parity is untouched.
+// gofmt guard walks testdata, so staticcheck_fixtures keeps it under another name and lays it out here, and the
+// harness, which reads fixtures where a testdata holds them, is given this tree. go1.0's CheckDeprecated imports
+// github.com/golang/protobuf/proto, which neither the release nor this repository carries: staticcheck's harness
+// supplies a stand-in, since its wants read "Alas, it is deprecated.", not the real package's notice, and so does this
+// test, testdata/protobuf, wired by a replace. Both sides read the same stand-in, so parity is untouched.
 func upstreamTree(test *testing.T) string {
 	test.Helper()
-	upstreamFixtures := filepath.Join(parity.StaticcheckDirectory(test), "staticcheck", "sa1019", "testdata")
-	tree := filepath.Join(test.TempDir(), "testdata")
-	if copyError := os.CopyFS(tree, os.DirFS(upstreamFixtures)); copyError != nil {
-		test.Fatalf("copying staticcheck's testdata for SA1019, which the module must keep: %v", copyError)
-	}
+	tree := staticcheck_fixtures.Directory(test, "staticcheck", "sa1019", "testdata")
 	protobuf, absoluteError := filepath.Abs(filepath.Join(analysistest.TestData(), "protobuf"))
 	if absoluteError != nil {
 		test.Fatal(absoluteError)

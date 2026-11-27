@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/lint/rules/tailwind/vendored"
-	"github.com/system-inc/cohere/internal/testing/corpus"
+	"github.com/system-inc/cohere/internal/testing/repository"
 )
 
 // The fixture is what the shipped Tailwind 4.3.3 did with this repository's own `@utility`
@@ -151,13 +151,12 @@ func utilityLoadCorpus(test *testing.T, name string) utilityCorpus {
 // own stylesheet graph, and the `@utility` definitions parsed out of the block text with the Go CSS
 // parser.
 //
-// The stylesheet is spelled inside its corpus, so this skips naming the variable when the corpus is
-// unset, and skips loudly, because a silently absent corpus turns this suite into one that compares
-// nothing and still prints green. A corpus that is set but lacks the stylesheet fails.
+// The stylesheet is a path inside this repository, so a missing one fails rather than skips: a
+// silently absent stylesheet turns this suite into one that compares nothing and still prints green.
 func utilityBuildEvaluator(test *testing.T, fixture utilityCorpus) *UtilityEvaluator {
 	test.Helper()
 
-	entryPath := corpus.Resolve(test, fixture.EntryPath)
+	entryPath := repository.Path(test, fixture.EntryPath)
 	theme, _, loadThemeFromFileError := LoadThemeFromFile(
 		entryPath,
 		NodeStylesheetResolver(utilityTailwindPackageRoot(test)),
@@ -171,7 +170,7 @@ func utilityBuildEvaluator(test *testing.T, fixture utilityCorpus) *UtilityEvalu
 }
 
 // forEachUtilityOracle runs an evaluator assertion once per copy of the utility oracle, the public
-// theme's and ahra's (#f598zk0), each with the evaluator built from the stylesheet that copy records.
+// theme's (#f598zk0), each with the evaluator built from the stylesheet that copy records.
 func forEachUtilityOracle(
 	test *testing.T,
 	run func(test *testing.T, fixtureName string, fixture utilityCorpus, evaluator *UtilityEvaluator),
@@ -368,9 +367,9 @@ func TestUtilityReproducesTheKnownExceptions(test *testing.T) {
 		evaluator *UtilityEvaluator,
 	) {
 
-		// Measured per copy: 18 on ahra in Phase 0, and 5 on the public theme, its five per-declaration
-		// roots each with the `translate-full` key two of their namespaces share.
-		measured := map[string]int{"utility_fixtures.json": 18, "utility_fixtures_public.json": 5}[fixtureName]
+		// Measured per copy: 5 on the public theme, its five per-declaration roots each with the
+		// `translate-full` key two of their namespaces share.
+		measured := map[string]int{"utility_fixtures_public.json": 5}[fixtureName]
 		if len(fixture.KnownExceptions) != measured {
 			test.Errorf(
 				"fixture holds %d known exceptions, %d were measured; the population this component exists for has changed and the change should be read rather than absorbed",
@@ -739,11 +738,11 @@ func TestUtilityDoesNotClaimTheShadowQuirk(test *testing.T) {
 		evaluator *UtilityEvaluator,
 	) {
 
-		// Measured per copy. Ahra's are the four `[16/9]` probes. The public theme's sweep also carries the
-		// five `max-w-screen-*`, which extract.mjs's own model predicts as nothing and Tailwind reads as
-		// `max-width`; the Go table reads them as Tailwind does, so they are the generator's model
-		// disagreeing, and outside this component like the rest.
-		measured := map[string]int{"utility_fixtures.json": 4, "utility_fixtures_public.json": 9}[fixtureName]
+		// Measured per copy. The public theme's are the four `[16/9]` probes and the five `max-w-screen-*`,
+		// which extract.mjs's own model predicts as nothing and Tailwind reads as `max-width`; the Go table
+		// reads them as Tailwind does, so they are the generator's model disagreeing, and outside this
+		// component like the rest.
+		measured := map[string]int{"utility_fixtures_public.json": 9}[fixtureName]
 		if len(fixture.ShadowQuirkProbes) != measured {
 			test.Errorf(
 				"fixture holds %d shadow-quirk probes, %d were measured",

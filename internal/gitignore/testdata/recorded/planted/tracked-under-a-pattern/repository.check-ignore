@@ -1,0 +1,5 @@
+::	.gitignore
+::	notes.txt
+::	other.txt
+.gitignore:1:*.go	sibling.go
+::	value.go
