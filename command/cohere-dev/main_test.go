@@ -659,6 +659,75 @@ func TestTheCacheTrimRunsBesideABusyPoolAndKeepsTheFloor(test *testing.T) {
 	}
 }
 
+// A Go cache a program serves is never trimmed (#e94a6r4): Loom's runner names its program and its layer for an
+// integrate job and keeps the layer's life itself, so the trim measures and removes nothing there, over its cap or
+// not, and its status says why.
+func TestTheCacheTrimLeavesACacheAProgramServes(test *testing.T) {
+	test.Parallel()
+	if runtime.GOOS == "windows" {
+		test.Skip("the trim holds tokens, a Unix lock")
+	}
+	wrapper := filepath.Join(test.TempDir(), "cohere-dev")
+	build_inputs.Record(test, ".", ".")
+	if output, outputError := exec.Command("go", "build", "-o", wrapper, ".").CombinedOutput(); outputError != nil {
+		test.Fatalf("building: %v\n%s", outputError, output)
+	}
+	home := test.TempDir()
+	if createDirectoryError := os.MkdirAll(
+		filepath.Join(userCacheDirectoryIn(home), "cohere", "test-slots"),
+		0o755,
+	); createDirectoryError != nil {
+		test.Fatal(createDirectoryError)
+	}
+	// Ten 1 KB entries three hours old, in the pool home's cache, over a 6 KB cap, so a trim would take most.
+	cache := filepath.Join(userCacheDirectoryIn(home), "go-build")
+	if createDirectoryError := os.MkdirAll(cache, 0o755); createDirectoryError != nil {
+		test.Fatal(createDirectoryError)
+	}
+	if writeError := os.WriteFile(
+		filepath.Join(cache, "README"),
+		[]byte("This directory holds cached build artifacts from the Go build system.\n"),
+		0o644,
+	); writeError != nil {
+		test.Fatal(writeError)
+	}
+	entries := []string{}
+	for index := 0; index < 10; index++ {
+		name := fmt.Sprintf("%02x%s-d", index, strings.Repeat("a", 62))
+		path := filepath.Join(cache, name[:2], name)
+		if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
+			test.Fatal(createDirectoryError)
+		}
+		if writeError := os.WriteFile(path, make([]byte, 1024), 0o644); writeError != nil {
+			test.Fatal(writeError)
+		}
+		when := time.Now().Add(-3 * time.Hour)
+		if changeTimesError := os.Chtimes(path, when, when); changeTimesError != nil {
+			test.Fatal(changeTimesError)
+		}
+		entries = append(entries, path)
+	}
+	// The program is named and never started: go env only reports it, and the trim reads no more than that.
+	trim := exec.Command(wrapper, trimCacheVerb)
+	trim.Env = append(own_go_cache.Environment(outsideThePool(os.Environ()), cache),
+		"GOCACHEPROG=loom-job-runner gocacheprog", homeVariable+"="+home, "HOME="+scratchHome(test),
+		tokensVariable+"=2", cacheCapVariable+"="+strconv.FormatFloat(6*1024.0/(1<<30), 'g', -1, 64))
+	if output, trimError := trim.CombinedOutput(); trimError != nil {
+		test.Fatalf("the trim of a cache a program serves failed: %v\n%s", trimError, output)
+	}
+	for _, entry := range entries {
+		if _, statError := os.Stat(entry); statError != nil {
+			test.Errorf("the trim removed %s from a cache a program serves: %v", entry, statError)
+		}
+	}
+	status := readMaybeMissing(test, filepath.Join(userCacheDirectoryIn(home), "cohere", "test-slots",
+		"gocache.status"))
+	if !strings.Contains(string(status), "not trimmed: the Go cache at "+cache+
+		" is served by a cache program, loom-job-runner gocacheprog") {
+		test.Errorf("the trim's status doesn't say it left the program's cache alone: %q", status)
+	}
+}
+
 // readMaybeMissing reads a file a run under test writes, as empty while it has not been written; any other
 // failure to read it fails the test.
 func readMaybeMissing(test testing.TB, path string) []byte {
