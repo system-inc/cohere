@@ -14,7 +14,6 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/release/dispatch"
-	"github.com/system-inc/cohere/internal/testing/needs"
 )
 
 // realSwiftBinary is the child built from this checkout's swift_language/, resolved once for the test binary as a
@@ -141,10 +140,9 @@ type swiftJsonSummary struct {
 // nothing ignored (#08cv2mp).
 //
 // It builds the child when this checkout's Swift sources changed since the last build, which takes minutes, so -short
-// leaves it out, and a land job, where the child can't be built, skips it by name (needs.SwiftLaid).
+// leaves it out.
 func TestARealSwiftRunThatExcludedEveryFileFails(test *testing.T) {
 	test.Parallel()
-	needs.SwiftLaid(test)
 	if testing.Short() {
 		test.Skip("runs the real cohere-swift, built from this checkout when its sources changed")
 	}

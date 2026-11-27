@@ -34,10 +34,6 @@ func TestAMissingToolOrPlatformIsANamedSkip(test *testing.T) {
 		value := OptIn(test, "COHERE_NEEDS_OPT_IN", "it measures a tree of the asker's choosing")
 		test.Logf("opted in with %s", value)
 		return
-	case "swift":
-		SwiftLaid(test)
-		test.Log("Swift is laid here")
-		return
 	case "race":
 		NoRace(test, "it bounds CPU time")
 		if raceDetector {
@@ -78,12 +74,10 @@ func TestAMissingToolOrPlatformIsANamedSkip(test *testing.T) {
 			nil,
 		},
 		{"opt-in", []string{"--- PASS", "opted in with a tree"}, []string{"COHERE_NEEDS_OPT_IN=a tree"}},
-		{"swift", []string{"--- SKIP", SwiftUnlaid}, []string{SwiftUnlaidVariable + "=" + SwiftUnlaidSetting}},
-		{"swift", []string{"--- PASS", "Swift is laid here"}, nil},
 	} {
 		command := exec.Command(executable, "-test.run=^TestAMissingToolOrPlatformIsANamedSkip$", "-test.v")
-		command.Env = append(append(os.Environ(), needsChildVariable+"="+row.child, "PATH=", "COHERE_NEEDS_OPT_IN=",
-			SwiftUnlaidVariable+"="), row.environment...)
+		command.Env = append(append(os.Environ(), needsChildVariable+"="+row.child, "PATH=", "COHERE_NEEDS_OPT_IN="),
+			row.environment...)
 		output, runError := command.CombinedOutput()
 		if runError != nil {
 			test.Errorf("the %s child failed rather than skipped: %v\n%s", row.child, runError, output)

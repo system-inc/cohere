@@ -48,28 +48,6 @@ func NoRace(test testing.TB, why string) {
 	}
 }
 
-// SwiftUnlaidVariable was set to SwiftUnlaidSetting by `cohere-dev integrate-job` for the tests it ran on Shackler,
-// while cohere-swift couldn't be built there: its build fetched packages from github.com, wrote Swift's caches and
-// started SwiftPM's own sandbox, none of which an integrate job's sandbox allows (#5wj23dd). Machines laid Swift there
-// and the judge builds from the laid set now (#je1r32a), so it sets the variable no more. The skip stays one pull
-// request longer, because the judge that runs is main's: the pull request that stopped setting it was judged by the
-// judge before it, which still set it, and its tests skipped by it there. The one after it deletes the skip.
-// SwiftUnlaid is what the skip says.
-const (
-	SwiftUnlaidVariable = "COHERE_DEV_LAND_JOB_SWIFT"
-	SwiftUnlaidSetting  = "unlaid"
-	SwiftUnlaid         = "Swift checked nowhere: cohere-swift isn't laid on Shackler (#je1r32a)"
-)
-
-// SwiftLaid skips a test that builds cohere-swift in a run where it can't be built, SwiftUnlaidVariable set to
-// SwiftUnlaidSetting, saying SwiftUnlaid. Anywhere else the test runs.
-func SwiftLaid(test testing.TB) {
-	test.Helper()
-	if os.Getenv(SwiftUnlaidVariable) == SwiftUnlaidSetting {
-		test.Skip(SwiftUnlaid)
-	}
-}
-
 // Platform skips the test unless it runs on the operating system named, as Go names it, saying why the test needs it.
 func Platform(test testing.TB, operatingSystem string, why string) {
 	test.Helper()

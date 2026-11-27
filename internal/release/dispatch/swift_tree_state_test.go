@@ -11,7 +11,6 @@ import (
 
 	"github.com/system-inc/cohere/internal/release/packaging"
 	"github.com/system-inc/cohere/internal/testing/executable_testing"
-	"github.com/system-inc/cohere/internal/testing/needs"
 )
 
 // The development binary is cached by a hash, and it reports whether its own inputs, the files that hash
@@ -167,7 +166,6 @@ func TestTheSwiftBuildIsHandedOnlyTheStatedTreeState(test *testing.T) {
 func TestTheSwiftManifestPrefersTheStatedTreeState(test *testing.T) {
 	test.Parallel()
 	// A land job, where cohere-swift can't be built, skips it by name.
-	needs.SwiftLaid(test)
 	if runtime.GOOS != "darwin" {
 		test.Skip("cohere-swift is built only on macOS")
 	}

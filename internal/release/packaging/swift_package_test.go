@@ -10,7 +10,6 @@ import (
 
 	"github.com/system-inc/cohere/internal/testing/build_inputs"
 	"github.com/system-inc/cohere/internal/testing/executable_testing"
-	"github.com/system-inc/cohere/internal/testing/needs"
 )
 
 // smallMacBinary builds a tiny Go program for macOS on goArchitecture and returns its path. The guards
@@ -261,7 +260,6 @@ func TestSwiftContractRefusesAMismatchedPair(test *testing.T) {
 func TestSwiftBinaryBuildReadsTheTreeAsItIsNow(test *testing.T) {
 	test.Parallel()
 	// A land job, where cohere-swift can't be built, skips it by name.
-	needs.SwiftLaid(test)
 
 	if runtime.GOOS != "darwin" {
 		test.Skip("NOT MEASURED: cohere-swift is only built on macOS")
