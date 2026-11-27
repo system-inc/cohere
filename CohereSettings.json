@@ -1,5 +1,5 @@
 {
-    "ignorePatterns": ["TypeScript/**", "internal/format/prettier/bundles/**"],
+    "ignorePatterns": ["TypeScript/**"],
     "go": {
         "rules": {},
         "targets": ["freebsd/arm64"]

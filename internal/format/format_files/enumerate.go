@@ -118,8 +118,8 @@ var NeverEntered = map[string]bool{
 
 // Enumerate walks a project root and returns the files handles accepts.
 //
-// The walk is a function of the ignore layers and a file-type predicate, not of any formatter, so the
-// native formatter enumerates without building a goja runtime it would never run.
+// The walk is a function of the ignore layers and a file-type predicate, not of any formatter, so a
+// formatter enumerates without building anything it would never run.
 //
 // The layers, in order: git's ignore rules, read as git reads them (every `.gitignore` from the root down,
 // each scoped to its directory, and info/exclude; see internal/gitignore); the house list, the `ignore`

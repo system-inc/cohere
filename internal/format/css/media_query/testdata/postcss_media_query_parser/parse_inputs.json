@@ -1,0 +1,400 @@
+{
+    "about": "The inputs of TestParseAgreesWithPostcssMediaQueryParser (oracle_test.go): params strings as Prettier's parser-postcss.js hands them to parseMediaQuery. postcss-media-query-parser 0.2.3's answers for them are recorded in parse_answers.json.gz by record-postcss-media-query-parser.mjs, attached to #yah3d69; a changed or added input is recorded again there. throws says the library throws on the text.",
+    "inputs": [
+        {
+            "name": "type and feature",
+            "text": "screen and (min-width: 768px)"
+        },
+        {
+            "name": "not",
+            "text": "not print"
+        },
+        {
+            "name": "only",
+            "text": "only screen"
+        },
+        {
+            "name": "bare type",
+            "text": "print"
+        },
+        {
+            "name": "bare feature",
+            "text": "(color)"
+        },
+        {
+            "name": "prefers color scheme",
+            "text": "(prefers-color-scheme: dark)"
+        },
+        {
+            "name": "prefers reduced motion",
+            "text": "(prefers-reduced-motion: reduce)"
+        },
+        {
+            "name": "vendor feature",
+            "text": "(-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi)"
+        },
+        {
+            "name": "only with two features",
+            "text": "only screen and (min-width: 100px) and (max-width: 200px)"
+        },
+        {
+            "name": "not with feature",
+            "text": "not screen and (color), print and (orientation: landscape)"
+        },
+        {
+            "name": "features joined",
+            "text": "(min-width: 100px) and (max-width: 200px)"
+        },
+        {
+            "name": "upper case",
+            "text": "SCREEN AND (COLOR), NOT print, ONLY tv"
+        },
+        {
+            "name": "keywords alone",
+            "text": "and"
+        },
+        {
+            "name": "keywords in a row",
+            "text": "only and not"
+        },
+        {
+            "name": "comma list",
+            "text": "screen, print"
+        },
+        {
+            "name": "comma list with spacing",
+            "text": "screen , print and (color)  ,tv"
+        },
+        {
+            "name": "empty queries in a list",
+            "text": "a,,b"
+        },
+        {
+            "name": "only commas",
+            "text": " , "
+        },
+        {
+            "name": "trailing comma",
+            "text": "screen,"
+        },
+        {
+            "name": "comma inside parens",
+            "text": "(a: f(1, 2)), print"
+        },
+        {
+            "name": "range both sides",
+            "text": "(400px <= width <= 700px)"
+        },
+        {
+            "name": "range one side",
+            "text": "(width >= 600px)"
+        },
+        {
+            "name": "range strict",
+            "text": "screen and (400px < width < 700px)"
+        },
+        {
+            "name": "range with colon free value",
+            "text": "(height > 30em) and (width = 50em)"
+        },
+        {
+            "name": "no space inside",
+            "text": "screen and (max-width:100px)"
+        },
+        {
+            "name": "wide spacing",
+            "text": "  screen  and   (  max-width  :  100px  )   "
+        },
+        {
+            "name": "tabs and newlines",
+            "text": "screen\tand\n(color)\r\n,\n\tprint"
+        },
+        {
+            "name": "no space before paren",
+            "text": "screen and(color)"
+        },
+        {
+            "name": "no space after paren",
+            "text": "(color)and screen"
+        },
+        {
+            "name": "paren then word",
+            "text": "(a)b"
+        },
+        {
+            "name": "colon with empty value",
+            "text": "(a:)"
+        },
+        {
+            "name": "colon with spaces only",
+            "text": "(a:   )"
+        },
+        {
+            "name": "two colons",
+            "text": "(a: b: c)"
+        },
+        {
+            "name": "empty parens",
+            "text": "()"
+        },
+        {
+            "name": "comment between",
+            "text": "screen /* comment */ and (color)"
+        },
+        {
+            "name": "comment first",
+            "text": "/* c */ screen"
+        },
+        {
+            "name": "comment in feature",
+            "text": "(min-width: /* x */ 100px)"
+        },
+        {
+            "name": "custom media",
+            "text": "--small-viewport (max-width: 30em)"
+        },
+        {
+            "name": "custom media list",
+            "text": "--narrow-window (max-width: 30em), print"
+        },
+        {
+            "name": "custom media reference",
+            "text": "(--small-viewport)"
+        },
+        {
+            "name": "calc value",
+            "text": "(max-width: calc(100px + 2em))"
+        },
+        {
+            "name": "var value",
+            "text": "screen and (min-width: var(--bp))"
+        },
+        {
+            "name": "function first",
+            "text": "fn(a, b) and (color)"
+        },
+        {
+            "name": "function alone",
+            "text": "fn(a b)"
+        },
+        {
+            "name": "nested parens",
+            "text": "(display: grid) and (not (display: inline-grid))"
+        },
+        {
+            "name": "style query",
+            "text": "style(--responsive: true)"
+        },
+        {
+            "name": "container params",
+            "text": "sidebar (min-width: 400px)"
+        },
+        {
+            "name": "custom variant params",
+            "text": "dark (&:where(.dark, .dark *))"
+        },
+        {
+            "name": "two words",
+            "text": "a b"
+        },
+        {
+            "name": "three words",
+            "text": "a b c"
+        },
+        {
+            "name": "four words",
+            "text": "a b c d"
+        },
+        {
+            "name": "five words",
+            "text": "a b c d e"
+        },
+        {
+            "name": "word paren word",
+            "text": "a (b) c"
+        },
+        {
+            "name": "word word paren",
+            "text": "a b (c)"
+        },
+        {
+            "name": "word word word paren",
+            "text": "a b c (d)"
+        },
+        {
+            "name": "word keyword word word",
+            "text": "a and b c"
+        },
+        {
+            "name": "paren then words",
+            "text": "(a) b c"
+        },
+        {
+            "name": "not then words",
+            "text": "not a b"
+        },
+        {
+            "name": "type then words",
+            "text": "only a b c"
+        },
+        {
+            "name": "interpolation type",
+            "text": "#{$query} and (color)"
+        },
+        {
+            "name": "interpolation value",
+            "text": "screen and (max-width: #{$w})"
+        },
+        {
+            "name": "interpolation with colon",
+            "text": "(#{$a: b}: c)"
+        },
+        {
+            "name": "string in interpolation",
+            "text": "({'a}' : b}: c)"
+        },
+        {
+            "name": "escaped quote in interpolation",
+            "text": "({'a\\'b'}: c)"
+        },
+        {
+            "name": "double quote in interpolation",
+            "text": "({\"x:y\"}: z)"
+        },
+        {
+            "name": "quote outside interpolation",
+            "text": "(a: \"b:c\")"
+        },
+        {
+            "name": "braces first",
+            "text": "{a} b"
+        },
+        {
+            "name": "brace element",
+            "text": "{a b} (c)"
+        },
+        {
+            "name": "url then type",
+            "text": "url(foo.css) screen"
+        },
+        {
+            "name": "url with spacing",
+            "text": "  url ( 'a(b)' )  print, tv"
+        },
+        {
+            "name": "url alone",
+            "text": "url(x)"
+        },
+        {
+            "name": "url not first",
+            "text": "screen url(x)"
+        },
+        {
+            "name": "url upper case",
+            "text": "URL(x) screen"
+        },
+        {
+            "name": "stray close paren",
+            "text": "screen)"
+        },
+        {
+            "name": "close paren mid word",
+            "text": "a)b c"
+        },
+        {
+            "name": "unclosed feature",
+            "text": "print and (color"
+        },
+        {
+            "name": "unclosed alone",
+            "text": "(a"
+        },
+        {
+            "name": "close paren first",
+            "text": ")"
+        },
+        {
+            "name": "open paren alone",
+            "text": "("
+        },
+        {
+            "name": "brace closing a feature",
+            "text": "(a} b",
+            "throws": true
+        },
+        {
+            "name": "brace closing a feature at the end",
+            "text": "screen and (color}",
+            "throws": true
+        },
+        {
+            "name": "brace closing a feature mid-word drops it",
+            "text": "(a}:b)"
+        },
+        {
+            "name": "interpolation then an extra brace",
+            "text": "(a{}}",
+            "throws": true
+        },
+        {
+            "name": "brace alone",
+            "text": "}"
+        },
+        {
+            "name": "brace pair element",
+            "text": "{a}"
+        },
+        {
+            "name": "empty",
+            "text": ""
+        },
+        {
+            "name": "blank",
+            "text": "   "
+        },
+        {
+            "name": "non-ASCII comment",
+            "text": "screen and (min-width: 1em) /* é */"
+        },
+        {
+            "name": "non-ASCII type",
+            "text": "écran and (color)"
+        },
+        {
+            "name": "no-break space before a feature",
+            "text": "(\u00a0x: 1px)"
+        },
+        {
+            "name": "non-ASCII in a feature",
+            "text": "(é-width: 1px)"
+        },
+        {
+            "name": "non-ASCII after a feature's colon",
+            "text": "(x: é)"
+        },
+        {
+            "name": "no-break space",
+            "text": "(max-width:\u00a0100px)\u00a0and\u00a0print"
+        },
+        {
+            "name": "ideographic space",
+            "text": "\u3000screen\u3000and (color)"
+        },
+        {
+            "name": "emoji",
+            "text": "😀 and (a: 😀), 😀"
+        },
+        {
+            "name": "byte order mark",
+            "text": "\ufeffscreen"
+        },
+        {
+            "name": "next line is not whitespace",
+            "text": "a\u0085b"
+        },
+        {
+            "name": "em space and line separator",
+            "text": "a\u2003b\u2028c"
+        }
+    ]
+}

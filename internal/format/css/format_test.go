@@ -10,8 +10,6 @@ import (
 	"github.com/system-inc/cohere/internal/format/doc"
 	"github.com/system-inc/cohere/internal/format/format_options"
 	"github.com/system-inc/cohere/internal/format/oracle_testing"
-	"github.com/system-inc/cohere/internal/format/prettier"
-	"github.com/system-inc/cohere/internal/testing/needs"
 )
 
 // Each snippet goes through this printer and through the embedded Prettier fork, and the two outputs must
@@ -214,12 +212,27 @@ func formatOptionSets() map[string]format_options.Options {
 	}
 }
 
+// unsettledCases are the cases whose fork output the fork itself rewrites, so Format, which prints as the fork does,
+// rewrites it on a second pass too. Their second pass is held to the fork's own, recorded beside the first in
+// <test>SecondPass.json.gz, so a change to it in either direction fails, settling included. One whose recorded
+// second pass settles everywhere fails too, so the list only shrinks.
+var unsettledCases = map[string]bool{
+	// `|b`, a type in no namespace, prints as `,|b`, and each pass adds a line holding a lone comma before it.
+	"selectors: combinators, pseudo-classes, pseudo-elements, attributes, namespaces, lists": true,
+	// A grid property keeps the line breaks of its source, so the second pass keeps the breaks the first chose and
+	// lays the value out again.
+	"long comma lists and space lists break at the print width": true,
+}
+
 func TestFormatMatchesTheFork(test *testing.T) {
 	test.Parallel()
 	// The oracle's answers, recorded (see oracle_testing), so no JavaScript runs here.
 	golden := oracle_testing.Open(test, test.Name())
+	secondPass := oracle_testing.Open(test, test.Name()+"SecondPass")
+	unsettled := map[string]bool{}
 	for optionsName, options := range formatOptionSets() {
 		oracle := golden.Formatter(options)
+		forkAgain := secondPass.Formatter(options)
 		for _, testCase := range formatCases {
 			expected, formatError := oracle.Format("Probe.css", testCase.source)
 			if formatError != nil {
@@ -252,7 +265,27 @@ func TestFormatMatchesTheFork(test *testing.T) {
 			}
 			if actual != expected {
 				test.Errorf("%s (%s):\n--- fork\n%s--- native\n%s", testCase.name, optionsName, expected, actual)
+				continue
 			}
+			// Formatted output formats to itself, or every run rewrites what the last one wrote.
+			again, againError := Format(expected, options, nil)
+			if unsettledCases[testCase.name] {
+				want, wantError := forkAgain.Format("Probe.css", expected)
+				unsettled[testCase.name] = unsettled[testCase.name] || wantError != nil || want != expected
+				if (againError != nil) != (wantError != nil) || again != want {
+					test.Errorf("%s (%s): formatted again, not as the fork formats it again (%v, the fork %v):\n%s",
+						testCase.name, optionsName, againError, wantError, firstDifference(want, again))
+				}
+			} else if againError != nil || again != expected {
+				test.Errorf("%s (%s): formatted again (%v):\n%s", testCase.name, optionsName, againError,
+					firstDifference(expected, again))
+			}
+		}
+	}
+	// Only a clean run judges the list: a case whose first pass differed never reached its second.
+	for name := range unsettledCases {
+		if !test.Failed() && !unsettled[name] {
+			test.Errorf("the fork formats %s to itself on a second pass, so take it out of unsettledCases", name)
 		}
 	}
 }
@@ -351,6 +384,12 @@ func TestCoreNormalizedInputMatchesTheFork(test *testing.T) {
 			if formatError != nil || actual != expected {
 				test.Errorf("%q as %s (%s):\n--- fork\n%q\n--- native (%v)\n%q", testCase.source, testCase.fileName,
 					optionsName, expected, formatError, actual)
+				continue
+			}
+			// Formatted output formats to itself, or every run rewrites what the last one wrote.
+			if again, againError := format(expected, options, nil); againError != nil || again != expected {
+				test.Errorf("%q as %s (%s): formatted again, %q (%v)", testCase.source, testCase.fileName, optionsName,
+					again, againError)
 			}
 		}
 	}
@@ -379,73 +418,285 @@ func TestPrintToDocIsFormatWithoutTheTrailingHardline(test *testing.T) {
 	}
 }
 
-// The corpus is the 26 CSS files the brief names, read from the machine's projects. They are not part of
-// this repository, so the test runs only when COHERE_CSS_CORPUS names the directories to search,
-// separated by the path list separator, and fails when that finds nothing. Each file runs as written and
-// with every line's indentation stripped: the files are already formatted, so only the stripped copy
-// makes the oracle rewrite anything.
-func TestCorpusMatchesTheFork(test *testing.T) {
+// corpusConstructCases are the constructs of the stylesheets the formatter is used on most, the theme styles
+// of ahra's projects and their @font-face files, which a test here cannot read (Kirk, Nov 25, #5wj23dd).
+// Each is written for this test, not copied, and holds a construct those files lean on: Tailwind's @import,
+// @config, @source, @theme, @utility with --value(), @custom-variant and @layer; @property; light-dark() and
+// var() chains with trailing comments; @keyframes; @media and @supports guards; nesting with &:dir() and
+// &:where(); attribute selectors with pseudo-elements; multi-line transition lists; @font-face with
+// unicode-range; and the doc comments above them all. Each is written formatted, as those files are, and runs
+// as written and with every line's indentation stripped, since only the stripped copy makes the oracle rewrite
+// anything.
+var corpusConstructCases = []formatCase{
+	{
+		name: "Tailwind entry points: @import, @config, @source and @layer",
+		source: `@import 'tailwindcss';
+@import '../shared/styles/global.css';
+@import './tokens.css' layer(base);
+
+@config '../../TailwindConfiguration.ts';
+@source '../app/';
+@source not '../app/legacy/';
+
+@layer base {
+    html {
+        -webkit-tap-highlight-color: transparent;
+    }
+}
+`,
+		contains: []string{"@import 'tailwindcss';", "@config '../../TailwindConfiguration.ts';", "@layer base {"},
+	},
+	{
+		name: "@theme tokens: light-dark() over var(), hex with alpha, trailing comments",
+		source: `@theme {
+    --color-gray-0: #f8f8f8; /* Step 0 */
+    --color-gray-1000: #000000; /* Step 1000 */
+    --color-surface-1: light-dark(var(--color-gray-0), var(--color-gray-1000));
+    --color-surface-warning-muted: light-dark(var(--color-orange-50), #ea580c29);
+    --color-outline-focus-ring-strong: light-dark(var(--color-blue-600), var(--color-blue-400));
+}
+
+@theme inline {
+    --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+    --animate-blink: blink 1s steps(2, start) infinite;
+}
+`,
+		contains: []string{
+			"@theme inline {",
+			"light-dark(var(--color-gray-0), var(--color-gray-1000))",
+			"/* Step 0 */",
+		},
+	},
+	{
+		name: "@property registrations",
+		source: `/* Registered so an animation's custom properties do not inherit into children */
+@property --enter-opacity {
+    syntax: '*';
+    inherits: false;
+}
+@property --enter-scale {
+    syntax: '<number>';
+    inherits: false;
+    initial-value: 1;
+}
+`,
+		contains: []string{"@property --enter-opacity {", "syntax: '*';", "initial-value: 1;"},
+	},
+	{
+		name: "@utility with a wildcard name and --value()",
+		source: `@utility fade-in-* {
+    --enter-opacity: calc(--value(number) / 100);
+    --enter-opacity: --value(--percentage-*, [*]);
+}
+@utility -slide-in-from-left-* {
+    --enter-translate-x: calc(--value(integer) * var(--spacing) * -1);
+    --enter-translate-x: --value(--translate-*, [percentage], [length]);
+}
+@utility tab-4 {
+    tab-size: 4;
+}
+`,
+		contains: []string{
+			"@utility fade-in-* {",
+			"calc(--value(number) / 100)",
+			"--value(--translate-*, [percentage], [length])",
+		},
+	},
+	{
+		name: "@custom-variant with nested :where(), :not() and :has()",
+		source: `@custom-variant dark (&:where(.scheme-dark, .scheme-dark *):not(:where(.scheme-light:not(:has(.scheme-dark)), .scheme-light:not(:has(.scheme-dark)) *)));
+@custom-variant hocus (&:hover, &:focus-visible);
+
+.toolbar {
+    @variant dark {
+        color: var(--color-gray-0);
+    }
+}
+`,
+		contains: []string{"@custom-variant hocus (&:hover, &:focus-visible);", "    @variant dark {"},
+	},
+	{
+		name: "@keyframes with percentages, from and to",
+		source: `@keyframes bounce {
+    0%,
+    80%,
+    100% {
+        transform: scale(0);
+    }
+    40% {
+        transform: scale(1);
+    }
+}
+@keyframes enter {
+    from {
+        opacity: var(--enter-opacity, 1);
+        transform: translate3d(var(--enter-translate-x, 0), var(--enter-translate-y, 0), 0) scale3d(var(--enter-scale, 1), var(--enter-scale, 1), var(--enter-scale, 1)) rotate(var(--enter-rotate, 0));
+    }
+}
+`,
+		contains: []string{"@keyframes bounce {", "    80%,\n", "from {"},
+	},
+	{
+		name: "@media and @supports guards around animations",
+		source: `.live-dot {
+    animation: live-ping 1.6s ease-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+    .live-dot {
+        animation: none;
+    }
+}
+@supports (-webkit-touch-callout: none) {
+    input,
+    textarea {
+        font-size: 16px;
+    }
+}
+`,
+		contains: []string{"@media (prefers-reduced-motion: reduce) {", "@supports (-webkit-touch-callout: none) {"},
+	},
+	{
+		name: "nesting with &:dir(), &:where() and &::-webkit-scrollbar",
+		source: `.slide-in-from-start {
+    &:dir(ltr) {
+        --enter-translate-x: -100%;
+    }
+    &:where(:dir(rtl), [dir='rtl'], [dir='rtl'] *) {
+        --enter-translate-x: 100%;
+    }
+    &::-webkit-scrollbar {
+        display: none;
+    }
+}
+`,
+		contains: []string{
+			"&:dir(ltr) {",
+			"&:where(:dir(rtl), [dir='rtl'], [dir='rtl'] *) {",
+			"&::-webkit-scrollbar {",
+		},
+	},
+	{
+		name: "attribute selectors with pseudo-elements, vendor pseudo-classes and combinators",
+		source: `[data-input-code]::selection {
+    background: transparent;
+}
+[data-input-code]:autofill,
+[data-input-code]:-webkit-autofill {
+    transition:
+        background-color 0s 99999s,
+        color 0s 99999s;
+    transition-delay: 99999s;
+}
+.range-start.range-end > button,
+.calendar td:has(> .selected) ~ td {
+    border-radius: var(--radius-md);
+}
+`,
+		contains: []string{
+			"[data-input-code]:-webkit-autofill {",
+			"    transition:\n",
+			".range-start.range-end > button,",
+		},
+	},
+	{
+		name: "@font-face with url(), format() and a long unicode-range",
+		source: `/* latin-ext */
+@font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 100 900;
+    font-display: swap;
+    src: url('../fonts/inter/Inter-latin-ext.woff2') format('woff2');
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+`,
+		contains: []string{"font-weight: 100 900;", "format('woff2');", "unicode-range:\n        U+0100-02BA, "},
+	},
+	{
+		name: "doc comments with starred lines and code in backticks",
+		source: `/*
+ * Enter and exit animations, composed from custom properties.
+ *
+ * - fade-in-50 sets --enter-opacity, and animate-in reads it.
+ * - @property registrations keep the values from leaking into children.
+ */
+.animate-in {
+    animation: enter 150ms var(--ease-out-expo, ease-out) both; /* the shared easing */
+}
+`,
+		contains: []string{" * Enter and exit animations, composed from custom properties.", "/* the shared easing */"},
+	},
+	{
+		name: "rgba() and calc() in shadows, long values that break",
+		source: `.shadow-raised {
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 4px 8px rgba(0, 0, 0, 0.08), 0 calc(var(--spacing) * 4) calc(var(--spacing) * 8) rgba(0, 0, 0, 0.1);
+    background-image: linear-gradient(90deg, color-mix(in oklab, var(--color-red-500) 50%, transparent), var(--color-violet-400));
+    transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+`,
+		contains: []string{"rgba(0, 0, 0, 0.06),", "cubic-bezier(0.16, 1, 0.3, 1)"},
+	},
+}
+
+// TestCorpusConstructsMatchTheFork holds the formatter to the fork on corpusConstructCases, as written and
+// with every line's indentation stripped, under every option set.
+func TestCorpusConstructsMatchTheFork(test *testing.T) {
 	test.Parallel()
-	roots := needs.OptIn(
-		test,
-		"COHERE_CSS_CORPUS",
-		"a differential of the formatter against the fork over a corpus of CSS files",
-	)
-	var files []string
-	for _, root := range filepath.SplitList(roots) {
-		walkError := filepath.WalkDir(root, func(path string, entry os.DirEntry, pathError error) error {
-			if pathError != nil {
-				return nil
-			}
-			if entry.IsDir() &&
-				(entry.Name() == "node_modules" || entry.Name() == ".git" || entry.Name() == "conversations") {
-				return filepath.SkipDir
-			}
-			if !entry.IsDir() && strings.HasSuffix(path, ".css") &&
-				(strings.Contains(path, "theme/styles") ||
-					strings.HasSuffix(path, "OsKingdomGraph.css") ||
-					strings.HasSuffix(path, "fonts/inter/inter.css")) {
-				files = append(files, path)
-			}
-			return nil
-		})
-		if walkError != nil {
-			test.Fatal(walkError)
-		}
-	}
-	if len(files) == 0 {
-		test.Fatalf("no corpus files under %s", roots)
-	}
-	rewritten := 0
-	// The live oracle, not a golden (see oracle_testing): the corpus is the projects' own CSS as it stands
-	// today, which changes with every edit to them, so recorded answers would only ever be stale.
+	// The oracle's answers, recorded (see oracle_testing), so no JavaScript runs here.
+	golden := oracle_testing.Open(test, test.Name())
+	inputs, rewritten := 0, 0
 	for optionsName, options := range formatOptionSets() {
-		oracle, newPrettierError := prettier.New(options)
-		if newPrettierError != nil {
-			test.Fatal(newPrettierError)
-		}
-		for _, file := range files {
-			source, readError := os.ReadFile(file)
-			if readError != nil {
-				test.Fatal(readError)
-			}
-			for _, variant := range []string{string(source), stripIndentation(string(source))} {
+		oracle := golden.Formatter(options)
+		for _, testCase := range corpusConstructCases {
+			for variantName, variant := range map[string]string{
+				"as written": testCase.source,
+				"stripped":   stripIndentation(testCase.source),
+			} {
+				inputs++
 				expected, formatError := oracle.Format("Probe.css", variant)
 				if formatError != nil {
-					test.Fatalf("%s (%s): the oracle failed: %v", file, optionsName, formatError)
+					test.Fatalf(
+						"%s, %s (%s): the oracle failed: %v",
+						testCase.name,
+						variantName,
+						optionsName,
+						formatError,
+					)
 				}
 				if expected != variant {
 					rewritten++
+				} else if variantName == "stripped" {
+					test.Errorf(
+						"%s (%s): the oracle left the stripped copy unchanged, so an identity printer would pass",
+						testCase.name,
+						optionsName,
+					)
+				}
+				// Stripping changes a comment's own lines, which the printer keeps as written, so what a case
+				// is about is spelled out against the copy as written.
+				if optionsName == "defaults" && variantName == "as written" {
+					for _, substring := range testCase.contains {
+						if !strings.Contains(expected, substring) {
+							test.Errorf(
+								"%s, %s: the fork's output lacks %q:\n%s",
+								testCase.name,
+								variantName,
+								substring,
+								expected,
+							)
+						}
+					}
 				}
 				actual, formatError := Format(variant, options, nil)
 				if formatError != nil {
-					test.Errorf("%s (%s): %v", file, optionsName, formatError)
+					test.Errorf("%s, %s (%s): %v", testCase.name, variantName, optionsName, formatError)
 					continue
 				}
 				if actual != expected {
 					test.Errorf(
-						"%s (%s): differs from the fork\n%s",
-						file,
+						"%s, %s (%s): differs from the fork\n%s",
+						testCase.name,
+						variantName,
 						optionsName,
 						firstDifference(expected, actual),
 					)
@@ -453,19 +704,8 @@ func TestCorpusMatchesTheFork(test *testing.T) {
 			}
 		}
 	}
-	if rewritten < len(files)*len(formatOptionSets()) {
-		test.Errorf(
-			"the oracle rewrote only %d of %d inputs, so the corpus barely tests the printer",
-			rewritten,
-			2*len(files)*len(formatOptionSets()),
-		)
-	}
-	test.Logf(
-		"%d corpus files, two variants each, under %d option sets; the oracle rewrote %d",
-		len(files),
-		len(formatOptionSets()),
-		rewritten,
-	)
+	test.Logf("%d inputs, two variants of %d cases under %d option sets; the oracle rewrote %d", inputs,
+		len(corpusConstructCases), len(formatOptionSets()), rewritten)
 }
 
 // stripIndentation removes every line's leading spaces and tabs.
@@ -542,6 +782,10 @@ func TestPrettierFixturesMatchTheFork(test *testing.T) {
 						optionsName,
 						firstDifference(expected, actual),
 					)
+				} else if again, againError := Format(expected, options, nil); againError != nil || again != expected {
+					// Formatted output formats to itself, or every run rewrites what the last one wrote.
+					test.Errorf("%s (%s): formatted again (%v):\n%s", file, optionsName, againError,
+						firstDifference(expected, again))
 				}
 			}
 		}
@@ -707,6 +951,12 @@ func TestFormatScssMatchesTheFork(test *testing.T) {
 			}
 			if actual != expected {
 				test.Errorf("%s (%s):\n--- fork\n%s--- native\n%s", testCase.name, optionsName, expected, actual)
+				continue
+			}
+			// Formatted output formats to itself, or every run rewrites what the last one wrote.
+			if again, againError := FormatScss(expected, options, nil); againError != nil || again != expected {
+				test.Errorf("%s (%s): formatted again (%v):\n%s", testCase.name, optionsName, againError,
+					firstDifference(expected, again))
 			}
 		}
 	}
@@ -737,6 +987,10 @@ func TestFormatScssIsNotFormat(test *testing.T) {
 		actualScss, formatScssError := FormatScss(source, format_options.Default(), nil)
 		if formatScssError != nil || actualScss != asScss {
 			test.Errorf("%q as scss:\n--- fork\n%s--- native (%v)\n%s", source, asScss, formatScssError, actualScss)
+		} else if again, againError := FormatScss(asScss, format_options.Default(), nil); againError != nil ||
+			again != asScss {
+			// Formatted output formats to itself, or every run rewrites what the last one wrote.
+			test.Errorf("%q as scss: formatted again (%v):\n%s", source, againError, firstDifference(asScss, again))
 		}
 		actualCss, formatError := Format(source, format_options.Default(), nil)
 		if (formatError == nil) != (cssError == nil) || actualCss != asCss {
@@ -748,6 +1002,10 @@ func TestFormatScssIsNotFormat(test *testing.T) {
 				formatError,
 				actualCss,
 			)
+		} else if cssError == nil {
+			if again, againError := Format(asCss, format_options.Default(), nil); againError != nil || again != asCss {
+				test.Errorf("%q as css: formatted again (%v):\n%s", source, againError, firstDifference(asCss, again))
+			}
 		}
 	}
 }
@@ -840,6 +1098,11 @@ func TestPrettierScssFixturesMatchTheFork(test *testing.T) {
 				}
 				if actual == expected {
 					matched++
+					// Formatted output formats to itself, or every run rewrites what the last one wrote.
+					if again, againError := FormatScss(expected, options, nil); againError != nil || again != expected {
+						test.Errorf("%s (%s): formatted again (%v):\n%s", file, optionsName, againError,
+							firstDifference(expected, again))
+					}
 				} else {
 					test.Errorf(
 						"%s (%s): differs from the fork\n%s",
