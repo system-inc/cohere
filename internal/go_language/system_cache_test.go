@@ -62,10 +62,10 @@ func TestMain(suite *testing.M) {
 	if setError := os.Setenv("GOENV", "off"); setError != nil {
 		os.Exit(refuse(os.Stderr, setError))
 	}
-	// And no git child of this process or its runs, cohere-go's own `git ls-files` at a go.work's root among them,
-	// reads the machine's git configuration (#2htryg8): a person's global config signs, hooks and ignores as the
-	// person set it, and a test's git reads the repository's own alone. Set before testsEnvironment is taken, so
-	// the template and every guard that compares the environment with it hold these too.
+	// No test here starts git, but cohere-go does: its `git ls-files` at a go.work's root (project/gitlink.go) is
+	// this process's one git child, sealed here so it reads none of the machine's git configuration (#2htryg8), which
+	// signs, hooks and ignores as the person set it. Set before testsEnvironment is taken, so the template and every
+	// guard that compares the environment with it hold these too.
 	for name, value := range sealedGitEnvironment {
 		if setError := os.Setenv(name, value); setError != nil {
 			os.Exit(refuse(os.Stderr, setError))

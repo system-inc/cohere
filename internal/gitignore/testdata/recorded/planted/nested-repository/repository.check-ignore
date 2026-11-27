@@ -1,0 +1,5 @@
+::	.gitignore
+.gitignore:1:*.log	app.log
+::	main.go
+.gitignore:2:vendor/	vendor
+.gitignore:2:vendor/	vendor/module.go

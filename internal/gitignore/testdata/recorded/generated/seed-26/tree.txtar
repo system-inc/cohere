@@ -1,0 +1,59 @@
+Generated from seed 26: random names, ignore files at random depths, and about a quarter of
+the files tracked whatever the patterns say, as `git add -f` tracks them.
+
+repository .
+	keep/!bang/.gitignore
+	keep/!bang/.hidden/Dot.go/.gitignore
+	keep/trail /!bang
+	keep/trail /ab
+	"keep/trail /star*/trail "
+	"keep/trail /trail "
+-- .git/info/exclude --
+*.log/deep/
+[[:alpha:]]
+?/.hidden/
+*.log/[ab]/a   
+![a-c]/\!bang
+-- .gitignore --
+[a-c]/out/
+# */star\*
+a/[!a]
+-- keep/!bang/.gitignore --
+
+build
+*.log/trail /\?
+
+-- keep/!bang/.hidden/Dot.go/.gitignore --
+
+
+\*/[ab]
+q\?/ab/build   
+-- keep/!bang/.hidden/build --
+-- keep/!bang/keep/.gitignore --
+!*.log
+a/\?\ 
+
+-- keep/!bang/keep/keep --
+-- keep/!bang/trail /.gitignore --
+abc/x.log
+*.log/[ab]/[a-c]
+# sp ace/abc/*.tmp
+-- keep/!bang/trail /deep --
+-- keep/!bang/trail /trail /.gitignore --
+**/out
+
+\?   
+# [!a]
+-- keep/deep --
+-- keep/trail /!bang --
+-- keep/trail /.gitignore --
+deep/[a-c]   
+/x.log/[!a]
+keep/ab/**
+!.hidden
+[ab]
+-- keep/trail /ab --
+-- keep/trail /star*/br[ack]et --
+-- "keep/trail /star*/trail " --
+-- "keep/trail /trail " --
+-- keep/y.tmp --

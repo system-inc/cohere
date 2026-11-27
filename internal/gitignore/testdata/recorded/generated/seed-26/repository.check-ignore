@@ -1,0 +1,23 @@
+::	.gitignore
+::	keep
+::	keep/!bang
+::	keep/!bang/.gitignore
+::	keep/!bang/.hidden
+::	keep/!bang/.hidden/Dot.go
+::	keep/!bang/.hidden/Dot.go/.gitignore
+keep/!bang/.gitignore:2:build	keep/!bang/.hidden/build
+::	keep/!bang/keep
+::	keep/!bang/keep/.gitignore
+::	keep/!bang/keep/keep
+::	keep/!bang/trail 
+::	keep/!bang/trail /.gitignore
+::	keep/!bang/trail /deep
+::	keep/!bang/trail /trail 
+::	keep/!bang/trail /trail /.gitignore
+::	keep/deep
+::	keep/trail 
+::	keep/trail /!bang
+::	keep/trail /.gitignore
+::	keep/trail /ab
+::	keep/trail /trail 
+::	keep/y.tmp

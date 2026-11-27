@@ -56,7 +56,7 @@ func TestARebuildAfterATrimRecomputesOnlyWhatWasTrimmed(test *testing.T) {
 		test.Helper()
 		command := exec.Command("go", "build", "-o", test.TempDir()+string(filepath.Separator), "./...")
 		command.Dir = outsideModule(test, module)
-		command.Env = append(os.Environ(), "GOCACHE="+cache, "GOFLAGS=", "GOWORK=off")
+		command.Env = append(ownCacheEnvironment(os.Environ(), cache), "GOFLAGS=", "GOWORK=off")
 		if output, outputError := command.CombinedOutput(); outputError != nil {
 			test.Fatalf("go build: %v: %s", outputError, output)
 		}

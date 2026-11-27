@@ -17,7 +17,7 @@ import (
 )
 
 // The oracle for what prettier.Formatter cannot be asked: proseWrap, which format_options.Options does not carry
-// and every corpus leaves at "preserve", and a file path the formatter does not route (.prettierrc). These
+// and every repository leaves at "preserve", and a file path the formatter does not route (.prettierrc). These
 // run the same embedded bundles in their own runtime, with the option given.
 
 // Its answers are recorded (see oracle_testing), so the runtime is built only when they are recorded again.
@@ -150,77 +150,34 @@ var proseWrapFixtures = []string{
 func TestProseWrapMatchesOracle(test *testing.T) {
 	test.Parallel()
 	oracle := newOptionsOracle(test)
-	inputs := append(append(append([]string{}, proseWrapFixtures...), formatFixtures...), suiteInputs(test)...)
-	texts, byteOrderMarks, trees := parseInputs(test, inputs)
-	failures, fullStackFailures, compared := 0, 0, 0
+	inputs := append(append([]string{}, proseWrapFixtures...), formatFixtures...)
+	failures, compared := 0, 0
 	for _, proseWrap := range []string{"always", "never"} {
 		for variantIndex, options := range formatVariants[:3] {
-			for index, input := range inputs {
+			for _, input := range inputs {
 				expected, formatError := oracle.format(input, "fixture.yaml", "yaml", options, proseWrap)
 				if formatError != nil {
 					continue
 				}
 				compared++
-				// The full stack: the Go parser and the printer, from the text.
-				if fullStack, formatFullStackError := formatFullStack(
-					"fixture.yaml",
-					input,
-					options,
-					proseWrap,
-					nil,
-				); formatFullStackError != nil || fullStack != expected {
-					fullStackFailures++
-					if formatFullStackError != nil {
-						test.Errorf(
-							"%s, variant %d, %q: Format: %v",
-							proseWrap,
-							variantIndex,
-							input,
-							formatFullStackError,
-						)
-					} else {
-						test.Errorf(
-							"%s, variant %d, %q: Format: %s",
-							proseWrap,
-							variantIndex,
-							input,
-							differential.FirstDifference(expected, fullStack),
-						)
-					}
-				}
-				actual, formatParsedError := formatParsed(
-					"fixture.yaml",
-					trees[index],
-					texts[index],
-					byteOrderMarks[index],
-					options,
-					proseWrap,
-					nil,
-				)
-				if formatParsedError != nil {
+				fullStack, formatFullStackError := formatFullStack("fixture.yaml", input, options, proseWrap, nil)
+				if formatFullStackError != nil {
 					failures++
-					test.Errorf("%s, variant %d, %q: %v", proseWrap, variantIndex, input, formatParsedError)
-					continue
-				}
-				if actual != expected {
+					test.Errorf("%s, variant %d, %q: Format: %v", proseWrap, variantIndex, input, formatFullStackError)
+				} else if fullStack != expected {
 					failures++
 					test.Errorf(
-						"%s, variant %d, %q: %s",
+						"%s, variant %d, %q: Format: %s",
 						proseWrap,
 						variantIndex,
 						input,
-						differential.FirstDifference(expected, actual),
+						differential.FirstDifference(expected, fullStack),
 					)
 				}
 			}
 		}
 	}
-	test.Logf(
-		"%d proseWrap comparisons: full stack %d differ, tree loader %d differ",
-		compared,
-		fullStackFailures,
-		failures,
-	)
+	test.Logf("%d proseWrap comparisons: %d differ", compared, failures)
 }
 
 // jsonTextToDoc stands in for the native JSON printer: the oracle formats the JSON, and the text comes
@@ -255,21 +212,12 @@ func TestPrettierRcEmbedsJson(test *testing.T) {
 		".prettierrc.yaml",
 		"x.yaml",
 	}
-	texts, byteOrderMarks, trees := parseInputs(test, inputs)
 	for _, options := range formatVariants[:2] {
 		textToDoc := jsonTextToDoc(test, oracle, options)
 		for _, fileName := range fileNames {
-			for index, input := range inputs {
+			for _, input := range inputs {
 				expected, formatError := oracle.format(input, fileName, "yaml", options, "preserve")
 				if formatError != nil {
-					if trees[index].parseFailure == "" {
-						test.Errorf(
-							"%s, %q: the oracle failed (%v) but the parser did not",
-							fileName,
-							input,
-							formatError,
-						)
-					}
 					if _, fullStackError := formatFullStack(
 						fileName,
 						input,
@@ -303,22 +251,6 @@ func TestPrettierRcEmbedsJson(test *testing.T) {
 						differential.FirstDifference(expected, fullStack),
 					)
 				}
-				actual, formatParsedError := formatParsed(
-					fileName,
-					trees[index],
-					texts[index],
-					byteOrderMarks[index],
-					options,
-					"preserve",
-					textToDoc,
-				)
-				if formatParsedError != nil {
-					test.Errorf("%s, %q: %v", fileName, input, formatParsedError)
-					continue
-				}
-				if actual != expected {
-					test.Errorf("%s, %q: %s", fileName, input, differential.FirstDifference(expected, actual))
-				}
 			}
 		}
 	}
@@ -328,8 +260,8 @@ func TestPrettierRcEmbedsJson(test *testing.T) {
 // file as YAML, as upstream does when the JSON format throws.
 func TestPrettierRcWithoutTextToDocPrintsYaml(test *testing.T) {
 	test.Parallel()
-	texts, _, trees := parseInputs(test, []string{`{"a":1}`})
-	actual, printFileError := PrintFile(".prettierrc", trees[0].root, texts[0], format_options.Default(), nil)
+	text := `{"a":1}`
+	actual, printFileError := PrintFile(".prettierrc", parseFixture(test, text), text, format_options.Default(), nil)
 	if printFileError != nil {
 		test.Fatal(printFileError)
 	}

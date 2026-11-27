@@ -14,19 +14,11 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/rename/local_rename"
 )
 
-// testVocabularyPath is the dry-run tree's policy file, the one the command reads there. WORDNAMES_VOCABULARY
-// overrides it.
-func testVocabularyPath() string {
-	if path := os.Getenv("WORDNAMES_VOCABULARY"); path != "" {
-		return path
-	}
-	// cohere-go 1c77e4a7's policy/Abbreviations.json, the first with a list of expansions per word.
-	return "testdata/Abbreviations.json"
-}
-
+// loadTestVocabulary loads the dry-run tree's policy file, the one the command reads there: cohere-go 1c77e4a7's
+// policy/Abbreviations.json, the first with a list of expansions per word.
 func loadTestVocabulary(test *testing.T) *vocabulary {
 	test.Helper()
-	data, readError := os.ReadFile(testVocabularyPath())
+	data, readError := os.ReadFile("testdata/Abbreviations.json")
 	if readError != nil {
 		test.Fatalf("reading the vocabulary: %v", readError)
 	}

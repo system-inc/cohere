@@ -117,9 +117,9 @@ func positiveVariable(name string, fallback int) (int, error) {
 const homeVariable = "COHERE_DEV_HOME"
 
 // poolHome is the home the machine's pool hangs from: the account's own, from the system's user database,
-// never the `HOME` variable. A gate run with `HOME` set to a scratch directory, to leave its corpora unset,
-// and the go cache passed through, opened a pool of its own and so ran outside the machine's, and its trim
-// held that empty pool and trimmed the live cache under every real gate (2026-10-06 04:44, #d0x1fhp).
+// never the `HOME` variable. A gate run with `HOME` set to a scratch directory, and the go cache passed through,
+// opened a pool of its own and so ran outside the machine's, and its trim held that empty pool and trimmed the live
+// cache under every real gate (2026-10-06 04:44, #d0x1fhp).
 func poolHome() (string, error) {
 	if home := os.Getenv(homeVariable); home != "" {
 		return home, nil

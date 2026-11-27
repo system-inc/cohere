@@ -19,9 +19,10 @@
 // Tailwind loads; `sourceRoot` is the tree this tool harvests real class lists from, so the fixture
 // carries the class lists two real repositories actually wrote rather than only the ones a test
 // author thought to invent. Both repositories in the default corpus declare their own
-// `@custom-variant dark`, which is the per-repository fact the whole port exists to respect. Either
-// may be spelled inside a corpus, such as `ahra:` for ahra's root, found through the corpus's variable
-// or the corpora file and recorded as spelled, so the fixture reads the same on every machine (#sycrdr6).
+// `@custom-variant dark`, which is the per-repository fact the whole port exists to respect. A
+// `sourceRoot` is a plain path, absolute or relative to this repository's root; a `<name>:` spelling,
+// which once named a checkout through the environment, is refused with an error that asks for the
+// checkout's path.
 //
 // `-check` regenerates and fails when the committed fixture disagrees, which is what makes a
 // Tailwind upgrade that changes variant ordering show up as a failing gate instead of a silent
@@ -44,7 +45,7 @@ import (
 	"strings"
 
 	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
-	"github.com/system-inc/cohere/internal/testing/corpus"
+	"github.com/system-inc/cohere/internal/testing/repository"
 )
 
 func main() {
@@ -233,8 +234,7 @@ func readCorpus(corpusPath string, maximumClassLists int) ([]corpusEntry, error)
 		if entries[index].SourceRoot == "" {
 			continue
 		}
-		// A corpus spelling such as "ahra:" names a private checkout, found the way the tests find it.
-		sourceRoot, locateError := corpus.Locate(entries[index].SourceRoot)
+		sourceRoot, locateError := locateSourceRoot(entries[index].SourceRoot)
 		if locateError != nil {
 			return nil, fmt.Errorf("harvest %s: %w", entries[index].Name, locateError)
 		}
@@ -246,6 +246,31 @@ func readCorpus(corpusPath string, maximumClassLists int) ([]corpusEntry, error)
 	}
 
 	return entries, nil
+}
+
+// spelledCheckoutPattern is the `<name>:<path>` spelling that once named a checkout outside this
+// repository by a name the environment resolved. A name is a word, never one letter, so a Windows drive
+// letter is not one.
+var spelledCheckoutPattern = regexp.MustCompile(`^[a-z][a-z0-9-]+:`)
+
+// locateSourceRoot is the tree a corpus entry's sourceRoot names: an absolute path as given, and a
+// relative one against this repository's root, so the corpus file reads the same from any directory.
+func locateSourceRoot(sourceRoot string) (string, error) {
+	if spelledCheckoutPattern.MatchString(sourceRoot) {
+		return "", fmt.Errorf(
+			"%s names a checkout by a name, which nothing resolves now: give the checkout's path, absolute or "+
+				"relative to this repository's root",
+			sourceRoot,
+		)
+	}
+	if filepath.IsAbs(sourceRoot) {
+		return sourceRoot, nil
+	}
+	root, rootError := repository.Root()
+	if rootError != nil {
+		return "", rootError
+	}
+	return filepath.Join(root, filepath.FromSlash(sourceRoot)), nil
 }
 
 // classAttributePattern finds the static class strings this corpus is built from.

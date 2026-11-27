@@ -242,7 +242,8 @@ func TestReplacedDirectoriesReadTheBytesAlreadyRead(test *testing.T) {
 // second's directory.
 func TestReplacesPastASkippedSubmoduleUseAreEachModulesOwn(test *testing.T) {
 	test.Parallel()
-	repository := gitlinkRepository(test)
+	// The library is a gitlink in the index alone, so its module's go.mod is on no disk: a read of it fails.
+	repository := gitlinkRepository(test, gitlink("library", strings.Repeat("1", 40)))
 	files := map[string]string{
 		"go.work": "go 1.25\n\nuse (\n\t.\n\t./library/mod\n\t./first\n\t./second\n)\n",
 		"first/go.mod": "module example.com/root/first\n\ngo 1.25\n\n" +
@@ -253,8 +254,6 @@ func TestReplacesPastASkippedSubmoduleUseAreEachModulesOwn(test *testing.T) {
 	if writeError := writeFiles(repository, files); writeError != nil {
 		test.Fatal(writeError)
 	}
-	// The library is a gitlink in the index alone, so its module's go.mod is on no disk: a read of it fails.
-	pinGitlink(test, repository, "library", "1")
 	covered, readError := ReadWorkspace(repository)
 	if readError != nil {
 		test.Fatalf("reading the workspace failed: %v", readError)

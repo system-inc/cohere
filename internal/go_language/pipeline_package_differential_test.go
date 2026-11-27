@@ -2,7 +2,6 @@ package go_language
 
 import (
 	"maps"
-	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -11,7 +10,6 @@ import (
 
 	"github.com/system-inc/cohere/internal/go_language/check"
 	"github.com/system-inc/cohere/internal/go_language/project"
-	"github.com/system-inc/cohere/internal/go_language/rules"
 )
 
 // The package differential (#wcwx8vf), the soundness contract's machine check pointed at what a build skips (#9paaen9,
@@ -334,45 +332,6 @@ func TestABuildSkipsNothingTypesHoldDeclines(test *testing.T) {
 				test.Errorf("the hook changed the run's stream:\nwith it\n%s\nwithout it\n%s", judgedStream, plain)
 			}
 		})
-	}
-}
-
-// packageDifferentialRootVariable names a tree the package differential runs over, skipped when it is unset:
-//
-//	COHERE_VERDICT_DIFFERENTIAL_ROOT=<tree> go run ./command/cohere-dev test ./internal/go_language/ \
-//	    -run 'TestABuildSkipsNothingTypesHoldDeclinesInARealTree$' -v
-const packageDifferentialRootVariable = "COHERE_VERDICT_DIFFERENTIAL_ROOT"
-
-// The package differential over the tree packageDifferentialRootVariable names, run in place under `--no-fix`, so
-// nothing of the tree is written, with the findings cache off, every build checked, every package an extra build
-// skips judged as a visited one is. It logs, for each extra build, the times it loaded, the packages its last load
-// skipped, the judgments made and those declined, and fails naming every decline and every skipped package never
-// judged. A tree whose census needs no extra build is skipped.
-func TestABuildSkipsNothingTypesHoldDeclinesInARealTree(test *testing.T) {
-	test.Parallel()
-
-	root := os.Getenv(packageDifferentialRootVariable)
-	if root == "" {
-		test.Skipf("%s names no tree", packageDifferentialRootVariable)
-	}
-	recorder := &skippedRecorder{}
-	pipeline, _, standardError, exitCode := runOverExiting(test, root, rules.All(), recorder.hook, "--no-cache",
-		"--no-fix")
-	if exitCode != exitClean && exitCode != exitFindings {
-		test.Fatalf("the run over %s exited %d:\n%s", root, exitCode, standardError)
-	}
-	if len(pipeline.buildRuns) < 2 {
-		test.Skipf("the census of %s needs no extra build", root)
-	}
-	tallies := judgeSkips(test, pipeline, recorder.loads(), recorder.skips(), recorder.judgments())
-	logTallies(test, root, pipeline, tallies)
-	judgedByTypes := 0
-	for _, tally := range tallies {
-		judgedByTypes += tally.byTypes
-	}
-	if judgedByTypes == 0 {
-		test.Errorf("no build of %s skipped a package TypesHold judged, so the differential proves nothing of it",
-			root)
 	}
 }
 

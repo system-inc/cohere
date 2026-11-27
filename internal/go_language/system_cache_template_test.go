@@ -17,6 +17,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/go_language/contract"
 	"github.com/system-inc/cohere/internal/go_language/rules"
+	"github.com/system-inc/cohere/internal/testing/written_repository"
 )
 
 // systemCacheTemplate is the standard library's system cache this test binary fills once, which every run of a test
@@ -105,7 +106,7 @@ func fillSystemCacheTemplate() (systemCacheTemplate, error) {
 		}
 	}
 	// A repository of its own, as every fixture's copy is (copyFixture).
-	if writeError := writeRepository(project); writeError != nil {
+	if writeError := written_repository.Write(project); writeError != nil {
 		return systemCacheTemplate{}, writeError
 	}
 	var standardError bytes.Buffer

@@ -1,12 +1,12 @@
 package load
 
 import (
-	"os/exec"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"golang.org/x/tools/go/packages"
+
+	"github.com/system-inc/cohere/internal/testing/go_root"
 )
 
 // A standard package's tests import a vendored package its own files do not, as net's external tests import
@@ -58,11 +58,7 @@ func TestAStandardPackagesTestsKeyAVendoredImportByItsWrittenPath(test *testing.
 func TestNetsExternalTestsImportTheVendoredNettest(test *testing.T) {
 	test.Parallel()
 
-	goRoot, goEnvironmentError := exec.Command("go", "env", "GOROOT").Output()
-	if goEnvironmentError != nil {
-		test.Fatalf("reading GOROOT with go env: %v", goEnvironmentError)
-	}
-	source := filepath.Join(strings.TrimSpace(string(goRoot)), "src")
+	source := filepath.Join(go_root.GoRoot(test), "src")
 	loaded, loadError := Packages(source, []string{"net"},
 		[]string{"GOWORK=off", "GOOS=linux", "GOARCH=amd64", "CGO_ENABLED=0"}, nil)
 	if loadError != nil {

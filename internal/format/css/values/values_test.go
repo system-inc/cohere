@@ -45,7 +45,7 @@ func sourceColumn(test *testing.T, node *estree.Node, edge string) (int, bool) {
 	return 0, false
 }
 
-// TestParseShapes checks, without node, the fields the oracle found that are easiest to get wrong:
+// TestParseShapes checks, without node, the fields that are easiest to get wrong:
 // the shapes Prettier's printer and loc.js lean on, and upstream's quirks.
 func TestParseShapes(test *testing.T) {
 	test.Parallel()

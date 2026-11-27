@@ -8,30 +8,22 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 	tailwindcollapse "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
 	"github.com/system-inc/cohere/internal/lint/testing"
-	"github.com/system-inc/cohere/internal/testing/corpus"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
-// Build-once, asserted against the repository the tool actually lints rather than against a fixture.
+// Build-once, asserted with every rule this package registers asking at once, the arrangement the shipped run has.
 //
-// `TestDesignSystemIsBuiltOncePerProgram` in design_system_test.go already counts builds across a
-// real `program.Graph.Walk`, and that test is the one that fails fastest and runs everywhere. This
-// file is the second half of the same claim, and it exists because a 40-file temporary directory
-// cannot reach three things the shipped run does:
+// `TestDesignSystemIsBuiltOncePerProgram` in design_system_test.go counts builds across a real
+// `program.Graph.Walk` with a single probe rule. This file is the second half of the same claim, and it
+// exists because a single rule cannot reach what the shipped run does: every Tailwind rule calling
+// `DesignSystemForProgram` on every file, which is the arrangement where a per-rule cache rather than a
+// per-run one would still pass a single-rule test, on a tree big enough that the walk strides across
+// files on several workers for long enough that a racing second build has room to happen.
 //
-//   - **The real design system.** The fixture's stylesheet is six directives and a two-token
-//     stand-in for the framework. This repository's is a nine-file `@import` graph resolving 744
-//     theme entries and 37 `@utility` blocks. A rebuild that costs 78µs against the fixture costs
-//     0.68ms here, and a build path that is cheap enough to hide in the fixture's noise is not
-//     cheap enough to hide in this one.
-//   - **All nine rules asking at once.** The fixture walks a single probe rule. The shipped run has
-//     nine rules calling `DesignSystemForProgram` on every file, which is the arrangement where a
-//     per-rule cache rather than a per-run one would still pass a single-rule test. Nine rules over
-//     3,481 files is 31,329 calls to a function that must build exactly once.
-//   - **The full worker pool on a tree big enough to use it.** `Workers()` clamps to the file count,
-//     so the 40-file fixture is not obviously short but the real tree is unambiguously at the
-//     16-checker ceiling this machine allows, striding across files for long enough that a racing
-//     second build has room to happen.
+// It used to walk a consumer's checkout, 3,481 files over a nine-file `@import` graph. Cohere's tests no
+// longer read other repositories (#5wj23dd), so it walks the same fixture project as the probe test, laid
+// out with as many files as its naming allows; the build count is the property, and it doesn't depend on
+// the stylesheet's size.
 //
 // The counter is process-scoped, so what is asserted is a delta across the walk rather than an
 // absolute. That is deliberate: `go test` runs this package's tests in one process, and an absolute
@@ -65,15 +57,15 @@ func liveWalkRules(test testing.TB) []rule.Entry {
 	}
 }
 
-// liveWalkMeasuredBuildCost is what one build of this repository's design system costs.
+// liveWalkFileCount is how many components the fixture project lays down: designSystemProject names each by a letter
+// and a digit, so 260 is every name it has, and far more files than workers.
+const liveWalkFileCount = 260
+
+// liveWalkMeasuredBuildCost is what one build of a real repository's design system costs.
 //
-// Measured at 1.66ms mean over 30 cold builds against ~/Projects/ahra on 2026-08-25, covering the
-// design system and the descriptor table that rides the same cache entry. Higher than the 0.68ms
-// this component's file comment quotes, and the gap is the table: that figure was taken before the
-// table moved onto this path, so it now understates the waste by more than half.
-//
-// It appears only inside a failure message, so drift costs an inaccurate estimate rather than a
-// wrong verdict. The cached lookup that 3,480 of the 3,481 files pay instead measures 5ns.
+// Measured at 1.66ms mean over 30 cold builds of a consumer's nine-file stylesheet graph on 2026-08-25,
+// covering the design system and the descriptor table that rides the same cache entry. It appears only
+// inside a failure message, so drift costs an inaccurate estimate rather than a wrong verdict.
 const liveWalkMeasuredBuildCost = 1660 * time.Microsecond
 
 // TestDesignSystemIsBuiltOnceUnderTheRealWalk is the end-to-end form of the build-once claim.
@@ -81,17 +73,13 @@ const liveWalkMeasuredBuildCost = 1660 * time.Microsecond
 // The failure it guards has no symptom other than time. A sibling rule in this tree spent 2,329ms of
 // setup against 0.54ms of listening across 1,862 files because its scan was redone per file, while
 // its own comment said it happened once. Every finding stayed correct and every test stayed green.
-// So the claim is a counter read across a real walk of a real repository, which is the only form of
-// it that cannot decay into a sentence someone believes.
+// So the claim is a counter read across a real walk with every rule, which is the only form of it that
+// cannot decay into a sentence someone believes.
 // Not parallel: it resets the package designSystemCache and asserts the process-wide
 // tailwindcollapse.BuildsSoFar moved by exactly one across the walk, which any parallel test building a
 // design system or evicting the cache's one slot would inflate.
-//
-// The tree is ahra, the corpus the rest of the live suites in this package read. Without it the test
-// skips naming the variable, because what is under test is a property of the rules and not of the
-// machine.
 func TestDesignSystemIsBuiltOnceUnderTheRealWalk(test *testing.T) {
-	liveWalkRepository := corpus.Ahra.Root(test)
+	liveWalkRepository := designSystemProject(test, liveWalkFileCount)
 
 	resetDesignSystemCacheForTest()
 
@@ -104,10 +92,9 @@ func TestDesignSystemIsBuiltOnceUnderTheRealWalk(test *testing.T) {
 	}
 
 	files := graph.ProjectFiles()
-	if len(files) < 1000 {
-		test.Fatalf("the corpus repository yielded %d project files; this assertion is about a tree "+
-			"large enough to use the worker pool, and a number this small means the program was "+
-			"built over something other than the repository", len(files))
+	if len(files) < liveWalkFileCount {
+		test.Fatalf("the fixture project yielded %d project files of the %d laid down, so the walk covers less "+
+			"than it claims", len(files), liveWalkFileCount)
 	}
 
 	// The pool is asserted rather than assumed. A walk that silently ran single-threaded would pass
@@ -128,7 +115,7 @@ func TestDesignSystemIsBuiltOnceUnderTheRealWalk(test *testing.T) {
 		// The counterfactual is stated in the failure rather than left for the reader to compute,
 		// because the whole defect is that the number is invisible until someone multiplies it out.
 		test.Fatalf("the design system was built %d times across %d files by %d rules on %d workers; "+
-			"it must be built exactly once per run. At the measured %v per build on this "+
+			"it must be built exactly once per run. At the measured %v per build on a real "+
 			"repository, %d extra builds is roughly %v of pure waste, and nothing else would fail",
 			built, len(files), len(rules), graph.Workers(), liveWalkMeasuredBuildCost,
 			built-1, time.Duration(built-1)*liveWalkMeasuredBuildCost)

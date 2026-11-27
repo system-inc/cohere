@@ -1,13 +1,13 @@
 package printing
 
 type toyNode struct {
-	Kind                    string     `json:"type"`
-	From                    int        `json:"start"`
-	To                      int        `json:"end"`
-	Value                   string     `json:"value,omitempty"`
-	Label                   *toyNode   `json:"label,omitempty"`
-	Children                []*toyNode `json:"children,omitempty"`
-	CommentFields[*toyNode] `json:"-"`
+	Kind     string
+	From     int
+	To       int
+	Value    string
+	Label    *toyNode
+	Children []*toyNode
+	CommentFields[*toyNode]
 }
 
 func (node *toyNode) Type() string { return node.Kind }

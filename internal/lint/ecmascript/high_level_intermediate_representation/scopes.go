@@ -62,7 +62,7 @@
 // So the invariant holds on every class, and the 28 mixed classes are exactly what upstream's
 // `start === 0` branch exists to handle. `ValidateScopes` returns the violations rather than
 // panicking, because a linter that stops on a graph it dislikes is worse than one that declines a
-// function, and `TestScopeRangesSatisfyUpstreamsInvariant` pins the zero.
+// function.
 //
 // # The distribution that proves these scopes are real
 //
@@ -81,7 +81,7 @@
 // false collapses the width-1 singletons from 1,903 to 193 while the wide multi-member scopes hold
 // at 1,203 of 1,323. So allocation is what mints the narrow single-value scopes, and the entangled
 // wide ones come from the range and mutability gates instead. Two populations, two causes, neither
-// an artifact of the other. `TestScopeWidthAndMembershipAgree` pins the empty cell.
+// an artifact of the other.
 //
 // # Termination is a single pass with no iteration at all
 //
@@ -306,8 +306,8 @@ func AssignReactiveScopesWithSets(
 // condemns every scope at once -- reproduced rather than hoisted, because upstream's message names
 // a scope and a caller reporting per scope needs the same granularity.
 //
-// Measured over 400 corpus files: zero violations across 3,306 scopes in 685 functions. See
-// `TestScopeRangesSatisfyUpstreamsInvariant`, which pins that zero rather than leaving it here.
+// Measured over 400 files of real code: zero violations across 3,306 scopes in 685 functions.
+// `TestValidateScopesCatchesAnEmptyHull` builds an empty-hull violation by hand, since real code gave none.
 func ValidateScopes(function *Function, scopes *ReactiveScopes) []ScopeId {
 	if function == nil || scopes == nil {
 		return nil

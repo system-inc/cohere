@@ -5,9 +5,8 @@ package micromark
 //
 // The fork registers its own copy of this construct ahead of this one on `<` (html_text_override.go). The
 // copy accepts exactly the inputs this one does, so whenever this one is reached through the fork's
-// extension set the copy has already failed and this one fails too; it is still ported, and tested
-// against an oracle run without the override, because it is CommonMark's construct and the copy is
-// defined as a difference from it.
+// extension set the copy has already failed and this one fails too; it is still ported because it is
+// CommonMark's construct and the copy is defined as a difference from it.
 var htmlText = &Construct{Name: "htmlText", Tokenize: tokenizeHtmlText}
 
 // htmlTextMarkerUndefined is upstream's `marker = undefined`: a value no code ever equals. CodeEof is 0,
