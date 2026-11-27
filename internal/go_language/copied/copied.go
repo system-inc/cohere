@@ -17,8 +17,9 @@
 // is never empty: a copy says when it goes away.
 //
 // Every line of the file outside its marked changes is upstream's, which a test beside this file holds true
-// against the module cache, or a std copy against the toolchain's source, which the copy's own package also holds to
-// the sources of the release the copy names, so a toolchain that moves past them fails until the copy is bumped. A
+// against upstream's text recorded in testdata/upstream, each file with its digest, by tools/generate. A std copy's
+// own package also holds the toolchain to the sources of the release the copy names, so a toolchain that moves past
+// them fails until the copy is bumped. A
 // marked change is a run of lines that differ from upstream's and hold a comment with `cohere:` in it, the header
 // among them; lines dropped from upstream are marked by such a comment where they were.
 // A file we translated rather than copied is ours and declares nothing here.

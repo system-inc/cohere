@@ -1,13 +1,14 @@
 package project
 
 import (
-	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/git_tree"
+	"github.com/system-inc/cohere/internal/testing/written_repository"
 )
 
 // fixture is the package's one tree, built once and only read: a repository whose go.work uses its root
@@ -70,22 +71,6 @@ func buildFixture(base string) (fixture, error) {
 		outside:    filepath.Join(base, "outside"),
 		broken:     filepath.Join(base, "broken"),
 	}
-	library := filepath.Join(base, "library")
-	libraryFiles := map[string]string{
-		"mod/go.mod":     "module example.com/library/mod\n\ngo 1.21\n",
-		"mod/library.go": "package mod\n",
-	}
-	if writeError := writeFiles(library, libraryFiles); writeError != nil {
-		return fixture{}, writeError
-	}
-	for _, arguments := range [][]string{
-		{"init", "-q", "-b", "main"}, {"add", "."}, {"commit", "-q", "-m", "a module"},
-	} {
-		if gitError := runGit(library, arguments...); gitError != nil {
-			return fixture{}, gitError
-		}
-	}
-
 	repositoryFiles := map[string]string{
 		"go.work": "go 1.25\n\nuse (\n\t.\n\t./inner\n\t./library/mod\n)\n",
 		"go.mod": "module example.com/root\n\ngo 1.25\n\n" +
@@ -128,13 +113,29 @@ func buildFixture(base string) (fixture, error) {
 	if writeError := writeFiles(built.repository, repositoryFiles); writeError != nil {
 		return fixture{}, writeError
 	}
-	for _, arguments := range [][]string{
-		{"init", "-q", "-b", "main"},
-		{"-c", "protocol.file.allow=always", "submodule", "add", "-q", library, "library"},
-	} {
-		if gitError := runGit(built.repository, arguments...); gitError != nil {
-			return fixture{}, gitError
-		}
+	// The library submodule as `git submodule add` leaves it, written without git: its files, its `.git` a file
+	// pointing into the parent's git directory, which holds its repository with both files tracked, and the parent's
+	// index tracking .gitmodules and the library's gitlink, pinned at a commit no repository holds.
+	libraryFiles := map[string]string{
+		"library/mod/go.mod":     "module example.com/library/mod\n\ngo 1.21\n",
+		"library/mod/library.go": "package mod\n",
+		"library/.git":           "gitdir: ../.git/modules/library\n",
+		".gitmodules":            "[submodule \"library\"]\n\tpath = library\n\turl = ../library\n",
+	}
+	if writeError := writeFiles(built.repository, libraryFiles); writeError != nil {
+		return fixture{}, writeError
+	}
+	libraryGitDirectory := filepath.Join(built.repository, ".git", "modules", "library")
+	libraryWorktree := filepath.Join(built.repository, "library")
+	writeError := written_repository.WriteGitDirectory(libraryGitDirectory, libraryWorktree,
+		trackedFile("mod/go.mod"), trackedFile("mod/library.go"))
+	if writeError != nil {
+		return fixture{}, writeError
+	}
+	writeError = written_repository.Write(built.repository,
+		trackedFile(".gitmodules"), gitlink("library", strings.Repeat("1", 40)))
+	if writeError != nil {
+		return fixture{}, writeError
 	}
 
 	loneFiles := map[string]string{"go.mod": "module example.com/lone\n\ngo 1.21\n", "lone.go": "package lone\n"}
@@ -173,16 +174,14 @@ func writeFiles(directory string, files map[string]string) error {
 	return nil
 }
 
-// runGit runs git with no configuration of the machine's, so the fixture is the same on every one.
-func runGit(directory string, arguments ...string) error {
-	command := exec.Command("git", arguments...)
-	command.Dir = directory
-	command.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_NOSYSTEM=1",
-		"GIT_AUTHOR_NAME=test", "GIT_AUTHOR_EMAIL=test@example.com",
-		"GIT_COMMITTER_NAME=test", "GIT_COMMITTER_EMAIL=test@example.com")
-	output, runError := command.CombinedOutput()
-	if runError != nil {
-		return fmt.Errorf("running git %s in %s: %w\n%s", strings.Join(arguments, " "), directory, runError, output)
-	}
-	return nil
+// trackedFile is path tracked as `git add` records it, its mode and blob read from the file
+// (written_repository.WriteGitDirectory).
+func trackedFile(path string) git_tree.IndexEntry {
+	return git_tree.IndexEntry{Entry: git_tree.Entry{Path: path}}
+}
+
+// gitlink is path tracked as a submodule pinned at commit, as `git update-index --cacheinfo` records one: the
+// commit need be in no repository, as GitlinksOf reads the index alone.
+func gitlink(path string, commit string) git_tree.IndexEntry {
+	return git_tree.IndexEntry{Entry: git_tree.Entry{Mode: git_tree.ModeGitlink, Object: commit, Path: path}}
 }

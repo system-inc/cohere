@@ -11,8 +11,7 @@ import (
 // its properties on the heap, two allocations per node, 9.1M of formatting's allocations on ahra.
 //
 // A nil *Arena allocates on the heap, as New does. Under the cohere_poison build tag a released node reads
-// as poisonedNodeType, so a node read after its file was printed changes the output where the corpus tests
-// see it.
+// as poisonedNodeType, so a node read after its file was printed changes the output where a test sees it.
 type Arena struct {
 	nodes      arena.Arena[Node]
 	properties arena.Slab[property]
