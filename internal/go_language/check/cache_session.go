@@ -267,11 +267,13 @@ type CacheSession struct {
 	// keepsForBuilds is set on the host's session of a run with extra builds (KeepForBuilds), whose every Restore keys
 	// the load, a store or none, into keptKeys, for the portable digests and the reads' owners of the entries it keeps
 	// for them (keepForBuilds). written are the misses whose entry this run wrote to the store, which it reads back
-	// rather than encode again, and buildKeys the keys a run without a store names an entry's reads' owners by
-	// (readsOf).
+	// rather than encode again, held those a session reading its store cold did not write, since the store held their
+	// key already (ReadColdWhen), which the keep reads back from there as it reads a written one, and nothing else
+	// counts, and buildKeys the keys a run without a store names an entry's reads' owners by (readsOf).
 	keepsForBuilds bool
 	keptKeys       *cache.Keyed
 	written        map[*packages.Package]bool
+	held           map[*packages.Package]bool
 	buildKeys      map[*packages.Package]cache.Key
 
 	// keeping is the time the host's run spent keeping its packages for the extra builds over every load: the keys a
@@ -409,6 +411,7 @@ func (session *CacheSession) Restore(
 	session.closures = map[*packages.Package]closureDigest{}
 	session.attempted = map[*packages.Package]bool{}
 	session.written = map[*packages.Package]bool{}
+	session.held = map[*packages.Package]bool{}
 	session.buildKeys = nil
 	session.standardLibraryKeys = nil
 	session.standardLibraryByPath = nil
@@ -428,12 +431,13 @@ func (session *CacheSession) Restore(
 	// The counts are of the run over this load, the one whose result stands, which is the last: a load again to check
 	// a package from source to answer a question drops the pass before it (see Reload), and its packages that pass
 	// saved are this one's hits. The problems stay, since every one of them was met.
-	session.counts = CacheCounts{On: session.counts.On, Problems: session.counts.Problems,
-		HostReadCold: session.readCold}
+	session.counts = CacheCounts{On: session.counts.On, Problems: session.counts.Problems}
 	session.factsSkipped.Store(0)
 	if session.known == nil {
 		return nil
 	}
+	// Only a session that reads at all says it read cold: one without analyzers sat the cache out.
+	session.counts.HostReadCold = session.readCold
 	// The digests of every file the run has hashed, which the standard library's keys read rather than hash again, so
 	// each standard-library file is hashed once a run (#b9f3bg4): this load's keys' when it keys one, the host's in an
 	// extra build that keys none, and none in a run with neither, which keys only the standard library.
@@ -1048,7 +1052,11 @@ func (session *CacheSession) saveMisses(
 		return func() {
 			// A session reading its store cold writes no entry the store holds already, under the same key, so a warm
 			// store it read nothing of stays exactly as it was, and a cold one is filled as any run fills it
-			// (ReadColdWhen). Its keep holds what it did not write from memory (keepForBuilds).
+			// (ReadColdWhen). Its keep reads what it did not write back from the store, as it reads one it wrote
+			// (keepForBuilds). Holds is true for any file under the key, damaged, short of slots or answers, or a
+			// facts-only entry written when the package was only a dependency, so the cold host keeps the stored one
+			// over its own better entry: a build then restores less from it, the keep's read failing closed, and a
+			// later warm run, missing or reloading the package, writes it whole and heals the store.
 			heldAlready := encodeError == nil && session.readsColdFrom(store) && store.Holds(session.keys[saved])
 			var putError error
 			if encodeError == nil && store != nil && !heldAlready {
@@ -1087,6 +1095,7 @@ func (session *CacheSession) saveMisses(
 				// package without a store is saved; nothing keeps it.
 			case heldAlready:
 				// Not written, since the store holds its key: neither a write nor a failure, and a miss all the same.
+				session.held[saved] = true
 			case putError != nil && toSystemCache:
 				session.systemCacheFailed(putError)
 			case putError != nil:

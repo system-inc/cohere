@@ -1099,10 +1099,11 @@ host's build keeps no pack, and a run with no extra build writes no `"packs"`.
 `"hostReadCold":"buildPacksMissing"`, additive within contract 3 and cohere-go's alone, says the host's build read its
 findings store cold (#s8e6z0n). A host whose store holds every package restores nearly all of them, so it keeps for
 the extra builds only what it checks from source, and a build whose own store holds nothing then checks every package
-itself, one build at a time. So when the run checks at least one extra build, each restoring from the host's run,
-and every extra build's pack of the findings store is missing, which a stat of each tells before the host's first
-restore, the host looks up nothing in its store, by first key or second, checks every package from source and keeps
-each for the builds, which restore from it as on a cold run. It writes no entry the store holds already, so a warm
+itself, one build at a time. So when the run's lint phase checks at least one extra build, each restoring from the
+host's run, and every extra build's pack of the findings store is missing, under either loader, and so is its alias
+table, which the first pack write of another child never removes, all of which a stat of each tells before the host's
+first restore, the host looks up nothing in its store, by first key or second, checks every package from source and
+keeps each for the builds, which restore from it as on a cold run. It writes no entry the store holds already, so a warm
 store stays exactly as it was, and a store new to the child is filled as on any cold run. The system cache is read and
 written as always, and so is each build's own store. `"hit"` is then 0 and `"missed"` every package the host
 reached outside the system cache; the field is absent when the host read its store as always.

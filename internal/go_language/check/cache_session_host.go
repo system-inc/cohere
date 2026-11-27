@@ -1231,13 +1231,13 @@ func (session *CacheSession) hostCounts() HostRestoreCounts {
 
 // keepForBuilds is what the host's run keeps of each package it analyzed from source, among analyzed and what they
 // reach, whose reads can hold, for its extra builds to restore from (#b2t9xmf): the package's entry, read back from the
-// store the run wrote it to, the system cache's for a standard-library package (storeFor), or else encoded here, as
-// saveMisses encodes it, and held in memory: every package under `--no-cache`, which never stores, and each one a
-// session reading its store cold did not write, since the store held it already (ReadColdWhen). A package the run
-// restored, from either store, is not kept: each build reads its own. Each package's portable digest is the one Restore
-// keyed it by, before the load gave anything its syntax (KeepForBuilds). Only a run with extra builds asks it, so a run
-// without pays nothing. gathered gives the findings the run's gather made of each root action, which an encoded entry
-// holds rather than convert them again (see encodeEntry).
+// store the run wrote it to, the system cache's for a standard-library package (storeFor), or from the project's store
+// that held it already for a session reading that store cold, which did not write it again (ReadColdWhen), so the keep
+// is a cold run's; or else, under `--no-cache`, which never stores, encoded here, as saveMisses encodes it, and held in
+// memory. A package the run restored, from either store, is not kept: each build reads its own. Each package's portable
+// digest is the one Restore keyed it by, before the load gave anything its syntax (KeepForBuilds). Only a run with
+// extra builds asks it, so a run without pays nothing. gathered gives the findings the run's gather made of each root
+// action, which an encoded entry holds rather than convert them again (see encodeEntry).
 func (session *CacheSession) keepForBuilds(
 	graphs []*checker.Graph,
 	analyzed []*packages.Package,
@@ -1298,7 +1298,11 @@ func (session *CacheSession) keepForBuilds(
 		}
 		kept := &hostEntry{restoring: restoringOf(keptPackage, packageReads), portable: keyed.Portable[keptPackage],
 			types: keptPackage.Types}
-		if session.written[keptPackage] {
+		// One a cold read held already is read back as one written: the record the store holds under its key is the
+		// one this run would have written but for its answers, and the builds name its body, as on a cold run. A
+		// stored entry that is damaged or not whole fails its read below, and one short of the slots a build expects
+		// is refused by that build's write through (throughEntry), so either is a package the build checks itself.
+		if session.written[keptPackage] || session.held[keptPackage] {
 			key := session.keys[keptPackage]
 			// The record the run wrote of it holds its body, which a build writing the package through names, in the
 			// store the run wrote it to, the system cache's for a standard-library package (storeFor).
@@ -1322,11 +1326,8 @@ func (session *CacheSession) keepForBuilds(
 			continue
 		}
 		unsure := session.resolver != nil && keptPackage.Types != nil && session.resolver.Unsure(keptPackage.Types)
-		// A session reading its store cold wrote no package the store held already (saveMisses), so each it did not
-		// write is kept from memory, as a run without a store keeps every one.
-		if (session.caching.Store == nil || session.readsColdFrom(session.caching.Store)) &&
-			len(keptPackage.Errors) == 0 && !keptPackage.IllTyped && len(actionsOf[keptPackage]) > 0 &&
-			finishedClean(actionsOf[keptPackage]) && !unsure {
+		if session.caching.Store == nil && len(keptPackage.Errors) == 0 && !keptPackage.IllTyped &&
+			len(actionsOf[keptPackage]) > 0 && finishedClean(actionsOf[keptPackage]) && !unsure {
 			encoding = append(encoding, keptPackage)
 			host.entries[keptPackage.ID] = kept
 		}

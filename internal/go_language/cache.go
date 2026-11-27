@@ -58,7 +58,8 @@ var errorOverlaid = errors.New("the go flags name an overlay (-overlay), whose f
 // is nil only for a host whose census judged no file, which asked go env nothing; then it is read here, recorded in
 // children, the run's account of the go commands it starts (see load.Children). The project's store holds stamps, the
 // run's shard stamps, as the system cache's does, so a write by any session of the run marks the shard it changes moved
-// for every build's pack (cache.Open).
+// for every build's pack (cache.Open). identify is cohere-go's identity (pipeline.executableIdentity), asked only of a
+// run that keeps a cache.
 func lintCache(
 	request invocation,
 	workspace project.Workspace,
@@ -68,6 +69,7 @@ func lintCache(
 	children *load.Children,
 	system *systemCache,
 	stamps *cache.ShardStamps,
+	identify func() (string, error),
 ) (*check.Caching, error) {
 	source := request.standardLibrary
 	noCache := request.switches["no-cache"]
@@ -92,7 +94,7 @@ func lintCache(
 	if noCache && !keepsSystem {
 		return nil, nil
 	}
-	identity, identityError := cache.ExecutableIdentity()
+	identity, identityError := identify()
 	if identityError != nil {
 		return nil, fmt.Errorf("identifying cohere-go: %w", identityError)
 	}

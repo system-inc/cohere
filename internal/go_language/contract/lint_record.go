@@ -478,8 +478,9 @@ type LintCache struct {
 type HostReadColdReason string
 
 // HostReadColdBuildPacksMissing is the run checking at least one extra build, each restoring from the host's run,
-// whose every pack of the findings store was missing: a build with none reads nothing of its own store, so it restores
-// from what the host keeps, and a host that restores from its store keeps nearly nothing (#s8e6z0n).
+// whose every pack of the findings store was missing, and every alias table too, which another executable's sweep of
+// the packs never removes: a build with none reads nothing of its own store, so it restores from what the host keeps,
+// and a host that restores from its store keeps nearly nothing (#s8e6z0n).
 const HostReadColdBuildPacksMissing HostReadColdReason = "buildPacksMissing"
 
 // BuildPacks counts what extra builds did with their packs (#b2t9xmf): each build keeps one pack of each store it reads
