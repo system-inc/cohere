@@ -4,6 +4,7 @@ package release
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"slices"
@@ -76,6 +77,54 @@ func TestALaidSwiftSetIsCopiedOnlyIntoAScratchWithNoCheckouts(test *testing.T) {
 	}
 }
 
+// A sandbox that refuses clonefile, as an integrate job's on Shackler does (J-pjh3d4h), still gets the set: the clone
+// fails, whatever it left is cleared, and a plain copy lays the same files. The set is read-only, as Machines lays it,
+// and every copied file and directory ends writable by its owner either way, since SwiftPM writes into its scratch.
+// The cp first on PATH here refuses `-cR` in the words Shackler's sandbox used, after leaving a partial file, and
+// hands every other copy to the real cp.
+//
+// Not parallel: it puts a refusing cp first on PATH and names the set, with test.Setenv.
+func TestALaidSwiftSetIsCopiedWhereCloningIsRefused(test *testing.T) {
+	set := layResolvedSet(test)
+	readOnly := func(mode string) {
+		test.Helper()
+		if output, modeError := exec.Command("chmod", "-R", mode, set).CombinedOutput(); modeError != nil {
+			test.Fatalf("chmod -R %s %s: %v: %s", mode, set, modeError, output)
+		}
+	}
+	readOnly("a-w")
+	// The set's files go writable again before test.TempDir removes them.
+	test.Cleanup(func() { readOnly("u+w") })
+	bin := test.TempDir()
+	refusing := "#!/bin/sh\nif [ \"$1\" = -cR ]; then\n  for last; do :; done\n  : > \"$last/partial-clone\"\n" +
+		"  echo 'cp: clonefile failed: Operation not permitted' >&2\n  exit 1\nfi\nexec /bin/cp \"$@\"\n"
+	writeError := executable_testing.WriteFile(filepath.Join(bin, "cp"), []byte(refusing), 0o755)
+	if writeError != nil {
+		test.Fatal(writeError)
+	}
+	test.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	test.Setenv(SwiftResolvedVariable, set)
+	scratch := test.TempDir()
+	flags, copyError := SwiftResolvedArguments(scratch)
+	if copyError != nil || !slices.Equal(flags, []string{"--disable-sandbox", "--skip-update"}) {
+		test.Fatalf("a refused clone gave %q (%v), want the two flags from a plain copy", flags, copyError)
+	}
+	if _, statError := os.Stat(filepath.Join(scratch, "partial-clone")); statError == nil {
+		test.Error("what the refused clone left stayed in the scratch")
+	}
+	for _, name := range []string{"checkouts", filepath.Join("checkouts", "swift-syntax"),
+		filepath.Join("checkouts", "swift-syntax", "Package.swift"), "workspace-state.json"} {
+		information, statError := os.Stat(filepath.Join(scratch, name))
+		if statError != nil {
+			test.Errorf("the set's %s wasn't copied: %v", name, statError)
+			continue
+		}
+		if information.Mode().Perm()&0o200 == 0 {
+			test.Errorf("the copied %s is %v, not writable by its owner", name, information.Mode().Perm())
+		}
+	}
+}
+
 // A set that can't be laid is refused in words, never built around: one named by no whole path, and one whose scratch
 // cp can't copy, which says cp's own words.
 //
@@ -90,7 +139,7 @@ func TestALaidSwiftSetThatCantBeCopiedIsRefused(test *testing.T) {
 	test.Setenv(SwiftResolvedVariable, empty)
 	if _, copyError := SwiftResolvedArguments(test.TempDir()); copyError == nil ||
 		!strings.Contains(copyError.Error(), "copying the laid resolved set "+filepath.Join(empty, "scratch")) ||
-		!strings.Contains(copyError.Error(), "(cp -cR)") {
+		!strings.Contains(copyError.Error(), "cp -cR failed (") || !strings.Contains(copyError.Error(), "and cp -R: ") {
 		test.Errorf("a set with no scratch wasn't refused naming its copy: %v", copyError)
 	}
 }

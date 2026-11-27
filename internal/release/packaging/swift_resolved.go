@@ -32,8 +32,12 @@ var swiftResolvedFlags = []string{"--disable-sandbox", "--skip-update"}
 //
 // The set's scratch is copied in when scratchDirectory holds no `checkouts` yet, since SwiftPM writes into its scratch
 // and the set is read-only. One that holds them is left alone: its checkouts are an earlier build's, which SwiftPM
-// keeps. The copy is `cp -cR`, APFS clones, so the set's 280 MB copies in moments; a copy that fails is refused in its
-// own words, never built around, since SwiftPM would then reach for the network it doesn't have.
+// keeps. The copy is `cp -cR`, APFS clones, so the set's 280 MB copies in moments. A sandbox that refuses clonefile,
+// as an integrate job's on Shackler does ("clonefile failed: Operation not permitted", J-pjh3d4h), gets a plain `cp -R`
+// into a scratch emptied of the clone's partial copy, the same files at the cost of their bytes (swiftResolvedCopy).
+// Either way the copy is made writable by its owner, since the set is read-only and SwiftPM writes into its scratch. A
+// copy that fails both ways is refused in its own words, never built around, since SwiftPM would then reach for the
+// network it doesn't have.
 func SwiftResolvedArguments(scratchDirectory string) ([]string, error) {
 	set := strings.TrimSpace(os.Getenv(SwiftResolvedVariable))
 	if set == "" {
@@ -53,12 +57,39 @@ func SwiftResolvedArguments(scratchDirectory string) ([]string, error) {
 	if makeError := os.MkdirAll(scratchDirectory, 0o755); makeError != nil {
 		return nil, fmt.Errorf("making SwiftPM's scratch %s: %w", scratchDirectory, makeError)
 	}
-	// The source's trailing slash copies the scratch's contents into scratchDirectory, which now exists, rather than
-	// a directory named scratch inside it.
-	source := filepath.Join(set, "scratch") + string(filepath.Separator)
-	if output, copyError := exec.Command("cp", "-cR", source, scratchDirectory).CombinedOutput(); copyError != nil {
-		return nil, fmt.Errorf("copying the laid resolved set %s into SwiftPM's scratch %s (cp -cR): %w: %s", source,
-			scratchDirectory, copyError, strings.TrimSpace(string(output)))
+	if copyError := swiftResolvedCopy(filepath.Join(set, "scratch"), scratchDirectory); copyError != nil {
+		return nil, copyError
 	}
 	return slices.Clone(swiftResolvedFlags), nil
+}
+
+// swiftResolvedCopy copies scratch, a laid set's read-only SwiftPM scratch, into scratchDirectory, which exists and
+// holds no checkouts: by APFS clones first, then, when cloning is refused, by a plain copy into a scratchDirectory
+// emptied of whatever the clone left, and at the end makes every copied file and directory writable by its owner.
+func swiftResolvedCopy(scratch string, scratchDirectory string) error {
+	// The source's trailing slash copies the scratch's contents into scratchDirectory rather than a directory named
+	// scratch inside it.
+	source := scratch + string(filepath.Separator)
+	cloned, cloneError := exec.Command("cp", "-cR", source, scratchDirectory).CombinedOutput()
+	if cloneError != nil {
+		entries, readError := os.ReadDir(scratchDirectory)
+		if readError != nil {
+			return fmt.Errorf("reading SwiftPM's scratch %s after its clone failed: %w", scratchDirectory, readError)
+		}
+		for _, entry := range entries {
+			if removeError := os.RemoveAll(filepath.Join(scratchDirectory, entry.Name())); removeError != nil {
+				return fmt.Errorf("emptying SwiftPM's scratch %s of a failed clone: %w", scratchDirectory, removeError)
+			}
+		}
+		if copied, copyError := exec.Command("cp", "-R", source, scratchDirectory).CombinedOutput(); copyError != nil {
+			return fmt.Errorf("copying the laid resolved set %s into SwiftPM's scratch %s: cp -cR failed (%s), and "+
+				"cp -R: %w: %s", source, scratchDirectory, strings.TrimSpace(string(cloned)), copyError,
+				strings.TrimSpace(string(copied)))
+		}
+	}
+	if output, modeError := exec.Command("chmod", "-R", "u+w", scratchDirectory).CombinedOutput(); modeError != nil {
+		return fmt.Errorf("making SwiftPM's scratch %s writable: %w: %s", scratchDirectory, modeError,
+			strings.TrimSpace(string(output)))
+	}
+	return nil
 }
