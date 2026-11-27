@@ -37,7 +37,9 @@ import (
 //   - The comparison is honest: a number is "moved" only when its new minimum to maximum range doesn't overlap the
 //     old one, and "level" otherwise; another machine, another build or another shape of measurement is a line of its
 //     own, never a comparison.
-//   - The file records that the box was held quiet, and her load before and after.
+//   - The file records that the box was held quiet, and her load before and after. Held is not quiet: a measurement
+//     whose one-minute load before or after passes a quarter of her cores (performanceBusy) records nothing, main's
+//     file stays, and the landing says her load and that a later landing measures (#6ex523f).
 //   - A test-only landing measures too, and Go is the only language measured.
 //
 // A tree with no command/cohere, every land test's fixture, has no cohere to time, and lands saying so. cohere's own
@@ -520,12 +522,20 @@ func landMeasurement(
 			return refused(problem)
 		}
 		if same {
-			return keepMainsPerformance(worktree, gating, tree, mainCommit, taken)
+			return keepMainsPerformance(worktree, tree, mainCommit, fmt.Sprintf(
+				"Not measured: %s built %s in %s, the same binary as main's (sha256 %s), so not measured, and main's "+
+					"%s stays.", performanceBox, shortCommit(gating), time.Since(taken.started).Round(time.Second),
+				taken.mainBinary[:min(12, len(taken.mainBinary))], performanceFileName))
 		}
 	}
 	measurement, problem := readPerformance(taken.output, gating, taken.runError)
 	if problem != "" {
 		return refused(problem)
+	}
+	if busy := performanceBusy(measurement); busy != "" {
+		return keepMainsPerformance(worktree, tree, mainCommit, fmt.Sprintf(
+			"Not measured: %s wasn't quiet, %s, so %s's numbers are recorded nowhere, main's %s stays, and a later "+
+				"landing measures.", performanceBox, busy, shortCommit(gating), performanceFileName))
 	}
 	fmt.Fprintf(streams.Errors, "cohere-dev: %s measured %s in %s: %s\n", performanceBox, shortCommit(gating),
 		time.Since(taken.started).Round(time.Second), strings.Join(measurement.phases, ", "))
@@ -578,15 +588,40 @@ func sameBinaryAsMain(output []byte, commit string, mainBinary string, runError 
 	return true, ""
 }
 
-// keepMainsPerformance is the landing's tree when gating builds main's binary: tree with main's performance file at
-// mainCommit, byte for byte, since its numbers are of this very program, and the sentence the landing says of it.
-func keepMainsPerformance(
-	worktree string,
-	gating string,
-	tree string,
-	mainCommit string,
-	taken performanceTaken,
-) (string, string, int) {
+// performanceQuietShare is the share of a box's cores her one-minute load may reach, before and after the measurement,
+// and the box still read as quiet: a quarter. Held means only that the box was claimed for the measurement, never that
+// she was quiet: on Nov 26 Shackler measured main's record at a one-minute load of 12.6 and J-ge4cc9w's at 8.8 (17
+// over fifteen minutes), both held, and J-ge4cc9w's cold deeafbf4 read 3280 ms against the record's 2050.
+const performanceQuietShare = 0.25
+
+// performanceBusy is why measurement's box wasn't quiet, empty when she was: her one-minute load before or after over
+// performanceQuietShare of her cores. A loaded box's numbers are its load's as much as cohere's, so they are recorded
+// nowhere, never as main's (system_cohere's ruling, #6ex523f).
+func performanceBusy(measurement performanceMeasurement) string {
+	bound := performanceQuietShare * float64(measurement.cores)
+	before, after := measurement.loadBefore[0], measurement.loadAfter[0]
+	if before <= bound && after <= bound {
+		return ""
+	}
+	return fmt.Sprintf("her one-minute load %.2f before and %.2f after on %d cores, where a quiet box stays at or "+
+		"under %.2f", before, after, measurement.cores, bound)
+}
+
+// keepMainsPerformance is the landing's tree when gating measured nothing it records, because it builds main's binary
+// or its box wasn't quiet: tree with main's performance file at mainCommit, byte for byte, and said, the sentence the
+// landing says of it.
+func keepMainsPerformance(worktree string, tree string, mainCommit string, said string) (string, string, int) {
+	// A main with no file yet has none to keep, so the tree lands as it is, still with no file.
+	mode, treeModeError := treeMode(worktree, mainCommit, performanceFileName)
+	if treeModeError != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: reading whether main holds %s: %v\n", performanceFileName,
+			treeModeError)
+		return "", "", 1
+	}
+	if mode == "" {
+		fmt.Fprintf(streams.Errors, "cohere-dev: %s\n", said)
+		return tree, said, 0
+	}
 	reading := exec.Command("git", "cat-file", "blob", mainCommit+":"+performanceFileName)
 	reading.Dir = worktree
 	var readingErrors bytes.Buffer
@@ -603,9 +638,6 @@ func keepMainsPerformance(
 			spliceError)
 		return "", "", 1
 	}
-	said := fmt.Sprintf("Not measured: %s built %s in %s, the same binary as main's (sha256 %s), so not measured, "+
-		"and main's %s stays.", performanceBox, shortCommit(gating), time.Since(taken.started).Round(time.Second),
-		taken.mainBinary[:min(12, len(taken.mainBinary))], performanceFileName)
 	fmt.Fprintf(streams.Errors, "cohere-dev: %s\n", said)
 	return kept, said, 0
 }
