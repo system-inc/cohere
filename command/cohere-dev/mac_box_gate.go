@@ -59,21 +59,32 @@ const (
 // for 3 minutes, before the box refuses. A test replaces the line to point the script at mirrors of its own.
 const macBoxMirrorLine = "mirrors=" + macBoxMirrors + "; tries=10; pause=20"
 
-// macBoxLandCacheLine is macBoxScript's and landGateScript's line setting landCache, sharedBoxGate's kept Go cache
-// (sharedBoxCacheBlock), to none: set in the script itself, so no variable in a shared box's environment can keep a
-// cache there. The land job on Shackler alone replaces it with its own setting (land_job_run.go).
-const macBoxLandCacheLine = `landCache=""`
+// macBoxIntegrateCacheLine is macBoxScript's and landGateScript's line setting integrateCache, sharedBoxGate's kept Go
+// cache (sharedBoxCacheBlock), to none: set in the script itself, so no variable in a shared box's environment can keep
+// a cache there. The integrate job on Shackler alone replaces it with its own setting (integrate_job_run.go).
+const macBoxIntegrateCacheLine = `integrateCache=""`
 
-// macBoxTemporaryBlock makes gatetemp, the tests' temporary directory under /tmp: a new one each run on a gate box, and
-// on Shackler, with landCache set, one path every land job, made empty first. go test's cache keys a test on the
-// `TMPDIR` it read, which t.TempDir reads, so a directory named anew each job would miss every package that makes one.
-// The land job is serial (land_job_run.go), so no two runs share the path.
-const macBoxTemporaryBlock = `if [ -n "$landCache" ]; then
-  gatetemp="/tmp/cohere-land-gate.$(id -u)"
+// integrateJobLine is the line of macBoxScript, landGateScript and performanceScript saying the script runs in no
+// integrate job: set in the script itself, so no variable in an account's environment can make it one. The integrate
+// job alone replaces it with integrateJobSetting (integrate_job_run.go), which is what lets each script read the module
+// set Loom laid for the job, with a kept cache or without one (sharedBoxGate, land_performance.go).
+const (
+	integrateJobLine    = `integrateJob=""`
+	integrateJobSetting = `integrateJob=1`
+)
+
+// macBoxTemporaryBlock makes gatetemp, the tests' temporary directory: a new one each run on a gate box, under the
+// account's `TMPDIR`, and with integrateCache set, one path every integrate job, inside the kept cache, made empty
+// first. go test's cache keys a test on the `TMPDIR` it read, which t.TempDir reads, so a directory named anew each job
+// would miss every package that makes one. Never a fixed /tmp: an integrate job in Shackler's sandbox may write its own
+// tmp and its kept cache, and /tmp refused it (J-7dhfcty). The integrate job is serial (integrate_job_run.go), so no
+// two runs share the path.
+const macBoxTemporaryBlock = `if [ -n "$integrateCache" ]; then
+  gatetemp="$integrateCache/temporary"
   { chmod -R u+w "$gatetemp" 2>/dev/null || true; rm -rf "$gatetemp"; } || refuse "$gatetemp couldn't be emptied"
-  mkdir -m 700 "$gatetemp" || refuse "$gatetemp couldn't be made"
+  mkdir -p "$integrateCache" && mkdir -m 700 "$gatetemp" || refuse "$gatetemp couldn't be made"
 else
-  gatetemp=$(mktemp -d /tmp/cohere-gate.XXXXXX)
+  gatetemp=$(mktemp -d "${TMPDIR:-/tmp}/cohere-gate.XXXXXX") || refuse "no temporary directory could be made"
 fi
 `
 
@@ -114,11 +125,13 @@ held() {
 // mirror to hold the commit, refusing once it has waited 3 minutes, fetches the commit and the pin, checks them out,
 // and runs sharedBoxGate against the Mac's pinned toolchain and node. It reads the mirrors through macBoxMirrorReads,
 // and removes the configuration file naming them safe before any test runs. On a gate box it keeps no Go cache
-// (macBoxLandCacheLine); the land job runs it on Shackler with its mirrors and its cache.
+// (macBoxIntegrateCacheLine) and is no integrate job (integrateJobLine); the integrate job runs it on Shackler with its
+// mirrors, its cache when one is kept, and its own setting.
 const macBoxScript = `set -euo pipefail
 commit="$1"; pin="$2"; races="$3"; shift 3
 ` + macBoxMirrorLine + `
-` + macBoxLandCacheLine + `
+` + macBoxIntegrateCacheLine + `
+` + integrateJobLine + `
 base=` + macBoxScratch + `
 mkdir -p "$base"; cd "$base"
 refuse() { echo "` + sharedBoxRefusedMarker + `$*"; exit 1; }
@@ -139,8 +152,8 @@ if [ -n "$pin" ]; then
   git -C tree/TypeScript checkout -q --detach --force "$pin"
 fi
 rm -f "$safe"; trap - EXIT
-# The tests' temporary directory is reached through a link, /tmp to /private/tmp, as a developer's Mac reaches its own
-# through /var, so a test of what such a path does runs here too; the gap's own is reached through none (#5r0vrte).
+# The tests' temporary directory, made anew under the account's TMPDIR, or one path inside the integrate job's kept
+# cache, and never under a fixed /tmp, which an integrate job in Shackler's sandbox may not write (J-7dhfcty).
 ` + macBoxTemporaryBlock + `trap 'chmod -R u+w "$gatetemp" 2>/dev/null; rm -rf "$gatetemp"' EXIT
 export TMPDIR="$gatetemp"
 cd tree

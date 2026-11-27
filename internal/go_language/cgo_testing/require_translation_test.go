@@ -10,7 +10,9 @@ import (
 )
 
 // fakeGo is a go that says CGO_ENABLED is FAKE_CGO and answers go list as FAKE_LIST says: "compiles", "refuses"
-// as Loom's stand-in does, word for word in what the probe reads, or "breaks" as a broken toolchain would.
+// as Loom's stand-in does, or "breaks" as a broken toolchain would. Its refusal is in our own words around the two
+// markers translationUnavailable matches, `loom-runner:` and `never builds`, which are all of the runner's message
+// the probe relies on.
 const fakeGo = `#!/bin/sh
 case "$1" in
 env) echo "$FAKE_CGO" ;;
@@ -18,7 +20,7 @@ list)
 	case "$FAKE_LIST" in
 	compiles) echo '{"ImportPath":"unsafe"}' ;;
 	refuses)
-		echo "loom-runner: go $*: this runner runs Workshop's prebuilt tests and never builds; a test that needs a build is Loom's to fix, never the change's" >&2
+		echo "loom-runner: go $*: refused, since this stand-in never builds" >&2
 		exit 1 ;;
 	*) echo "go: cannot find GOROOT directory" >&2; exit 2 ;;
 	esac ;;

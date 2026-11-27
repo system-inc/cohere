@@ -10,7 +10,6 @@ import (
 	goformat "go/format"
 	"io/fs"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -22,6 +21,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/printf"
 
+	"github.com/system-inc/cohere/internal/git_tree"
 	"github.com/system-inc/cohere/internal/go_language/cgo_testing"
 	"github.com/system-inc/cohere/internal/go_language/contract"
 	"github.com/system-inc/cohere/internal/go_language/rule"
@@ -66,6 +66,8 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/rules/security_no_interpolated_shell_command"
 	"github.com/system-inc/cohere/internal/go_language/rules/security_no_interpolated_sql_string"
 	"github.com/system-inc/cohere/internal/go_language/settings"
+	"github.com/system-inc/cohere/internal/testing/go_root"
+	"github.com/system-inc/cohere/internal/testing/written_repository"
 )
 
 var update = flag.Bool("update", false, "rewrite each case's expected.jsonl and expected.stderr from cohere-go")
@@ -988,14 +990,14 @@ var (
 	}
 )
 
-// toolchainRoot is the `GOROOT` go env names for this process, asked once, or "" when go env can't say, in which
-// case no path is normalized for it and a stream naming the toolchain's files compares unnormalized.
+// toolchainRoot is the toolchain's `GOROOT`, found once in this process, or "" when it can't be found, in which case
+// no path is normalized for it and a stream naming the toolchain's files compares unnormalized.
 var toolchainRoot = sync.OnceValue(func() string {
-	output, runError := exec.Command("go", "env", "GOROOT").Output()
-	if runError != nil {
+	root, findError := go_root.Find()
+	if findError != nil {
 		return ""
 	}
-	return strings.TrimSpace(string(output))
+	return root
 })
 
 // normalize makes a stream comparable across runs: the copy's root reads /project, every elapsed time 0, the
@@ -1117,9 +1119,10 @@ func inputsInside(line string, root string) string {
 
 // copyFixture copies a fixture into a fresh directory named project, in a git repository of its own with the
 // fixture's gitlinks in its index, and returns the directory with every symbolic link above it resolved, so the
-// paths cohere-go writes are the ones the copy is replaced by. The repository is written without git
-// (writeRepository) unless the fixture has gitlinks, whose index only git writes: each git child forks this process,
-// and on darwin a fork makes the whole heap fault again on its next write (#2htryg8).
+// paths cohere-go writes are the ones the copy is replaced by. The repository and its index are written without git
+// (written_repository.Write): a test starts no git of its own (#vb50z0q), and each git child forked this process,
+// which on darwin makes the whole heap fault again on its next write (#2htryg8). Each gitlink is pinned at a commit
+// no repository holds, as a check reads a gitlink's path alone (project.GitlinksOf).
 func copyFixture(test *testing.T, fixture string) string {
 	test.Helper()
 	root := copyFixtureFiles(test, fixture)
@@ -1127,16 +1130,14 @@ func copyFixture(test *testing.T, fixture string) string {
 	if readError != nil && !errors.Is(readError, fs.ErrNotExist) {
 		test.Fatalf("reading %s's gitlinks: %v", fixture, readError)
 	}
-	if len(strings.Fields(string(gitlinks))) == 0 {
-		if writeError := writeRepository(root); writeError != nil {
-			test.Fatalf("writing %s's repository: %v", root, writeError)
-		}
-		return root
-	}
-	runGit(test, root, "init", "-q")
+	var tracked []git_tree.IndexEntry
 	for _, gitlink := range strings.Fields(string(gitlinks)) {
-		runGit(test, root, "update-index", "--add", "--cacheinfo",
-			"160000,0123456789abcdef0123456789abcdef01234567,"+gitlink)
+		tracked = append(tracked, git_tree.IndexEntry{Entry: git_tree.Entry{
+			Mode: git_tree.ModeGitlink, Object: "0123456789abcdef0123456789abcdef01234567", Path: gitlink,
+		}})
+	}
+	if writeError := written_repository.Write(root, tracked...); writeError != nil {
+		test.Fatalf("writing %s's repository: %v", root, writeError)
 	}
 	return root
 }
@@ -1176,19 +1177,6 @@ func copyFixtureFiles(test *testing.T, fixture string) string {
 		test.Fatalf("copying %s: %v", fixture, walkError)
 	}
 	return root
-}
-
-// runGit runs git in directory, failing test when it fails. It reads no git config but the repository's own, as
-// every hermetic test of the house's runs git: the person's global config sets hooks and the default branch, which a
-// test must never read. TestMain seals that for every git child of the process (sealedGitEnvironment), this one
-// among them.
-func runGit(test *testing.T, directory string, arguments ...string) {
-	test.Helper()
-	command := exec.Command("git", arguments...)
-	command.Dir = directory
-	if output, runError := command.CombinedOutput(); runError != nil {
-		test.Fatalf("git %s: %v: %s", strings.Join(arguments, " "), runError, output)
-	}
 }
 
 // unformattedFixtureSuffix ends the name of a fixture that must stay unformatted to test the fix phase. Such a
