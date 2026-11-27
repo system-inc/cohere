@@ -9,9 +9,10 @@ import "github.com/system-inc/cohere/internal/go_language/cache"
 // for the builds, which restore from it as they do on a cold run: 8.8 to 9.1 s there, its findings the same. So the
 // host's session asks once, at its first Restore, whether this run is such a one (ReadColdWhen); when it is, every
 // lookup of the project's store, by a package's first key or its second, reads as absent, as a cold run's would, and
-// it writes no alias and no entry the store holds already, so the warm store it read nothing of stays exactly as it
-// was: a write there would move its shard's stamp, which the packs the builds write this run then record as none. A
-// store new to the executable is filled all the same, so the next run, its builds' packs written, restores from it.
+// it writes no entry the store holds already, and so no alias of one, so the warm store it read nothing of stays
+// exactly as it was: a write there would move its shard's stamp, which the packs the builds write this run then record
+// as none. A store new to the executable is filled all the same, its entries and their aliases, so the next run, its
+// builds' packs written, restores from it, by a package's second key too.
 // Everything else is as in any run: the system cache is read and written, the session keeps for the builds what it
 // checks, and the builds read and write the project's store.
 

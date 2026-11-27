@@ -117,12 +117,12 @@ func TestAColdStartFillsTheHostsStore(test *testing.T) {
 }
 
 // The cliff (#s8e6z0n): a host whose store holds everything, filled by a run of the host's build alone, beside extra
-// builds whose stores hold nothing of their own, every pack and every alias table missing: the cold read itself says
-// the run of the host alone wrote no build's table, since one held would keep the host warm (buildPacksMissing). The
+// builds whose stores hold nothing of their own, every pack and every ran marker missing: the cold read itself says
+// the run of the host alone marked no build run, since a marker would keep the host warm (buildPacksMissing). The
 // host reads cold, which the record says, checks every package from source and keeps each for the builds, so each
 // build restores from it rather than check its whole graph, and the host writes nothing it held: every file of the
 // store before the run is there after with the same bytes, never written again. The files the run adds are the
-// builds', their entries written through and their packs.
+// builds', their entries written through, their packs and their markers.
 func TestTheHostReadsColdWhenEveryBuildsPackIsMissing(test *testing.T) {
 	test.Parallel()
 
@@ -175,6 +175,32 @@ func TestTheHostReadsColdWhenEveryBuildsPackIsMissing(test *testing.T) {
 func TestATreeWhoseEveryBuildIsBrokenReadsColdOnce(test *testing.T) {
 	test.Parallel()
 
+	root := everyBuildBroken(test)
+	sharing := packingLater(test.TempDir())
+	_, first := runOverConfigured(test, root, exitFindings, sharing)
+	lint := lintRecordOf(test, first)
+	if lint.Cache.HostReadCold != contract.HostReadColdBuildPacksMissing {
+		test.Errorf("the first run read cold for %q, want %q", lint.Cache.HostReadCold,
+			contract.HostReadColdBuildPacksMissing)
+	}
+	requireEveryExtraBuildBroken(test, lint)
+	// Each broken build's packs are counted as a build that saved counts them: the project's store's at the least.
+	if lint.Cache.Packs == nil || lint.Cache.Packs.Written < len(lint.Builds)-1 {
+		test.Errorf("want the first run to count a pack written by each of its %d broken builds, got %+v",
+			len(lint.Builds)-1, lint.Cache.Packs)
+	}
+	for run := range 2 {
+		_, later := runOverConfigured(test, root, exitFindings, sharing)
+		if reason := lintRecordOf(test, later).Cache.HostReadCold; reason != "" {
+			test.Errorf("run %d after the first read cold for %q, want its store read as always", run+2, reason)
+		}
+	}
+}
+
+// everyBuildBroken is a copy of rename-platforms whose every extra build fails to type-check: windows's, and
+// freebsd's.
+func everyBuildBroken(test *testing.T) string {
+	test.Helper()
 	root := copyFixture(test, filepath.Join("testdata", "rename-platforms"))
 	if breakError := breakUnderWindows(root); breakError != nil {
 		test.Fatal(breakError)
@@ -185,24 +211,20 @@ func TestATreeWhoseEveryBuildIsBrokenReadsColdOnce(test *testing.T) {
 	if writeError := os.WriteFile(freebsdFile, []byte(brokenUnderFreebsd), 0o644); writeError != nil {
 		test.Fatal(writeError)
 	}
-	sharing := packingLater(test.TempDir())
-	_, first := runOverConfigured(test, root, exitFindings, sharing)
-	lint := lintRecordOf(test, first)
-	if lint.Cache.HostReadCold != contract.HostReadColdBuildPacksMissing {
-		test.Errorf("the first run read cold for %q, want %q", lint.Cache.HostReadCold,
-			contract.HostReadColdBuildPacksMissing)
+	return root
+}
+
+// requireEveryExtraBuildBroken is the premise of a test over everyBuildBroken: every extra build of the run lint
+// records found a type error, so none of them ran its rules.
+func requireEveryExtraBuildBroken(test *testing.T, lint contract.LintRecord) {
+	test.Helper()
+	if len(lint.Builds) < 2 {
+		test.Fatalf("want extra builds, got %+v", lint.Builds)
 	}
-	// The premise: every extra build of the run found a type error, so none of them ran its rules.
 	for _, build := range lint.Builds[1:] {
 		if build.AnalyzedPackages != 0 {
 			test.Fatalf("want every extra build broken, got %s analyzing %d packages", build.Target,
 				build.AnalyzedPackages)
-		}
-	}
-	for run := range 2 {
-		_, later := runOverConfigured(test, root, exitFindings, sharing)
-		if reason := lintRecordOf(test, later).Cache.HostReadCold; reason != "" {
-			test.Errorf("run %d after the first read cold for %q, want its store read as always", run+2, reason)
 		}
 	}
 }
@@ -219,8 +241,9 @@ func identifyingAs(systemRoot string, identity string) func(*pipeline) {
 
 // Two executables taking turns over one root keep their hosts' hits (#s8e6z0n): the first pack write of each run
 // removes every other executable's packs, so A's run after B's finds every build's pack gone, though its builds'
-// entries and alias tables are all still there. The tables tell it its builds have run, so its host reads its store as
-// always and restores it whole, rather than read cold on every run while its builds restore from their own warm store.
+// entries are all still there, and their ran markers. The markers tell it its builds have run, so its host reads its
+// store as always and restores it whole, rather than read cold on every run while its builds restore from their own
+// warm store.
 func TestTwoExecutablesTakingTurnsKeepTheirHostsHits(test *testing.T) {
 	test.Parallel()
 
@@ -248,6 +271,61 @@ func TestTwoExecutablesTakingTurnsKeepTheirHostsHits(test *testing.T) {
 	if after.HostReadCold != "" || after.Hit == 0 || after.Missed != 0 {
 		test.Errorf("want A's run after B's to read its store as always and restore its host whole, got %q with %d "+
 			"hit and %d missed", after.HostReadCold, after.Hit, after.Missed)
+	}
+}
+
+// Two executables taking turns over a tree whose every extra build is broken read cold on each one's first run alone
+// (#s8e6z0n): a broken build never saves, so it never writes an alias table, but it marks its run as it writes its
+// packs (check.CacheSession.WritePacksWithoutSave), and the marker outlives the other executable's sweep of them.
+func TestTwoExecutablesTakingTurnsOverEveryBuildBrokenReadColdOnceEach(test *testing.T) {
+	test.Parallel()
+
+	root := everyBuildBroken(test)
+	systemRoot := test.TempDir()
+	for run, identity := range []string{"executable A", "executable B", "executable A", "executable B"} {
+		_, stream := runOverConfigured(test, root, exitFindings, identifyingAs(systemRoot, identity))
+		lint := lintRecordOf(test, stream)
+		requireEveryExtraBuildBroken(test, lint)
+		want := contract.HostReadColdReason("")
+		// Each executable's first run, over a store none of whose builds has run under it.
+		if run < 2 {
+			want = contract.HostReadColdBuildPacksMissing
+		}
+		if lint.Cache.HostReadCold != want {
+			test.Errorf("run %d, %s's, read cold for %q, want %q", run+1, identity, lint.Cache.HostReadCold, want)
+		}
+	}
+}
+
+// The first edit after a cold start restores the packages above it by their second key (#s8e6z0n, #m7w1ncy): the
+// cold start reads its store cold, every build's pack missing, and still writes the alias of each entry it writes,
+// as any run that writes an entry does, so a comment edited in a leaf, which moves the first key of everything above
+// it and the second key of nothing, has the host restore its importer by that alias.
+func TestTheFirstEditAfterAColdStartHitsBySecondKey(test *testing.T) {
+	test.Parallel()
+
+	root := copyFixture(test, filepath.Join("testdata", "other-builds"))
+	sharing := packingLater(test.TempDir())
+	_, cold := runOverConfigured(test, root, exitFindings, sharing)
+	if reason := lintRecordOf(test, cold).Cache.HostReadCold; reason != contract.HostReadColdBuildPacksMissing {
+		test.Fatalf("the premise: the cold start read cold, got %q", reason)
+	}
+	leaf := filepath.Join(root, "internal", "label", "label.go")
+	contents, readError := os.ReadFile(leaf)
+	if readError != nil {
+		test.Fatal(readError)
+	}
+	edited := append(contents, []byte("\n// A comment added after the cold start, which label's API never reads.\n")...)
+	if writeError := os.WriteFile(leaf, edited, 0o644); writeError != nil {
+		test.Fatal(writeError)
+	}
+	edit, _ := runOverConfigured(test, root, exitFindings, sharing)
+	if len(edit.buildRuns) == 0 {
+		test.Fatal("the run after the edit handed the merge no run")
+	}
+	if host := edit.buildRuns[0].result.Cache; host.SecondKeyHit == 0 {
+		test.Errorf("want the host's run after the edit to restore label's importer by its second key, got %d hit, "+
+			"%d of them by the second key, and %d missed", host.Hit, host.SecondKeyHit, host.Missed)
 	}
 }
 
@@ -320,7 +398,7 @@ func TestTheCliffReadsAsAColdRunAndSettles(test *testing.T) {
 	}
 }
 
-// Nothing unknown reads as missing (#s8e6z0n): over the cliff's store, every build's pack and table missing, a run
+// Nothing unknown reads as missing (#s8e6z0n): over the cliff's store, every build's pack and marker missing, a run
 // whose one build's go env the host's run could not read, so the build reads its own as it starts
 // (extraBuildRun), never reads cold, since that build's pack cannot be named.
 func TestABuildWhoseGoEnvironmentIsUnreadNeverReadsCold(test *testing.T) {

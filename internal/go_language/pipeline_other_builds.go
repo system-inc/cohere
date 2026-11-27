@@ -707,7 +707,8 @@ func (pipeline *pipeline) extraBuildRun(
 	}
 	if loadError != nil {
 		// A load that failed past its restore read what the packs then hold, and one that failed before it opened none,
-		// which writes nothing: either way the packs are written as a build that saved writes them (#s8e6z0n).
+		// which writes nothing: either way the packs are written as a build that saved writes them (#s8e6z0n). A build
+		// that fails has no record, so none counts them.
 		if session != nil {
 			session.WritePacksWithoutSave()
 		}
@@ -748,9 +749,10 @@ func (pipeline *pipeline) extraBuildRun(
 		pipeline.keepMustCheckSet(extra, mustCheck)
 	}
 	if len(loaded.Diagnostics) > 0 {
-		// It runs no rule, so it never saves; its packs are written all the same (#s8e6z0n).
+		// It runs no rule, so it never saves; its packs are written all the same (#s8e6z0n), and counted in its record
+		// and the run's, as a build that saved counts them.
 		if session != nil {
-			session.WritePacksWithoutSave()
+			run.result.Cache.Packs = session.WritePacksWithoutSave()
 		}
 		return run, nil
 	}
@@ -909,7 +911,8 @@ func (pipeline *pipeline) extraBuildRun(
 	}
 	if lintError != nil {
 		// Rules that failed, or a reload's load, may have stopped short of the save: its packs are written all the
-		// same, and a build whose save ran writes nothing again (#s8e6z0n).
+		// same, and a build whose save ran writes nothing again (#s8e6z0n). A build that fails has no record, so none
+		// counts them.
 		if session != nil {
 			session.WritePacksWithoutSave()
 		}

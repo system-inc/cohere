@@ -171,18 +171,22 @@ func (session *CacheSession) putRecord(store *cache.Store, key cache.Key, entry 
 	return putError
 }
 
-// WritePacksWithoutSave writes the session's packs, an extra build's, from what its loads read, for a build that ran
-// no save: one whose load found type errors, which runs no rule, one whose load failed, or one whose rules failed. With
-// no pack the host of every later run would take this build for one that has never run, and read its own store cold
-// each time (the host reading cold, #s8e6z0n): a project that builds only on its own platform has every extra build
-// fail so, and its host would read cold forever. What a pack holds is what the run read of the store, each shard's
-// stamp taken before it was read, so a run cut short writes one as sound as a save's. It writes nothing for a session
-// whose save already wrote them, and nothing for one that keeps no packs or opened none.
-func (session *CacheSession) WritePacksWithoutSave() {
-	if session.packs == nil || session.packs.written {
-		return
+// WritePacksWithoutSave writes the session's packs, an extra build's, from what its loads read, and marks the build
+// run, for a build that ran no save: one whose load found type errors, which runs no rule, one whose load failed, or
+// one whose rules failed. With neither the host of every later run would take this build for one that has never run,
+// and read its own store cold each time (the host reading cold, #s8e6z0n): a project that builds only on its own
+// platform has every extra build fail so, and its host would read cold forever. What a pack holds is what the run read
+// of the store, each shard's stamp taken before it was read, so a run cut short writes one as sound as a save's. It
+// returns what the packs did over the run, for the build's record, nil for a session that keeps none. It writes
+// nothing for a session whose save already wrote them, and nothing for one that keeps no packs or opened none.
+func (session *CacheSession) WritePacksWithoutSave() *PackCounts {
+	if session.packs == nil {
+		return nil
 	}
-	session.writePacks()
+	if !session.packs.written {
+		session.writePacks()
+	}
+	return session.counts.Packs
 }
 
 // writePacks writes each pack that changed, was missing or was refused, or whose shards' stamps moved, with what the
@@ -201,6 +205,15 @@ func (session *CacheSession) writePacks() {
 	}
 	packs.written = true
 	for _, pack := range packs.byStore {
+		// The project's pack is marked run whether it changed or not, so a store whose packs this executable wrote
+		// before markers were kept is marked by its next run, and a marker another executable's sweep never removes
+		// says the build has run here (cache.Store.MarkRan, #s8e6z0n). A failed mark is a problem of the store, never
+		// a finding: the next run under another executable's sweep reads cold once more.
+		if !pack.system {
+			if markError := pack.store.MarkRan(pack.place); markError != nil {
+				session.problem(fmt.Sprintf("marking the build's run: %v", markError))
+			}
+		}
 		pack.lock.Lock()
 		entries := slices.Collect(maps.Values(pack.held))
 		pack.lock.Unlock()

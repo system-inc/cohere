@@ -743,7 +743,7 @@
                         "hostReadCold": {
                             "type": "string",
                             "enum": ["buildPacksMissing"],
-                            "description": "Why the host's build read its findings store cold: every package of it a miss, checked from source and kept for the extra builds to restore from, and no entry the store held written again, so a warm store stays as it was. buildPacksMissing: the run checked at least one extra build, each restoring from the host's run, and every one's pack of the findings store was missing, and its alias table too. Absent when the host read its store as always."
+                            "description": "Why the host's build read its findings store cold: every package of it a miss, checked from source and kept for the extra builds to restore from, and no entry the store held written again, so a warm store stays as it was. buildPacksMissing: the run checked at least one extra build, each restoring from the host's run, and every one's pack of the findings store was missing, and its marker that it had run too. Absent when the host read its store as always."
                         }
                     }
                 },

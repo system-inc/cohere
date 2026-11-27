@@ -44,18 +44,9 @@ type aliasTable struct {
 // newAliasTable is the table of the build context names, kept in store: one table for each context, as every key
 // it holds is one, since each folds the context in.
 func newAliasTable(store *cache.Store, context cache.Context) *aliasTable {
-	return &aliasTable{store: store, key: BuildAliasTableKey(context)}
-}
-
-// BuildAliasTableKey is the key the alias table of the build context names is kept under (newAliasTable): named by
-// cohere-go's identity, the build and the rules, and by no loader. The host's run stats it, before its first restore,
-// to tell a build that has run under this executable from one that never has (#s8e6z0n): a run's first pack write
-// removes every other executable's packs, never its tables, so the table outlives the pack of a build whose last run
-// was under another executable.
-func BuildAliasTableKey(context cache.Context) cache.Key {
 	named := strings.Join(slices.Concat([]string{"alias table", context.FormatVersion, context.ExecutableIdentity},
 		context.Build, []string{"rules"}, context.RuleSet), "\x00")
-	return sha256.Sum256([]byte(named))
+	return &aliasTable{store: store, key: sha256.Sum256([]byte(named))}
 }
 
 // load reads the table from the store, once. A table the store does not hold whole, or whose length is no whole
