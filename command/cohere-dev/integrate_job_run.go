@@ -1130,6 +1130,18 @@ func runnerDeclaredCache() bool {
 	return strings.TrimSpace(os.Getenv("GOCACHEPROG")) != "" && strings.TrimSpace(os.Getenv("GOCACHE")) != ""
 }
 
+// runnerSharedCache is the one Go cache folder the runner shares across every integrate job (#ntrewm3), empty when it
+// shares none: `GOCACHE` with no `GOCACHEPROG`, and runnerSharedCacheVariable naming the same path, as
+// sharedBoxCacheBlock reads them.
+func runnerSharedCache() string {
+	cache := strings.TrimSpace(os.Getenv("GOCACHE"))
+	if cache == "" || strings.TrimSpace(os.Getenv("GOCACHEPROG")) != "" ||
+		strings.TrimSpace(os.Getenv(runnerSharedCacheVariable)) != cache {
+		return ""
+	}
+	return cache
+}
+
 // cacheSaid is how the integrate job's lines name the Go cache its tests ran on.
 func (job *integrateJobRun) cacheSaid() string {
 	switch {
@@ -1137,6 +1149,8 @@ func (job *integrateJobRun) cacheSaid() string {
 		return "the integrate job's kept Go cache"
 	case runnerDeclaredCache():
 		return "the runner's declared Go cache"
+	case runnerSharedCache() != "":
+		return "the runner's shared Go cache"
 	}
 	return "an empty Go cache with -count=1"
 }

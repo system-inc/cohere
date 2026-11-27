@@ -31,6 +31,17 @@ package main
 // sharedBoxGate runs with the cache that job keeps and without -count=1 (sharedBoxCacheBlock), so a package nothing
 // changed replays.
 
+// runnerSharedCacheVariable is Loom's runner's name for the one Go cache folder every integrate job shares on Shackler
+// (#ntrewm3), set to the same path as `GOCACHE`, with no `GOCACHEPROG`. The two agreeing is what says `GOCACHE` is
+// that folder and no account's stray setting. The runner's trim at the job's start says the folder's size in the
+// three after it, each unset when its walk stopped at its bound.
+const (
+	runnerSharedCacheVariable            = "LOOM_CACHE_GO_SHARED"
+	runnerSharedCacheBytesBeforeVariable = "LOOM_CACHE_GO_BYTES_BEFORE"
+	runnerSharedCacheBytesVariable       = "LOOM_CACHE_GO_BYTES"
+	runnerSharedCacheRemovedVariable     = "LOOM_CACHE_GO_REMOVED"
+)
+
 // sharedBoxCacheBlock is sharedBoxGate's choice of Go cache, by integrateCache, which every script that runs it sets
 // before it: empty on every gate box and scratch box (macBoxIntegrateCacheLine), so the box's environment never keeps a
 // cache there, and the integrate job's kept directory on Shackler alone. Set, the cache is integrateCache's gocache,
@@ -38,7 +49,10 @@ package main
 // (runnerCacheProgram, #e94a6r4), the cache is the runner's: its writable layer as `GOCACHE` and its program,
 // `GOCACHEPROG`, serving a get from the layer, then from a shared folder only the cold fill at main's tip writes, and
 // every put to the layer alone. Either way it is a cache no candidate shares, so countFlag is empty and Go's honest
-// keys replay every package whose inputs didn't change as "(cached)", and keepCache says the cache stays. Otherwise
+// keys replay every package whose inputs didn't change as "(cached)", and keepCache says the cache stays. Empty, in an
+// integrate job whose runner shares one Go cache across every job (#ntrewm3), `GOCACHE` alone and the same path in
+// runnerSharedCacheVariable, with no program, the cache is that folder, read and written in place, and kept as well.
+// Otherwise
 // the cache is made empty for this job and removed after it, and countFlag is -count=1, which every go test the gate
 // runs carries: the cold, correct run of a shared box.
 const sharedBoxCacheBlock = `# The Go cache: the integrate job's kept one, the runner's declared one, or this job's own.
@@ -51,6 +65,9 @@ if [ -n "${integrateCache:-}" ]; then
 elif [ -n "$runnerCacheProgram" ]; then
   gocache="$runnerCache"
   export GOCACHEPROG="$runnerCacheProgram"
+  countFlag=""; keepCache=1
+elif [ -n "$runnerSharedCache" ]; then
+  gocache="$runnerSharedCache"
   countFlag=""; keepCache=1
 else
   gocache=$(mktemp -d "${TMPDIR:-/tmp}/cohere-gate-gocache.XXXXXX")
@@ -174,11 +191,15 @@ fi
 # one, kept before the account's Go settings go. Anywhere else a GOMODCACHE is the account's own, never read.
 laidModules=""
 [ -z "${integrateJob:-}" ] || laidModules="${GOMODCACHE:-}"
-# The Go cache the runner declared for an integrate job, its layer and its program, both or neither, kept before the
-# account's Go settings go (sharedBoxCacheBlock). Anywhere else they are never read.
-runnerCache=""; runnerCacheProgram=""
+# The Go cache the runner declared for an integrate job, its layer and its program, both or neither, or the one
+# folder it shares across every job, GOCACHE with no program and the same path in the runner's own name for it,
+# kept before the account's Go settings go (sharedBoxCacheBlock). Anywhere else they are never read.
+runnerCache=""; runnerCacheProgram=""; runnerSharedCache=""
 if [ -n "${integrateJob:-}" ] && [ -n "${GOCACHEPROG:-}" ] && [ -n "${GOCACHE:-}" ]; then
   runnerCache="$GOCACHE"; runnerCacheProgram="$GOCACHEPROG"
+elif [ -n "${integrateJob:-}" ] && [ -z "${GOCACHEPROG:-}" ] && [ -n "${GOCACHE:-}" ] &&
+  [ "${` + runnerSharedCacheVariable + `:-}" = "$GOCACHE" ]; then
+  runnerSharedCache="$GOCACHE"
 fi
 unset GOFLAGS GOCACHEPROG GOCACHE GOMODCACHE GOPATH GOWORK GOPROXY GONOSUMDB GONOSUMCHECK GOPRIVATE GOINSECURE GOSUMDB
 ` + sharedBoxPathLine + `
