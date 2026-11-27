@@ -59,30 +59,9 @@ func measurePerLine(benchmark *testing.B, lines []string, read func(lines []stri
 	benchmark.ReportMetric(float64(after.Mallocs-before.Mallocs)/linesRead, "allocs/line")
 }
 
-// Loom's regular expressions over the in-repo corpus, each line read as planner/trace.go reads it: the
-// call it finishes, then on each call the descriptor its AT_FDCWD check reads, the path argument after
-// it, and the opened path.
-func BenchmarkLoomsRegularExpressions(benchmark *testing.B) {
-	measureEachPart(benchmark, func(lines []string) {
-		parser := &loomParser{}
-		for _, text := range lines {
-			event, isEvent := parser.line(text)
-			if !isEvent {
-				continue
-			}
-			arguments := event.arguments
-			if match := loomDescriptor.FindStringSubmatch(arguments); match != nil {
-				arguments = arguments[len(match[0]):]
-			}
-			// Ignored: the benchmark measures the read, and the differential judges what it read.
-			_, _, _ = loomQuoted(arguments)
-			_ = loomOpenedPath.FindStringSubmatch(event.line)
-		}
-	})
-}
-
-// This package over the same corpus, each line read to the same parts: the call it finishes, its
-// descriptor, the path argument after it, and the opened path, which the call already holds.
+// This package over the in-repo corpus, each line read to the parts a consumer keys on: the call it
+// finishes, its descriptor, the path argument after it, and the opened path, which the call already
+// holds.
 func BenchmarkStraceEvents(benchmark *testing.B) {
 	measureEachPart(benchmark, func(lines []string) {
 		joiner := &strace_events.Joiner{}
