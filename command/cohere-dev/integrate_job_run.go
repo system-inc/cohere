@@ -782,13 +782,23 @@ func (job *integrateJobRun) lay() (string, int) {
 	if pin != "" {
 		stamped = append(stamped, filepath.Join(job.tree, "TypeScript"))
 	}
+	left := []string{}
 	for _, tree := range stamped {
-		if stampError := stampTreeTimes(tree); stampError != nil {
+		unstamped, stampError := stampTreeTimes(tree)
+		if stampError != nil {
 			fmt.Fprintf(streams.Errors, "cohere-dev: stamping %s's times by content: %v\n", tree, stampError)
 			return "", 1
 		}
+		for _, path := range unstamped {
+			left = append(left, filepath.Join(tree, path))
+		}
 	}
-	return shortCommit(job.merge) + " at " + job.tree + ", its times by content", 0
+	said := shortCommit(job.merge) + " at " + job.tree + ", its times by content"
+	if len(left) > 0 {
+		said += fmt.Sprintf(" but for %d that differ from its HEAD, left their own: %s", len(left),
+			strings.Join(left, ", "))
+	}
+	return said, 0
 }
 
 // layTypeScript checks tree's TypeScript out at pin, a worktree of the integrate job's TypeScript mirror kept across

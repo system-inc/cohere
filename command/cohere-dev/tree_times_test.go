@@ -88,3 +88,60 @@ func TestAnIntegrateJobStampsItsTreeByContent(test *testing.T) {
 		}
 	}
 }
+
+// A tracked file whose bytes differ from `HEAD` when the stamp runs, the same size but other bytes, keeps the time it
+// was written and is named, never stamped with its old blob's time, which would tell Go's test cache it is unchanged
+// (system_cohere's review of #32). Its clean neighbor is stamped as ever, and a file only touched, its bytes `HEAD`'s,
+// reads clean once the index is refreshed.
+//
+// Not parallel: it runs git in this process with a configuration of its own, set with test.Setenv.
+func TestAFileThatDiffersFromHeadKeepsItsOwnTime(test *testing.T) {
+	for _, setting := range [][2]string{{"GIT_CONFIG_GLOBAL", os.DevNull}, {"GIT_CONFIG_NOSYSTEM", "1"},
+		{"GIT_AUTHOR_NAME", "test"}, {"GIT_AUTHOR_EMAIL", "test@example.com"}, {"GIT_COMMITTER_NAME", "test"},
+		{"GIT_COMMITTER_EMAIL", "test@example.com"}} {
+		test.Setenv(setting[0], setting[1])
+	}
+	tree := test.TempDir()
+	for _, file := range []string{"changed.txt", "clean.txt", "touched.txt"} {
+		writeFixtureFile(test, filepath.Join(tree, file), "the committed bytes\n")
+	}
+	for _, arguments := range [][]string{{"init", "-q"}, {"add", "."}, {"commit", "-q", "-m", "base"}} {
+		if output, gitError := gitCombined(tree, arguments...); gitError != nil {
+			test.Fatalf("git %v: %v\n%s", arguments, gitError, output)
+		}
+	}
+	writeFixtureFile(test, filepath.Join(tree, "changed.txt"), "the committed bytez\n")
+	if information, statError := os.Stat(filepath.Join(tree, "changed.txt")); statError != nil ||
+		information.Size() != int64(len("the committed bytes\n")) {
+		test.Fatalf("the changed file isn't the committed size: %v", statError)
+	}
+	now := time.Now()
+	if changeError := os.Chtimes(filepath.Join(tree, "touched.txt"), now, now); changeError != nil {
+		test.Fatal(changeError)
+	}
+	unstamped, stampError := stampTreeTimes(tree)
+	if stampError != nil {
+		test.Fatal(stampError)
+	}
+	if len(unstamped) != 1 || unstamped[0] != "changed.txt" {
+		test.Errorf("the stamp left %q unstamped, want changed.txt alone", unstamped)
+	}
+	for file, wantStamped := range map[string]bool{"changed.txt": false, "clean.txt": true, "touched.txt": true} {
+		blob, blobError := gitOutput(tree, "rev-parse", "HEAD:"+file)
+		if blobError != nil {
+			test.Fatal(blobError)
+		}
+		stamp, timeError := objectTime(blob)
+		if timeError != nil {
+			test.Fatal(timeError)
+		}
+		information, statError := os.Stat(filepath.Join(tree, file))
+		if statError != nil {
+			test.Fatal(statError)
+		}
+		if information.ModTime().Equal(stamp) != wantStamped {
+			test.Errorf("%s is at %v, its blob's time %v: stamped %t, want %t", file, information.ModTime(), stamp,
+				!wantStamped, wantStamped)
+		}
+	}
+}

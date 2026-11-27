@@ -62,14 +62,32 @@ type treeEntry struct {
 // leaves its directory's time alone but nothing else must touch a directory once it is stamped. A symbolic link and a
 // submodule's gitlink are left as they are: the link's own time is the link's, and a submodule is a tree of its own,
 // stamped by its own call.
-func stampTreeTimes(tree string) error {
+//
+// A blob's time is a claim that the bytes on disk are that blob, so a tracked file that differs from `HEAD` when the
+// stamp runs, written by the lay, by go or by a filter, is left the time it was written and returned, never stamped:
+// stamped, a file of the same size would read to Go as unchanged, and a test could replay a result saved over other
+// bytes (system_cohere's review). The index is refreshed first, so a file that matches `HEAD` but was only touched
+// reads as clean.
+func stampTreeTimes(tree string) ([]string, error) {
+	// Ignored: --refresh exits 1 when an entry needs updating, which the diff below reads in its own words.
+	_, _ = gitCombined(tree, "update-index", "-q", "--refresh")
+	differing, diffError := gitOutput(tree, "diff-index", "--name-only", "-z", "--no-renames", "HEAD", "--")
+	if diffError != nil {
+		return nil, fmt.Errorf("reading which tracked files differ from the tree's HEAD: %w", diffError)
+	}
+	unstamped := []string{}
+	for _, path := range strings.Split(differing, "\x00") {
+		if path != "" {
+			unstamped = append(unstamped, path)
+		}
+	}
 	listing, listError := gitOutput(tree, "ls-tree", "-r", "-t", "-z", "--full-tree", "HEAD")
 	if listError != nil {
-		return fmt.Errorf("listing the tree to stamp: %w", listError)
+		return nil, fmt.Errorf("listing the tree to stamp: %w", listError)
 	}
 	rootId, rootError := gitOutput(tree, "rev-parse", "HEAD^{tree}")
 	if rootError != nil {
-		return fmt.Errorf("reading the tree's root: %w", rootError)
+		return nil, fmt.Errorf("reading the tree's root: %w", rootError)
 	}
 	files, directories := []treeEntry{}, []treeEntry{}
 	for _, line := range strings.Split(listing, "\x00") {
@@ -79,11 +97,11 @@ func stampTreeTimes(tree string) error {
 		header, path, found := strings.Cut(line, "\t")
 		fields := strings.Fields(header)
 		if !found || len(fields) != 3 {
-			return fmt.Errorf("git ls-tree said %q, not a mode, a type, an id and a path", line)
+			return nil, fmt.Errorf("git ls-tree said %q, not a mode, a type, an id and a path", line)
 		}
 		mode, kind, id := fields[0], fields[1], fields[2]
 		switch {
-		case kind == "blob" && mode != "120000":
+		case kind == "blob" && mode != "120000" && !slices.Contains(unstamped, path):
 			files = append(files, treeEntry{kind: kind, id: id, path: path})
 		case kind == "tree":
 			directories = append(directories, treeEntry{kind: kind, id: id, path: path})
@@ -96,7 +114,7 @@ func stampTreeTimes(tree string) error {
 	for _, entry := range slices.Concat(files, directories, []treeEntry{{kind: "tree", id: rootId, path: "."}}) {
 		when, timeError := objectTime(entry.id)
 		if timeError != nil {
-			return fmt.Errorf("stamping %s: %w", entry.path, timeError)
+			return nil, fmt.Errorf("stamping %s: %w", entry.path, timeError)
 		}
 		place := filepath.Join(tree, filepath.FromSlash(entry.path))
 		if changeError := os.Chtimes(place, when, when); changeError != nil {
@@ -104,8 +122,8 @@ func stampTreeTimes(tree string) error {
 				// A directory git tracks only through files that aren't checked out has nothing on disk to stamp.
 				continue
 			}
-			return fmt.Errorf("stamping %s: %w", entry.path, changeError)
+			return nil, fmt.Errorf("stamping %s: %w", entry.path, changeError)
 		}
 	}
-	return nil
+	return unstamped, nil
 }
