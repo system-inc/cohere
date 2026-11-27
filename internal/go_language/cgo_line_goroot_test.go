@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -13,6 +12,8 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/cgo_testing"
 	"github.com/system-inc/cohere/internal/go_language/contract"
 	"github.com/system-inc/cohere/internal/go_language/rules"
+	"github.com/system-inc/cohere/internal/testing/go_root"
+	"github.com/system-inc/cohere/internal/testing/own_go_cache"
 )
 
 // cgoStandardFile is the one cgo file of a small cgo package of the standard library, which each fake `GOROOT` has a
@@ -74,11 +75,7 @@ func runOverCgoStandardPackage(test *testing.T, root string, overlaps bool) cgoS
 func TestACgoTranslationSharedWithAGoneGorootReadsTheCurrentOne(test *testing.T) {
 	cgo_testing.RequireTranslation(test)
 
-	output, goEnvironmentError := exec.Command("go", "env", "GOROOT").Output()
-	if goEnvironmentError != nil {
-		test.Fatalf("reading GOROOT with go env: %v", goEnvironmentError)
-	}
-	local := strings.TrimSpace(string(output))
+	local := go_root.GoRoot(test)
 	first, second := mirroredGoRoot(test, local, cgoStandardFile, ""), mirroredGoRoot(test, local, cgoStandardFile, "")
 	// Two mirrors' paths are of one length, and a rewrite to a path of another length is what moves a translation's
 	// size, which a reader of the build cache's bytes would then disagree with.
@@ -86,7 +83,7 @@ func TestACgoTranslationSharedWithAGoneGorootReadsTheCurrentOne(test *testing.T)
 		test.Fatal(renameError)
 	}
 	first += "-first"
-	test.Setenv("GOCACHE", test.TempDir())
+	own_go_cache.Set(test, test.TempDir())
 	test.Setenv("GOTOOLCHAIN", "local")
 	test.Setenv("CGO_ENABLED", "1")
 	test.Setenv("GOROOT", first)

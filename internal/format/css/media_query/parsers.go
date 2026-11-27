@@ -27,7 +27,7 @@ import (
 
 // errorReadingMode is the TypeError V8 throws on modesEntered[lastModeIndex].mode with lastModeIndex -1.
 //
-//cohere:ignore consistency-require-error-clause V8's TypeError text, which the oracle compares byte for byte
+//cohere:ignore consistency-require-error-clause V8's TypeError text, kept byte for byte as the library throws it
 var errorReadingMode = errors.New("Cannot read properties of undefined (reading 'mode')")
 
 // errorUnclosedUrl stands for the infinite loop on an unclosed `url(`, where the library never returns.

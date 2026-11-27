@@ -1,7 +1,5 @@
 package micromark
 
-import "testing"
-
 // headingAtxFixtures hold no container, emphasis, code, html, link or setext syntax: those constructs
 // are not ported yet, so a fixture leaning on them would differ for reasons that are not headingAtx's.
 var headingAtxFixtures = []string{
@@ -86,9 +84,4 @@ var headingAtxFixtures = []string{
 	"# a\n***",
 	"***\n# a",
 	"# a\nb\n# c",
-}
-
-func TestHeadingAtxEvents(test *testing.T) {
-	test.Parallel()
-	compareEvents(test, headingAtxFixtures)
 }

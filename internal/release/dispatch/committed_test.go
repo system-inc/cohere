@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/release/packaging"
+	"github.com/system-inc/cohere/internal/testing/own_go_cache"
 )
 
 // The defect these tests exist for: the global cohere was built from the shared working tree, so a
@@ -300,7 +301,7 @@ func run(test *testing.T, binary string, arguments ...string) string {
 func TestALaunchedBuildUsesTheCallersGoCache(test *testing.T) {
 	fixture := newCommittedFixture(test)
 	shared := test.TempDir()
-	test.Setenv("GOCACHE", shared)
+	own_go_cache.Set(test, shared)
 	if _, _, built, resolveCommittedError := ResolveCommitted(
 		fixture.paths,
 		"./command/cohere",

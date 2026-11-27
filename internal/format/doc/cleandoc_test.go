@@ -6,7 +6,7 @@ import (
 )
 
 // TestCleanDocMatchesMapDoc checks CleanDoc's own walk against upstream's definition, mapDoc(doc,
-// cleanDocFn), on the random specs the printer differential uses, without the fork (#r89mksm). Both
+// cleanDocFn), on random specs from specGenerator (#r89mksm). Both
 // results are compared structurally and printed, and the doc CleanDoc was given must read the same
 // afterwards, since an unchanged part is now handed back rather than copied.
 func TestCleanDocMatchesMapDoc(test *testing.T) {
@@ -42,7 +42,7 @@ func TestCleanDocMatchesMapDoc(test *testing.T) {
 	}
 }
 
-// printOrError prints a doc as the differentials do, or the panic it raises.
+// printOrError prints a doc at a print width of 20, or reports that printing it panicked.
 func printOrError(document Doc) (result string) {
 	defer func() {
 		if recovered := recover(); recovered != nil {

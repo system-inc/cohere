@@ -8,6 +8,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/go_language/cache"
 	"github.com/system-inc/cohere/internal/go_language/load"
+	"github.com/system-inc/cohere/internal/testing/go_root"
 )
 
 // Without a store, as under `--no-cache`, a run with an extra build hashes each file once, the standard library's
@@ -21,7 +22,7 @@ func TestARunWithAnExtraBuildHashesEachStandardLibraryFileOnceWithoutAStore(test
 	root := test.TempDir()
 	writeFiles(test, root, throughFiles)
 	rules := throughRules()
-	goRoot := goRootOf(test)
+	goRoot := go_root.GoRoot(test)
 	storeless := func(build ...string) *Caching {
 		caching := cachingAt(test.TempDir(), rules)
 		caching.Store = nil

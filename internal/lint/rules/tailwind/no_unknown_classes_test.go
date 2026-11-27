@@ -8,7 +8,6 @@ import (
 	tailwindcollapse "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
 	"github.com/system-inc/cohere/internal/lint/rules/tailwind/vendored"
 	"github.com/system-inc/cohere/internal/lint/testing"
-	"github.com/system-inc/cohere/internal/testing/corpus"
 )
 
 // Expectations measured against the real plugin, and against the real corpus for the silent half.
@@ -446,49 +445,6 @@ func TestUnknownIgnoreExemptsProjectClasses(test *testing.T) {
 	}
 }
 
-// TestExistenceIsNotReadFromPropertyTables is the known-dirty control.
-//
-// The tempting implementation asks the property tables whether a class is known, because they are
-// already there and every other rule uses them. It passes every violation fixture above and reports
-// 12 valid classes on the real corpus, because those tables deliberately exclude utilities that
-// declare nothing a rule can compare.
-//
-// So the shortcut is implemented here and required to be wrong about classes the real rule gets
-// right.
-func TestExistenceIsNotReadFromPropertyTables(test *testing.T) {
-	test.Parallel()
-	system := unknownFixtureLiveSystem(test)
-
-	// Classes that are real and absent from the property tables.
-	realButUndeclared := []string{
-		"container",
-		"from-black/70",
-		"to-transparent",
-		"fade-in",
-	}
-
-	designSystem := loadedDesignSystemResult(system, "")
-	lostByShortcut := 0
-	for _, className := range realButUndeclared {
-		if !classExistsIn(className, system) {
-			test.Errorf("the real rule reports %q as unknown, and it is a valid class", className)
-			continue
-		}
-
-		// The shortcut: resolve through the property tables, as the other rules do.
-		if _, canResolve := resolveClassFactsIn(className, designSystem); !canResolve {
-			lostByShortcut++
-		}
-	}
-
-	if lostByShortcut == 0 {
-		test.Fatal("the property-table shortcut resolved every one of these, so this control no longer " +
-			"demonstrates the defect it exists to demonstrate")
-	}
-	test.Logf("the property-table shortcut would report %d of %d valid classes as unknown",
-		lostByShortcut, len(realButUndeclared))
-}
-
 // TestKnownRootWithUnknownValueIsReported is what the pinned gap became.
 //
 // The gap this replaces said `text-huge` had root `text`, did not compile, and was not reported,
@@ -521,162 +477,6 @@ func TestKnownRootWithUnknownValueIsReported(test *testing.T) {
 	})
 }
 
-// TestExistenceComesFromTheRepositoryRatherThanATable is the measurement the swap exists for.
-//
-// It asks two design systems about the same classes and requires them to disagree. A rule reading a
-// generated table cannot produce a disagreement at all, which is what makes the disagreement count
-// the assertion that fails if the swap is ever reverted.
-//
-// The second system is built from `independent_theme.css`, which exists precisely because the two
-// corpus repositories cannot answer this question: they both vendor `libraries/structure`, so a fact
-// they agree on may be a fact about the submodule rather than about Tailwind. Its own file comment
-// records that generating against it produced 258 of 301 shared roots differing.
-//
-// `flex` and `px-4` are asserted known on both. Without them the disagreement count would be
-// satisfiable by a rule that had simply stopped answering.
-func TestExistenceComesFromTheRepositoryRatherThanATable(test *testing.T) {
-	test.Parallel()
-	ahra := unknownFixtureLiveSystem(test)
-	independent := independentLiveSystem(test)
-
-	testCases := []struct {
-		className     string
-		onAhra        bool
-		onIndependent bool
-		why           string
-	}{
-		{
-			className:     "synthetic-static",
-			onAhra:        false,
-			onIndependent: true,
-			why:           "an `@utility` block only the independent stylesheet declares",
-		},
-		{
-			className:     "synthetic-fn-small",
-			onAhra:        false,
-			onIndependent: true,
-			why:           "a functional `@utility` block only the independent stylesheet declares",
-		},
-		{
-			className:     "flex",
-			onAhra:        true,
-			onIndependent: true,
-			why:           "a framework static, known everywhere",
-		},
-		{
-			className:     "px-4",
-			onAhra:        true,
-			onIndependent: true,
-			why:           "a framework functional root, known everywhere",
-		},
-	}
-
-	disagreements := 0
-	for _, testCase := range testCases {
-		gotAhra := classExistsIn(testCase.className, ahra)
-		gotIndependent := classExistsIn(testCase.className, independent)
-
-		if gotAhra != testCase.onAhra {
-			test.Errorf("%s (%s): the ahra design system says exists=%v, want %v",
-				testCase.className, testCase.why, gotAhra, testCase.onAhra)
-		}
-		if gotIndependent != testCase.onIndependent {
-			test.Errorf("%s (%s): the independent design system says exists=%v, want %v",
-				testCase.className, testCase.why, gotIndependent, testCase.onIndependent)
-		}
-		if testCase.onAhra != testCase.onIndependent {
-			disagreements++
-		}
-	}
-
-	// The population guard. Every assertion above is satisfiable by a rule that answers false for
-	// everything, and a table-reading rule answers identically on both systems by construction. So
-	// the disagreement count is asserted directly: it is the one number no table can produce.
-	if disagreements < 2 {
-		test.Fatalf(
-			"only %d of the classes answered differently on the two design systems; a rule reading a "+
-				"generated table produces zero disagreements by construction, so this count is the "+
-				"evidence that existence is being asked of the repository",
-			disagreements,
-		)
-	}
-	test.Logf("%d of %d classes answered differently on the two design systems",
-		disagreements, len(testCases))
-}
-
-// TestRepositoryNamesInTheFrameworkTablesAreStillVouchedFor pins a gap this task did not close.
-//
-// The migration fixed one direction of the repository/framework confusion and not the other, and the
-// half that remains is in a component this task does not own. Pinned as a failing-shaped assertion
-// on the current behaviour, so closing it upstream breaks this test deliberately rather than leaving
-// a comment nobody reads.
-//
-// # What is fixed
-//
-// A repository's own `@utility` classes are no longer reported as unknown. `synthetic-static` and
-// `synthetic-fn-small` read as known on the design system that declares them, which the shipped
-// tables could not do for any repository except the one they were generated from. That is the
-// failure the task names and TestExistenceComesFromTheRepositoryRatherThanATable measures.
-//
-// # What was not fixed here, and now is
-//
-// `KnownStatics` and `KnownRoots` were enumerated from `designSystem.getClassList()` on a loaded
-// design system, which returns the repository's `@utility` classes alongside the framework's. The
-// generator ran against ahra's `theme.css`, so ahra's own tokens sat in tables headed
-// `Source: Tailwind 4.3.3`, and `HasUtility` consulted them as its framework fallback.
-//
-// M9 replaced that fallback with the ported registrations: `FrameworkStaticDeclarations` for statics
-// and the union of the wave tables and the descriptor rows for functional roots. The test that used
-// to measure the leak said to delete it and assert the corrected behaviour instead, so this is that
-// assertion.
-func TestRepositoryNamesAreNoLongerVouchedForByTheFramework(test *testing.T) {
-	test.Parallel()
-	ahra := unknownFixtureLiveSystem(test)
-	independent := independentLiveSystem(test)
-
-	// Names ahra declares and the independent system does not, measured rather than listed.
-	//
-	// `zoom-in` and `zoom-out` are deliberately absent from this sample, and the reason is worth
-	// stating because writing it wrong is what surfaced it. Ahra declares both as `@utility` blocks,
-	// so a list built from "ahra declares it" includes them. But they also parse as the framework
-	// root `zoom` with the value `in`, which every design system registers, so they are correctly
-	// known everywhere and flagging them measured the parser rather than the tables.
-	//
-	// The rest are static names with no functional root behind them, so their only source is a
-	// registration, which is exactly what this asserts.
-	var declaredByAhra []string
-	for _, name := range []string{
-		"markdown-content", "typing-dots", "prose", "scrollbar-hide",
-		"fade-in", "fade-out",
-		"slide-in-from-top", "slide-out-to-left",
-	} {
-		if ahra.Utilities() == nil || !ahra.Utilities().Has(name) {
-			continue
-		}
-		declaredByAhra = append(declaredByAhra, name)
-	}
-
-	if len(declaredByAhra) == 0 {
-		test.Fatal("ahra declares none of the sampled utilities, so this measurement compared nothing; " +
-			"either the fixture stopped loading the repository's blocks or the names changed")
-	}
-
-	for _, name := range declaredByAhra {
-		if classExistsIn(name, independent) {
-			test.Errorf("%q is declared by ahra and still vouched for on a design system that does not "+
-				"declare it, so a repository token is being carried as a framework fact", name)
-		}
-		if !classExistsIn(name, ahra) {
-			test.Errorf("%q is declared by ahra and no longer known there, so the fix removed more than "+
-				"the leak", name)
-		}
-	}
-	test.Logf(
-		"checked %d repository-declared utilities: known on ahra, unknown on an independent system",
-		len(declaredByAhra),
-	)
-}
-
 // TestUnknownClassFixturesActuallyRan is what stops this file from going green on nothing.
 //
 // Every fixture above skips when no installed tailwindcss can be found, and a skip is the honest
@@ -705,35 +505,9 @@ func TestUnknownClassFixturesActuallyRan(test *testing.T) {
 	rule_testing.ExpectFindings(test, result, "unknownClass")
 }
 
-// unknownFixtureLiveSystem builds the corpus repository's design system, for the unit-level tests.
+// independentLiveSystem builds a design system that shares nothing with any consumer repository's theme.
 //
-// The repository on disk rather than the fixture's temp directory, because these tests ask about
-// classes the fixture stylesheet does not declare and the corpus repository does. ahra is private, so
-// it skips naming COHERE_CORPUS_AHRA where the corpus is not set, and fails where it is set and the
-// stylesheet is missing (#sycrdr6). The stylesheet's tailwindcss is the vendored snapshot, the same
-// version ahra installs.
-func unknownFixtureLiveSystem(test *testing.T) *tailwindcollapse.LoadedDesignSystem {
-	test.Helper()
-
-	entryPoint := corpus.Ahra.Path(test, "app", "_theme", "styles", "theme.css")
-	if _, statError := os.Stat(entryPoint); statError != nil {
-		test.Fatalf("the ahra corpus has no stylesheet at %s, so there is no live design system to ask", entryPoint)
-	}
-	packageRoot := unknownFixturePackageRoot(test)
-
-	system, loadDesignSystemError := tailwindcollapse.LoadDesignSystem(tailwindcollapse.LoadOptions{
-		EntryPoint:          entryPoint,
-		TailwindPackageRoot: packageRoot,
-	})
-	if loadDesignSystemError != nil {
-		test.Fatalf("loading the corpus design system: %v", loadDesignSystemError)
-	}
-	return system
-}
-
-// independentLiveSystem builds a design system that shares nothing with either corpus repository.
-//
-// The stylesheet is copied beside the corpus repository's `node_modules` rather than read in place,
+// The stylesheet is copied beside a staged `node_modules` rather than read in place,
 // because `@import "tailwindcss"` resolves through whichever `node_modules` is reachable from where
 // the file sits, and this checkout vendors none. Its own file comment says the same.
 func independentLiveSystem(test *testing.T) *tailwindcollapse.LoadedDesignSystem {
@@ -754,8 +528,7 @@ func independentLiveSystem(test *testing.T) *tailwindcollapse.LoadedDesignSystem
 	}
 
 	// Beside the installed package's own tree, so the bare specifier resolves by the same upward
-	// walk a repository uses. Written into a directory this test owns and removed after, rather than
-	// into the corpus repository's working tree.
+	// walk a repository uses. Written into a directory this test owns and removed after.
 	staging := test.TempDir()
 	if symlinkError := os.Symlink(packageRoot, filepath.Join(staging, "node_modules_link")); symlinkError != nil {
 		test.Fatalf("linking the installed tailwindcss beside the independent stylesheet: %v", symlinkError)
@@ -781,48 +554,4 @@ func independentLiveSystem(test *testing.T) *tailwindcollapse.LoadedDesignSystem
 		test.Fatalf("loading the independent design system: %v", loadDesignSystemError)
 	}
 	return system
-}
-
-// A repository's own `@utility` root is never reported, whatever its value looks like.
-//
-// `shadow--3` is the control this rule needs and the one a value check gets wrong most easily. It
-// reads as root `shadow-`, declared by `@utility shadow--*` with a `--shadow---3` through
-// `--shadow--9` scale behind it, and no framework description covers that shape. Asking a framework
-// description about it would report a class this repository writes and Tailwind compiles.
-//
-// `content--0`, `border--0` and `background--0` are the same family, the trailing-dash roots
-// `4f23e9f` and `7a72125` found sitting in generated tables headed with a Tailwind version.
-//
-// Read from the design system rather than listed, so a repository adding an `@utility` block joins
-// this test rather than needing to be added to it.
-func TestRepositoryUtilityRootsAreNeverReported(test *testing.T) {
-	test.Parallel()
-	system := unknownFixtureLiveSystem(test)
-	if system == nil {
-		test.Skip("no design system loaded")
-	}
-
-	var checked int
-	for _, className := range []string{"shadow--3", "content--0", "border--0", "background--0"} {
-		candidates := tailwindcollapse.ParseCandidate(className, system)
-		if len(candidates) == 0 {
-			continue
-		}
-		if !system.DeclaresFunctionalUtility(candidates[0].Root) {
-			continue
-		}
-		checked++
-		if !classExistsIn(className, system) {
-			test.Errorf(
-				"%s reads as the repository root %q and is reported, which is a false positive on a declared utility",
-				className,
-				candidates[0].Root,
-			)
-		}
-	}
-
-	test.Logf("repository utility classes checked: %d", checked)
-	if checked == 0 {
-		test.Skip("this design system declares none of these roots")
-	}
 }

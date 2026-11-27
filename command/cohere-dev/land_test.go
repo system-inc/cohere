@@ -16,6 +16,12 @@ import (
 	"github.com/system-inc/cohere/internal/testing/executable_testing"
 )
 
+// gitWithoutMaintenance turns off git's automatic maintenance for every git a fixture starts, its own and the ones
+// cohere-dev starts in it: git 2.54's commit starts a detached `git maintenance run --auto`, which wrote into `.git`
+// while TempDir was removing it and failed the test at its cleanup (#hss44t2).
+var gitWithoutMaintenance = []string{"GIT_CONFIG_COUNT=1", "GIT_CONFIG_KEY_0=maintenance.auto",
+	"GIT_CONFIG_VALUE_0=false"}
+
 // landFixture is a repository with main checked out and two worktrees, a and b, each one commit ahead on a
 // file of its own, and a cohere-dev whose go stands in for the gate: it logs when each worktree's test run
 // starts and ends, and which files the tree it tests holds.
@@ -71,6 +77,7 @@ func newLandFixture(test *testing.T) *landFixture {
 		"GIT_CONFIG_GLOBAL=/dev/null",
 		"GIT_CONFIG_NOSYSTEM=1",
 	)
+	fixture.environment = append(fixture.environment, gitWithoutMaintenance...)
 
 	fixture.git(fixture.repository, "init", "-q", "-b", "main")
 	fixture.commit(fixture.repository, "base.txt")
@@ -364,6 +371,7 @@ func gitlinkRepository(test *testing.T) (string, func(directory string, argument
 		"GIT_CONFIG_GLOBAL=/dev/null",
 		"GIT_CONFIG_NOSYSTEM=1",
 	)
+	environment = append(environment, gitWithoutMaintenance...)
 	git := func(directory string, arguments ...string) string {
 		test.Helper()
 		command := exec.Command("git", arguments...)

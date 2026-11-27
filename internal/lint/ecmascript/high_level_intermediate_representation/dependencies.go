@@ -83,8 +83,6 @@
 // cross-tabulation of dependencies per scope against scope member count, over 400 corpus files and
 // 677 outermost functions. The control cell is scopes carrying zero dependencies: a pass that
 // collected nothing would put every scope there, and a pass that over-collected would empty it.
-//
-// See `TestDependencyDistributionIsReal`, which pins the shape rather than the corpus numbers.
 package high_level_intermediate_representation
 
 import (

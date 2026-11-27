@@ -41,7 +41,7 @@ type wave3Fixture struct {
 // function of its type, this is where it shows up, and the answer then is a new table rather than a
 // wider descriptor.
 //
-// Run on the public theme's oracle and on ahra's (#f598zk0), each against the design system it records.
+// Run on the public theme's oracle (#f598zk0), against the design system it records.
 func TestWave3RootsAreAlreadyAnsweredByTheDescriptorTable(test *testing.T) {
 	test.Parallel()
 	forEachOracleCopy(test, "wave3_fixtures.json", func(test *testing.T, fixtureName string) {
@@ -221,8 +221,9 @@ func loadWave3Fixture(test *testing.T, name string) wave3Fixture {
 // differential, and this is the measurement behind that rather than a shrug.
 //
 // The order is observable only when a key belongs to two namespaces and some root consumes both. The
-// second half nearly holds: `font` consumes `--font-weight` and `--font`, the only such root of the
-// 84 namespaces here. The first half does not. `bold` and `medium` are keys of `--font-weight`
+// second half nearly holds: `font` consumes `--font-weight` and `--font`, the only such root among the
+// public theme's namespaces, as it was among the 84 of the consumer theme this was first measured on. The
+// first half does not. `bold` and `medium` are keys of `--font-weight`
 // alone, `sans` of `--font` alone, so the loop's membership guard admits exactly one namespace per
 // key and the order it tries them in cannot matter.
 //
@@ -232,7 +233,7 @@ func loadWave3Fixture(test *testing.T, name string) wave3Fixture {
 // gains an ambiguous key, which is the moment the mutation becomes possible and is owed.
 func TestNamespacePrecedenceIsUnobservableInThisCorpus(test *testing.T) {
 	test.Parallel()
-	system := loadWave1DesignSystem(test)
+	system := publicThemeSystem(test)
 	table := NewTable(system)
 
 	ambiguous := map[string][]string{}

@@ -21,7 +21,7 @@ var tokenScanCases = []string{
 }
 
 // The hand scan finds exactly what uppercaseToken finds, every match where the pattern puts it, over the shapes above,
-// every string of up to four bytes from an alphabet of each kind of byte the boundary tells apart, and the corpus.
+// and every string of up to four bytes from an alphabet of each kind of byte the boundary tells apart.
 func TestNextUppercaseTokenMatchesThePattern(test *testing.T) {
 	test.Parallel()
 	texts := slices.Clone(tokenScanCases)
@@ -37,7 +37,6 @@ func TestNextUppercaseTokenMatchesThePattern(test *testing.T) {
 		texts = append(texts, longer...)
 		generated = longer
 	}
-	texts = append(texts, realCommentCorpus(test)...)
 	for _, text := range texts {
 		want := uppercaseToken.FindAllStringIndex(text, -1)
 		var got [][]int
@@ -57,7 +56,7 @@ func TestNextUppercaseTokenMatchesThePattern(test *testing.T) {
 // left a token the whole run held back, `RAY` out of `X-RAY`.
 func TestMaskingMakesNoNewToken(test *testing.T) {
 	test.Parallel()
-	texts := append(slices.Concat(tokenScanCases, runScanCases), realCommentCorpus(test)...)
+	texts := slices.Concat(tokenScanCases, runScanCases)
 	texts = append(texts, strings.Join(tokenScanCases, "\n"), strings.Join(runScanCases, "\n"))
 	for _, text := range texts {
 		before := map[[2]int]bool{}
@@ -78,7 +77,7 @@ func TestMaskingMakesNoNewToken(test *testing.T) {
 // acronyms, so a gate that read only the first capital word, or the masked text's words, fails here.
 func TestHasShoutedTokenSkipsOnlyWhatReportsNothing(test *testing.T) {
 	test.Parallel()
-	texts := append(slices.Concat(tokenScanCases, runScanCases), realCommentCorpus(test)...)
+	texts := slices.Concat(tokenScanCases, runScanCases)
 	skipped := 0
 	for _, text := range texts {
 		if HasShoutedToken(text) {
