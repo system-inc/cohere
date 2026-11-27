@@ -1,0 +1,141 @@
+/* Fernwood Field Notes: application stylesheet
+ *
+ * The entry point every layout imports. It wires Tailwind, names the content sources, and pulls in
+ * the token, utility and motion sheets in the order the cascade needs them:
+ *
+ *   app.css -> tokens.css -> utilities.css -> motion.css
+ *
+ * Keep @import statements above any rule; a browser ignores an @import that follows one.
+ */
+
+/* Tailwind's configuration file, still read for the plugin list */
+@config '../../fernwood.config.ts';
+
+/* Tailwind itself, with automatic source detection turned off */
+@import 'tailwindcss' source(none);
+
+/* Where class names are scanned from */
+@source '../../app/';
+@source '../../components/';
+@source not '../../components/legacy/';
+
+/* The dark variant honours a light island nested inside a dark page, and a dark island inside that */
+@custom-variant dark (&:where(.mode-dusk, .mode-dusk *):not(:where(.mode-day:not(:has(.mode-dusk)), .mode-day:not(:has(.mode-dusk)) *)));
+
+/* A variant for the print preview pane, written as a block so it can carry a media query */
+@custom-variant preview {
+    &:where([data-preview='true'] *) {
+        @slot;
+    }
+    @media print {
+        @slot;
+    }
+}
+
+@import './tokens.css';
+@import './utilities.css' layer(utilities);
+@import "./motion.css";
+@import url('./print.css') print;
+@import url("./reader.css") screen and (width >= 48rem);
+
+@layer base {
+    html {
+        font-family: Söhne, var(--font-sans);
+        -webkit-font-smoothing: antialiased;
+        text-rendering: optimizeLegibility;
+    }
+
+    /* The browser default outline is replaced, never removed */
+    :focus-visible {
+        outline: 2px solid var(--color-moss-500) !important;
+        outline-offset: 2px!important;
+    }
+
+    body {
+        background-color: var(--color-paper-50);
+        color: var(--color-ink-900);
+        /* Long notes wrap rather than scroll sideways */
+        overflow-wrap: anywhere;
+    }
+
+    ::selection {
+        background-color: color-mix(in oklab, var(--color-moss-300) 60%, transparent);
+    }
+
+    blockquote::before {
+        content: '\201C';
+    }
+    blockquote::after {
+        content: "\201D";
+    }
+
+    .breadcrumb > li + li::before {
+        content: '→';
+        padding-inline: 0.5ch;
+    }
+
+    .empty-state::after {
+        content: "Nothing here yet; add a note to get started.";
+    }
+
+    a[href^='http']:not([href*='fernwood.example']) {
+        text-decoration-style: dotted;
+    }
+
+    hr {
+        border: none;
+        border-block-start: 1px solid var(--color-paper-200);;
+    }
+}
+
+@layer components {
+    .note-card {
+        @apply rounded-lg border border-paper-200 bg-paper-50 p-4;
+        box-shadow:
+            0 1px 2px rgb(0 0 0 / 0.06), /* contact shadow */
+            0 8px 24px rgb(0 0 0 / 0.08);
+    }
+
+    .note-card:hover {
+        @apply border-moss-300 !important;
+    }
+
+    /* Escaped class names as the scanner writes them */
+    .before\:content-\[\'\;\'\]::before {
+        content: ';';
+    }
+    .w-\[calc\(100\%-2rem\)\] {
+        width: calc(100% - 2rem);
+    }
+    .hover\:tint-moss-500:hover {
+        color: var(--color-moss-500);
+    }
+
+    .legacy-toolbar {
+        color : var(--color-ink-700);
+        background : url(data:image/svg+xml;base64,PHN2Zy8+) no-repeat;
+    }
+}
+
+@supports not (backdrop-filter: blur(1px)) {
+    .glass-panel {
+        background-color: var(--color-paper-100);
+    }
+}
+
+/* Print preview and the reader share one page reset */
+.print-root, /* the preview pane */
+.reader-root {
+    margin: 0;
+}
+
+@media /* wide screens */ (width >= 64rem) {
+    .sidebar { inline-size: 18rem; }
+    .reader { max-inline-size: 72ch }
+}
+
+@media	print {
+    .no-print {
+        display: none;
+    }
+}

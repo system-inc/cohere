@@ -11,15 +11,18 @@ import (
 
 // The fixture is what the shipped Tailwind 4.3.3 candidate parser read for every class in the
 // corpus, captured by internal/lint/rules/tailwind/tools/generate_candidate and checked in next to this test.
+// It is captured on the planted theme, testdata/planted_repository/styles, and its repository classes
+// are the 4,750 distinct classes the source tree generated beside that theme writes, so the parser is
+// tested on a theme that declares its own utilities and variants.
 //
 // Measured rather than transcribed, and the thing measurement buys here is order. `parseCandidate`
-// is a generator; 2,760 of the 5,056 classes in this fixture yield more than one reading, and the
+// is a generator; 4,485 of the 8,426 classes in this fixture yield more than one reading, and the
 // caller keeps the first that compiles. A hand-written expectation set would almost certainly have
 // recorded the readings as a set, agreed with a port that had `border-b` and `border`+`b` the wrong
 // way round, and let every `border-b` in the repository resolve to the wrong utility silently.
 //
 // The fixture also carries the design system's own tables, so this test answers the parser's four
-// questions with the same 1,236 utility roots and 88 variant roots Tailwind had. Without that
+// questions with the same 1,209 utility roots and 92 variant roots Tailwind had. Without that
 // this would be a test of a stub.
 
 type candidateCorpus struct {
@@ -452,20 +455,26 @@ func TestParseCandidateMatchesTailwind(test *testing.T) {
 	// The volume assertions. A suite that compared almost nothing looks exactly like a suite that
 	// compared everything and agreed, so what makes the green line mean something is asserted here
 	// rather than assumed.
-	if comparedClasses < 1000 {
+	//
+	// The fixture holds 8,426 classes, 210 hand-written, 4,750 the planted tree writes and 3,466 from
+	// the sweep, and 4,485 of them are ambiguous, 51 of those hand-written. Each floor sits under its
+	// count by less than the hand-written share, so a fixture that lost any one source fails it. The
+	// framework alone registers 1,201 utility roots and 83 variant roots.
+	if comparedClasses < 8400 {
 		test.Fatalf("only %d classes compared; the corpus is too small to mean anything", comparedClasses)
 	}
-	if comparedAmbiguous < 500 {
+	if comparedAmbiguous < 4450 {
 		test.Fatalf("only %d ambiguous classes compared; the ordering claim rests on too few", comparedAmbiguous)
 	}
-	if corpus.UtilityRootCount < 500 || corpus.VariantRootCount < 50 {
+	if corpus.UtilityRootCount < 1201 || corpus.VariantRootCount < 83 {
 		test.Fatalf(
 			"the captured design system holds only %d utility roots and %d variant roots; even the framework defaults are missing",
 			corpus.UtilityRootCount, corpus.VariantRootCount,
 		)
 	}
 	// The counts above pass against framework defaults alone. These do not: they are roots only
-	// this repository's own `@utility` blocks and `@theme` breakpoints register, so they are what
+	// this repository's own `@utility` and `@custom-variant` blocks and `@theme` breakpoints register,
+	// `card-frame` and `wash-` and `compact` and `tablet` among them, so they are what
 	// distinguishes a fixture that read this repository from one that read Tailwind's own defaults
 	// while claiming otherwise.
 	if len(corpus.RepositoryUtilityMarkers) == 0 || len(corpus.RepositoryVariantMarkers) == 0 {
@@ -543,7 +552,8 @@ func TestParseCandidateOrderIsCompared(test *testing.T) {
 		}
 	}
 
-	if checked < 100 {
+	// The fixture holds 4,485 ambiguous classes, so a full sample of 200 is always available.
+	if checked < 200 {
 		test.Fatalf("only %d ambiguous classes were available to check; the fixture is not exercising order", checked)
 	}
 	test.Logf("confirmed on %d ambiguous classes that a reversed reading list renders differently", checked)
@@ -648,7 +658,8 @@ func TestGateCandidatesPreservesOrder(test *testing.T) {
 		}
 	}
 
-	if checked < 100 {
+	// The fixture holds 4,485 ambiguous classes, so a full sample of 500 is always available.
+	if checked < 500 {
 		test.Fatalf("only %d ambiguous classes were checked; the order claim is not being exercised", checked)
 	}
 	test.Logf("confirmed order is preserved through the gate conversion on %d ambiguous classes", checked)

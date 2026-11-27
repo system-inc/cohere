@@ -1,0 +1,16 @@
+/*
+ * The planted repository's design system (#pg78xtp, #gd38z12): a second theme written in cohere, for the
+ * tests that need a repository with a stylesheet and a source tree of its own, and for the ones whose point
+ * is that two design systems answer the same class differently. The public theme is the first.
+ *
+ * It belongs to no product. Every block is a shape a real repository's theme has and a test can fail on:
+ * custom variants that override and extend the framework's, custom breakpoints, numbered scales whose root
+ * ends in a dash, a root declared both ways, statics that declare only custom properties or only nested
+ * rules, a functional utility reading a modifier, and an animation token. Split across files so the import
+ * walk runs the way it does in a repository. The source tree beside it, under ../source, is generated from
+ * this theme by tools/generate_planted_repository and is what the corpus generators harvest.
+ */
+@import 'tailwindcss';
+@import './tokens.css';
+@import './variants.css';
+@import './utilities.css';

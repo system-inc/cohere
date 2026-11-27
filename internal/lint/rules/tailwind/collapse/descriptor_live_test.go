@@ -112,11 +112,12 @@ func expectLiveTableAgreesWithTailwind(test *testing.T, fixtures *descriptorFixt
 	test.Logf("  %d lookups declined", declined)
 
 	// Volume assertions, in the extractor's spirit: a suite that agreed on everything because it
-	// tested almost nothing reports the same green line as one that did the work.
+	// tested almost nothing reports the same green line as one that did the work. The floor sits just
+	// under the 7,151 cases the live table scores on the public theme's corpus.
 	if withoutReading > len(fixtures.Cases)/2 {
 		test.Errorf("%d of %d cases had no reading; the corpus is mostly unscored", withoutReading, len(fixtures.Cases))
 	}
-	if agreed < 5000 {
+	if agreed < 7000 {
 		test.Errorf("only %d agreements; the corpus is too small for the number to mean anything", agreed)
 	}
 }
@@ -243,20 +244,15 @@ func TestLiveTableDeclinesOnlyWhereTheEvaluatorAnswers(test *testing.T) {
 	test.Parallel()
 	forEachOracleCopy(test, "descriptor_fixtures.json", func(test *testing.T, fixtureName string) {
 		fixtures := loadDescriptorFixtures(test, fixtureName)
-		measured := testTable(test)
-		if tableName := oracleSibling(
-			test,
-			fixtureName,
-			"descriptor_table.json",
-		); tableName != "descriptor_table.json" {
-			var loadTestTableError error
-			measured, loadTestTableError = loadTestTable(
-				tableName,
-				oracleSibling(test, fixtureName, "descriptor_context.json"),
-			)
-			if loadTestTableError != nil {
-				test.Fatalf("building the measured table from %s: %v", tableName, loadTestTableError)
-			}
+		// The measured table is read from the same copy as the fixtures, so the two never come from
+		// different design systems.
+		tableName := oracleSibling(test, fixtureName, "descriptor_table.json")
+		measured, loadTestTableError := loadTestTable(
+			tableName,
+			oracleSibling(test, fixtureName, "descriptor_context.json"),
+		)
+		if loadTestTableError != nil {
+			test.Fatalf("building the measured table from %s: %v", tableName, loadTestTableError)
 		}
 		system, live := liveTableForOracle(test, fixtures.EntryPoint)
 		expectLiveTableDeclinesOnlyWhereTheEvaluatorAnswers(test, fixtures, measured, system, live)

@@ -1,6 +1,6 @@
 {
   "tailwindVersion": "4.3.3",
-  "entryPoint": "ahra:app/_theme/styles/theme.css",
+  "entryPoint": "internal/lint/rules/tailwind/collapse/testdata/public_theme/theme.css",
   "groundTruth": "compileAstNodes declarations; resolution is observed through its effect rather than read directly",
   "probeCount": 20,
   "rejectedCount": 4,

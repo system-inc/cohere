@@ -1,6 +1,6 @@
 // The value-resolution descriptions of the framework roots registered as bare closures.
 //
-// frameworkgaphandlers.go holds what these 57 roots emit. This holds how they decide a value
+// frameworkgaphandlers.go holds what these 55 roots emit. This holds how they decide a value
 // resolves at all, which is a different question and the one `no-unknown-classes` asks: `text-lg` is
 // a class and `text-ss` is a typo, and nothing in a declaration list separates them.
 //
@@ -8,9 +8,9 @@
 //
 // `FrameworkFunctionalUtilities` and `FrameworkMultiDeclarationUtilities` describe roots upstream
 // registers through `functionalUtility`, which takes a declarative description: one namespace list,
-// one bare-value handler, one default. 185 roots fit that and are fully answered by it.
+// one bare-value handler, one default. 187 roots fit that and are fully answered by it.
 //
-// These 57 are registered as `utilities.functional(root, candidate => {...})`, a bare closure, and a
+// These 55 are registered as `utilities.functional(root, candidate => {...})`, a bare closure, and a
 // closure can do things a description could not express until `Arms` existed: consult several
 // namespace lists in sequence, infer a type instead of reading the theme, and accept a modifier on
 // one path while refusing it on another.
@@ -251,12 +251,6 @@ var GapRootDescriptions = map[string]*FunctionalUtilityDescription{
 	"mask": {
 		StaticValueNames: map[string]bool{"none": true},
 	},
-
-	// `block` and `inline` are `staticUtility` registrations that the descriptor extractor probed as
-	// functional roots, which `TestGapRootExemptionsAreExactlyTheStaticCollision` already records.
-	// They take no value, so their description is empty and the emitter answers the static form.
-	"block":  {},
-	"inline": {},
 
 	// `flex` is not valueless: utilities.ts:1189 takes a fraction whose halves are positive integers
 	// and :1195 takes a bare positive integer, refusing a modifier on the latter. `flex-1` is 116 of

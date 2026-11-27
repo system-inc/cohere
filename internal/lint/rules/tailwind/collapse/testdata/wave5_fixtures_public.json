@@ -2,11 +2,23 @@
   "tailwindVersion": "4.3.3",
   "entryPoint": "internal/lint/rules/tailwind/collapse/testdata/public_theme/theme.css",
   "groundTruth": "compileAstNodes propertySort, via readingOf",
-  "rootCount": 91,
-  "caseCount": 5074,
-  "answered": 3697,
-  "rejected": 1377,
+  "rootCount": 93,
+  "caseCount": 5248,
+  "answered": 3852,
+  "rejected": 1396,
   "distinctByRoot": {
+    "block": [
+      {
+        "order": [],
+        "count": 1
+      },
+      {
+        "order": [
+          39
+        ],
+        "count": 1
+      }
+    ],
     "bottom": [
       {
         "order": [
@@ -43,6 +55,18 @@
       {
         "order": [
           42
+        ],
+        "count": 1
+      }
+    ],
+    "inline": [
+      {
+        "order": [],
+        "count": 1
+      },
+      {
+        "order": [
+          39
         ],
         "count": 1
       }
@@ -741,6 +765,707 @@
     ]
   },
   "cases": [
+    {
+      "root": "block",
+      "className": "block-0",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-0.5",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-1",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-1.5",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-2",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-2.5",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-3",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-3.5",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-4",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-5",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-6",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-7",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-8",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-9",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-10",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-11",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-12",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-14",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-16",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-20",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-24",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-28",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-32",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-36",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-40",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-44",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-48",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-52",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-56",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-60",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-64",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-72",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-80",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-96",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-1/2",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-1/3",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-1/4",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-1/5",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-1/6",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-1/12",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-2/3",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-2/4",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-2/5",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-2/6",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-2/12",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-3/4",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-3/5",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-3/6",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-3/12",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-4/5",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-4/6",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-4/12",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-5/6",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-5/12",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-6/12",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-7/12",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-8/12",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-9/12",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-10/12",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-11/12",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [
+          39
+        ],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-50",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-90",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-100",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-sm",
+      "parsedRoot": "block",
+      "reading": null
+    },
+    {
+      "root": "block",
+      "className": "block-none",
+      "parsedRoot": "block",
+      "reading": null
+    },
+    {
+      "root": "block",
+      "className": "block-linear",
+      "parsedRoot": "block",
+      "reading": null
+    },
+    {
+      "root": "block",
+      "className": "block-[3px]",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-[var(--a)]",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-1.3",
+      "parsedRoot": "block",
+      "reading": null
+    },
+    {
+      "root": "block",
+      "className": "block/50",
+      "parsedRoot": "block",
+      "reading": null
+    },
+    {
+      "root": "block",
+      "className": "block-16/9",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-3/2",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-1.3/2",
+      "parsedRoot": "block",
+      "reading": null
+    },
+    {
+      "root": "block",
+      "className": "block-7/3",
+      "parsedRoot": "block",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-red-500",
+      "parsedRoot": "block",
+      "reading": null
+    },
+    {
+      "root": "block",
+      "className": "block-current",
+      "parsedRoot": "block",
+      "reading": null
+    },
+    {
+      "root": "block",
+      "className": "block-transparent",
+      "parsedRoot": "block",
+      "reading": null
+    },
+    {
+      "root": "block",
+      "className": "block-px",
+      "parsedRoot": "block-px",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "block-full",
+      "parsedRoot": "block-full",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "block",
+      "className": "-block-3",
+      "parsedRoot": null,
+      "reading": null
+    },
     {
       "root": "bottom",
       "className": "bottom-0",
@@ -3152,6 +3877,818 @@
     {
       "root": "h",
       "className": "-h-3",
+      "parsedRoot": null,
+      "reading": null
+    },
+    {
+      "root": "inline",
+      "className": "inline-0",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-0.5",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-1",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-1.5",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-2",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-2.5",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-2xl",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-2xs",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-3",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-3.5",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-3xl",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-3xs",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-4",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-4xl",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-5",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-5xl",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-6",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-6xl",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-7",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-7xl",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-8",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-9",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-10",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-11",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-12",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-14",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-16",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-20",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-24",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-28",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-32",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-36",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-40",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-44",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-48",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-52",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-56",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-60",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-64",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-72",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-80",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-96",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-lg",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-md",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-sm",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-xl",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-xs",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-1/2",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-1/3",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-1/4",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-1/5",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-1/6",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-1/12",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-2/3",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-2/4",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-2/5",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-2/6",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-2/12",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-3/4",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-3/5",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-3/6",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-3/12",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-4/5",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-4/6",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-4/12",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-5/6",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-5/12",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-6/12",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-7/12",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-8/12",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-9/12",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-10/12",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-11/12",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [
+          39
+        ],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-50",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-90",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-100",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-none",
+      "parsedRoot": "inline",
+      "reading": null
+    },
+    {
+      "root": "inline",
+      "className": "inline-linear",
+      "parsedRoot": "inline",
+      "reading": null
+    },
+    {
+      "root": "inline",
+      "className": "inline-[3px]",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-[var(--a)]",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-1.3",
+      "parsedRoot": "inline",
+      "reading": null
+    },
+    {
+      "root": "inline",
+      "className": "inline/50",
+      "parsedRoot": "inline",
+      "reading": null
+    },
+    {
+      "root": "inline",
+      "className": "inline-16/9",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-3/2",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-1.3/2",
+      "parsedRoot": "inline",
+      "reading": null
+    },
+    {
+      "root": "inline",
+      "className": "inline-7/3",
+      "parsedRoot": "inline",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-red-500",
+      "parsedRoot": "inline",
+      "reading": null
+    },
+    {
+      "root": "inline",
+      "className": "inline-current",
+      "parsedRoot": "inline",
+      "reading": null
+    },
+    {
+      "root": "inline",
+      "className": "inline-transparent",
+      "parsedRoot": "inline",
+      "reading": null
+    },
+    {
+      "root": "inline",
+      "className": "inline-px",
+      "parsedRoot": "inline-px",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "inline-full",
+      "parsedRoot": "inline-full",
+      "reading": {
+        "order": [],
+        "count": 1
+      }
+    },
+    {
+      "root": "inline",
+      "className": "-inline-3",
       "parsedRoot": null,
       "reading": null
     },

@@ -24,15 +24,21 @@ type candidateParts struct {
 	// by hand correct by default.
 	SourceValue string
 	Important   bool
+	// FirstReadingStatic is set when the class's first reading is a static utility and the root and value
+	// here come from its first functional reading with a value, as upstream's collapse reads `w-px`. The
+	// family table says nothing about a static, so a merge with such a class is reported only when the
+	// signatures confirm it.
+	FirstReadingStatic bool
 }
 
-// mergeKey is everything except the root. Two classes can only merge when this matches.
-func (parts candidateParts) mergeKey() string {
+// groupKey is everything except the root and the value: the group upstream collapses within. Two classes
+// can only merge when this matches, and then only when their values agree, by text or by signature.
+func (parts candidateParts) groupKey() string {
 	importance := ""
 	if parts.Important {
 		importance = "!"
 	}
-	return parts.Prefix + "|" + importance + "|" + parts.Value
+	return parts.Prefix + "|" + importance
 }
 
 // printedValue is the value to write into a rebuilt class name.

@@ -1,0 +1,11 @@
+/* Overrides the framework's `dark`, the per-repository fact the variant port exists to respect. */
+@custom-variant dark (&:where(.night, .night *));
+
+/* Variants the framework does not have: a parent class, an attribute and a block form with a media query. */
+@custom-variant compact (&:where(.compact *));
+@custom-variant pressed (&[aria-pressed='true']);
+@custom-variant pointer-fine {
+    @media (pointer: fine) {
+        @slot;
+    }
+}
