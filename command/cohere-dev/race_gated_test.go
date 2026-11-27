@@ -106,11 +106,12 @@ func concurrencyTestDirectories(test *testing.T, root string) map[string]string 
 	return found
 }
 
-// raceGateContext is the build a gate's -race run compiles a package's tests under: darwin/arm64, a gate box's
-// platform, with cgo on and the race tag the race detector sets.
+// raceGateContext is the build a gate's -race run compiles a package's tests under: macBoxPlatform, the platform of
+// the toolchain the integrate job's script pins, with cgo on and the race tag the race detector sets.
 var raceGateContext = func() build.Context {
 	context := build.Default
-	context.GOOS, context.GOARCH, context.CgoEnabled = "darwin", "arm64", true
+	operatingSystem, architecture, _ := strings.Cut(macBoxPlatform, "/")
+	context.GOOS, context.GOARCH, context.CgoEnabled = operatingSystem, architecture, true
 	context.BuildTags = []string{"race"}
 	return context
 }()
@@ -1021,5 +1022,50 @@ func TestANarrowedRaceRunIsRefusedForEachWayItFailsItsPackage(test *testing.T) {
 		if (change.refusal == "") != (refusals == "") || !strings.Contains(refusals, change.refusal) {
 			test.Errorf("%s: the list is refused as %q, want %q", name, refusals, change.refusal)
 		}
+	}
+}
+
+// The race guard reads test files under the platform the gate's -race run compiles for, macBoxPlatform, and that is
+// the platform of the run only while the integrate job's tests step runs macBoxScript and that script pins
+// macBoxToolchainDigest, whose platform macBoxPlatform names (#f3m0x6j). Moving the race run to another script or
+// another toolchain reads red here until macBoxPlatform moves with it.
+func TestTheRaceGuardsPlatformIsTheGateScriptsToolchain(test *testing.T) {
+	test.Parallel()
+	if !strings.Contains(macBoxScript, `digest="`+macBoxToolchainDigest+`"`) {
+		test.Errorf("macBoxScript pins no toolchain by macBoxToolchainDigest, so macBoxPlatform may not be its " +
+			"platform")
+	}
+	parsed, parseError := parser.ParseFile(token.NewFileSet(), "integrate_job_run.go", nil, parser.SkipObjectResolution)
+	if parseError != nil {
+		test.Fatal(parseError)
+	}
+	scripts := []string{}
+	// The tests step's own method, as the measure step hands another script to the same call.
+	index := slices.IndexFunc(parsed.Decls, func(declaration ast.Decl) bool {
+		function, isFunction := declaration.(*ast.FuncDecl)
+		return isFunction && function.Recv != nil && function.Name.Name == "tests"
+	})
+	if index < 0 {
+		test.Fatal("integrate_job_run.go holds no tests method of the integrate job")
+	}
+	ast.Inspect(parsed.Decls[index], func(node ast.Node) bool {
+		if call, isCall := node.(*ast.CallExpr); isCall && calleeName(call) == "withIntegrateJobMirrors" &&
+			len(call.Args) > 0 {
+			if script, isIdentifier := call.Args[0].(*ast.Ident); isIdentifier {
+				scripts = append(scripts, script.Name)
+			} else {
+				scripts = append(scripts, "an expression")
+			}
+		}
+		return true
+	})
+	if !slices.Equal(scripts, []string{"macBoxScript"}) {
+		test.Errorf("the integrate job's tests step runs %v, want macBoxScript alone, whose toolchain macBoxPlatform "+
+			"names", scripts)
+	}
+	if operatingSystem, architecture, _ := strings.Cut(macBoxPlatform, "/"); raceGateContext.GOOS != operatingSystem ||
+		raceGateContext.GOARCH != architecture {
+		test.Errorf("the race guard reads test files as %s/%s, want macBoxPlatform, %s", raceGateContext.GOOS,
+			raceGateContext.GOARCH, macBoxPlatform)
 	}
 }

@@ -89,10 +89,13 @@ const (
 // macBoxGoroot is where Machines lays the Go toolchain on the house Macs, root-owned, outside loom's home, and
 // macBoxToolchainDigest is sharedBoxGate's digest of it: go1.27.1 darwin/arm64 as go.dev ships it
 // (go1.27.1.darwin-arm64.tar.gz, sha256 ee215d57..., matching go.dev's published one), read by this digest on Sun2 and
-// on Marin (#rr818c8, Nov 16). A Mac on another Go refuses until this moves.
+// on Marin (#rr818c8, Nov 16). A Mac on another Go refuses until this moves. macBoxPlatform is the platform that
+// toolchain builds for, which the digest vouches for, so the two move together: it is the platform the gate's tests
+// and its -race run compile under, which the race guard reads test files by (raceGateContext, #f3m0x6j).
 const (
 	macBoxGoroot          = "/opt/loom-tools/go"
 	macBoxToolchainDigest = "4256a1b77627be7a90f81396a371991e6232f1d1f0d55df55d4ad1f58f43405b"
+	macBoxPlatform        = "darwin/arm64"
 )
 
 // macBoxNode is where Machines lays node on the house Macs, beside the toolchain, and macBoxNodeDigest is the sha256 of
