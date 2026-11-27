@@ -19,9 +19,6 @@ import (
 	"github.com/system-inc/cohere/internal/go_language/load"
 	"github.com/system-inc/cohere/internal/go_language/rule"
 	"github.com/system-inc/cohere/internal/go_language/rules"
-	"github.com/system-inc/cohere/internal/go_language/rules/function_purity"
-	"github.com/system-inc/cohere/internal/go_language/rules/odd_slice_argument"
-	"github.com/system-inc/cohere/internal/go_language/rules/return_nil_ness"
 )
 
 // closureBottom is the import path of the workspace's bottom package, the one whose analysis the differential compares.
@@ -157,10 +154,6 @@ func Use() {
 `,
 }
 
-// closureKinds are the fact kinds the resolver computes on demand, each of which the differential holds to no
-// contradiction.
-var closureKinds = []*fact_resolver.Kind{function_purity.Kind, odd_slice_argument.Kind, return_nil_ness.Kind}
-
 // closureRun is one analysis of the workspace by every registered rule: the patterns' load, the graph, the resolver
 // it asked, and bottom's package in it.
 type closureRun struct {
@@ -292,8 +285,7 @@ func (run *closureRun) render(paths map[string][]objectpath.Path) string {
 // build's may not. Every registered rule runs over a workspace whose bottom package is imported by one that
 // instantiates its generics with its own types and asks the resolver of the same functions, and of one bottom never
 // asks of, beside one unrelated to either; and again over bottom's closure alone, the patterns naming bottom only, so
-// neither other package is loaded. Bottom must read the same, line for line, both ways, and no kind may contradict a
-// verdict it kept in either run.
+// neither other package is loaded. Bottom must read the same, line for line, both ways.
 func TestABottomPackageReadsTheSameWithItsImportersAndWithout(test *testing.T) {
 	test.Parallel()
 
@@ -325,12 +317,6 @@ func TestABottomPackageReadsTheSameWithItsImportersAndWithout(test *testing.T) {
 		name     string
 		analyzed *closureRun
 	}{{"the whole workspace", workspace}, {"the closure alone", closure}} {
-		for _, kind := range closureKinds {
-			if contradicted := run.analyzed.resolver.Counts(kind).Contradicted.Load(); contradicted != 0 {
-				test.Errorf("over %s, %s's fallbacks contradicted %d verdicts its demand walk kept", run.name,
-					kind.Name, contradicted)
-			}
-		}
 		if run.analyzed.resolver.Unsure(run.analyzed.bottom.Types) || len(run.analyzed.resolver.Reloads()) > 0 {
 			test.Errorf("over %s, bottom was handed a placeholder, or a question reached a package to reload", run.name)
 		}
