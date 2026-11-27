@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"go/ast"
+	"go/build"
 	"go/parser"
 	"go/token"
 	"io/fs"
@@ -100,6 +101,25 @@ func concurrencyTestDirectories(test *testing.T, root string) map[string]string 
 	return found
 }
 
+// raceGateContext is the build a gate's -race run compiles a package's tests under: darwin/arm64, a gate box's
+// platform, with cgo on and the race tag the race detector sets.
+var raceGateContext = func() build.Context {
+	context := build.Default
+	context.GOOS, context.GOARCH, context.CgoEnabled = "darwin", "arm64", true
+	context.BuildTags = []string{"race"}
+	return context
+}()
+
+// raceGateCompiles is whether the gate's -race run compiles the file name of directory: not one go ignores by its
+// name's leading underscore or dot, nor one whose name or build constraints leave out darwin/arm64 or the race tag. A
+// test in a file it doesn't compile is no test the run can select, so it is never held, kept or called concurrent by
+// the readers of test files (#q1v0ern, the Go Square's S7). A file that can't be read counts as compiled, so the
+// reader that parses it next fails on it.
+func raceGateCompiles(directory string, name string) bool {
+	matches, matchError := raceGateContext.MatchFile(directory, name)
+	return matches || matchError != nil
+}
+
 // concurrencyTestsInFile is every top-level test in the test file at path that the guard calls concurrent: each whose
 // name says it runs code at once, and every one when the file's name says its tests do.
 func concurrencyTestsInFile(path string) ([]string, error) {
@@ -131,7 +151,7 @@ func concurrencyTestsInDirectory(test *testing.T, directory string) []string {
 	}
 	tests := []string{}
 	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), "_test.go") {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), "_test.go") || !raceGateCompiles(directory, entry.Name()) {
 			continue
 		}
 		found, foundError := concurrencyTestsInFile(filepath.Join(directory, entry.Name()))
@@ -542,7 +562,7 @@ func testsReaching(directory string, matches func(ast.Node) bool) ([]string, err
 	tests := []string{}
 	for _, entry := range entries {
 		name := entry.Name()
-		if entry.IsDir() || !strings.HasSuffix(name, "_test.go") {
+		if entry.IsDir() || !strings.HasSuffix(name, "_test.go") || !raceGateCompiles(directory, name) {
 			continue
 		}
 		parsed, parseError := parser.ParseFile(token.NewFileSet(), filepath.Join(directory, name), nil,
@@ -602,7 +622,7 @@ func testsOfDirectory(test *testing.T, directory string) []string {
 	}
 	tests := []string{}
 	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), "_test.go") {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), "_test.go") || !raceGateCompiles(directory, entry.Name()) {
 			continue
 		}
 		parsed, parseError := parser.ParseFile(token.NewFileSet(), filepath.Join(directory, entry.Name()), nil,
@@ -815,9 +835,10 @@ func TestStartersAndSkippersAreFollowedThroughTheirPackagesHelpers(test *testing
 
 // A narrowed entry's list is refused for each way it can fail its package, and a whole list is taken: so dropping a
 // claimed test, a site claimed once or one goroutine wide, a claimant that may skip counted as one of the two, a new
-// site, a stale one, a concurrent test left out, a run beside the list, an empty list, and a claim from no other
-// narrowed entry each read red. The fixture's sites include a call of a starter by its bounded name, two init
-// functions, a method of a generic type and a package variable's literal, each keyed apart.
+// site, a stale one, a concurrent test left out, a run beside the list, an empty list, a claim from no other narrowed
+// entry, and a claimant in a test file the gate's -race run doesn't compile each read red, while a test that starts
+// goroutines in such a file is never asked for. The fixture's sites include a call of a starter by its bounded name,
+// two init functions, a method of a generic type and a package variable's literal, each keyed apart.
 func TestANarrowedRaceRunIsRefusedForEachWayItFailsItsPackage(test *testing.T) {
 	test.Parallel()
 	// Read from the module root, as the guard reads the list, so a claim from check reads check's own package.
@@ -887,7 +908,17 @@ func TestANarrowedRaceRunIsRefusedForEachWayItFailsItsPackage(test *testing.T) {
 			entry.kept.sites[0].claims = append(entry.kept.sites[0].claims, raceClaim{test: "TestGone", width: 2})
 		}, "doesn't hold"},
 		"a census that is no job": {func(entry *raceEntry) { entry.kept.census = "by hand" }, "no Loom job's id"},
-		"a run beside the list":   {func(entry *raceEntry) { entry.run = "Direct" }, "names a run beside"},
+		"a claimant only linux compiles": {func(entry *raceEntry) {
+			entry.kept.sites[0].claims = append(entry.kept.sites[0].claims, raceClaim{test: "TestOnLinux", width: 2})
+		}, "it keeps TestOnLinux, which the package doesn't hold"},
+		"a claimant the race tag leaves out": {func(entry *raceEntry) {
+			entry.kept.sites[0].claims = append(entry.kept.sites[0].claims, raceClaim{test: "TestNotUnderRace",
+				width: 2})
+		}, "it keeps TestNotUnderRace, which the package doesn't hold"},
+		"a claimant go ignores": {func(entry *raceEntry) {
+			entry.kept.sites[0].claims = append(entry.kept.sites[0].claims, raceClaim{test: "TestIgnored", width: 2})
+		}, "it keeps TestIgnored, which the package doesn't hold"},
+		"a run beside the list": {func(entry *raceEntry) { entry.run = "Direct" }, "names a run beside"},
 		"an empty list": {func(entry *raceEntry) { entry.kept = &raceKept{census: "J-0000000"} },
 			"keeps no test"},
 		"a claim from no other narrowed entry": {func(entry *raceEntry) {
