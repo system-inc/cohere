@@ -13,8 +13,9 @@ import (
 // TestNoDeprecatedInJsx reads through: a generic component alias and the JSX namespace a <div> needs. It
 // proves the same mechanism as that case, a prop marked @deprecated, reached through a generic component
 // alias an installed package declares, on any machine, with nothing vendored. The tag is on the source's
-// own Props, as in upstream's invalid:145; the package supplies only the alias. The live case against the
-// real @types/react stays beside it, opt-in through the ahra corpus (#sycrdr6).
+// own Props, as in upstream's invalid:145; the package supplies only the alias. invalid:145 itself reads
+// the alias from noDeprecatedReactModuleTypes, an ambient `declare module 'react'` in its own program, so
+// this is the case that reaches it as an installed package under node_modules/@types.
 const fixtureReactTypes = `export type FC<P> = (props: P) => unknown;
 
 declare global {
