@@ -184,7 +184,7 @@ func (designSystem *classOrderDesignSystem) VariantCompoundsWith(parent string, 
 // It reuses `extractedTableFile`, `extractedContextFile` and the four reading helpers that
 // `descriptor_table_test.go` declares at package scope, so there is one definition of how a measured
 // bucket becomes a `Reading` and this file cannot drift from it. What it does not reuse is
-// `loadTestTable`, which reads two fixed paths off disk and therefore only ever builds ahra's table.
+// `loadTestTable`, which reads two fixed paths off disk and therefore only ever builds one table.
 // This tier needs one table per design system out of one fixture, so the assembly is here and the
 // decoding is shared.
 func classOrderTable(test *testing.T, system *classOrderSystem) *Table {
@@ -338,9 +338,10 @@ func classOrderUnresolvableAlpha(className string) bool {
 
 // classOrderExpectedUnresolvableAlpha is how many classes the mechanism must cover per design system.
 //
-// A floor rather than an exact count, so a repository adding a shadow token does not fail the suite,
-// and high enough that an acknowledgement which stopped applying cannot pass as covered.
-const classOrderExpectedUnresolvableAlpha = 15
+// The fixture measures 17 on the public theme and 19 on the planted one, every disagreement either
+// system has, so the floor is the smaller: a shadow family that stopped disagreeing, or a corpus class
+// that left, fails it, and an acknowledgement which stopped applying cannot pass as covered.
+const classOrderExpectedUnresolvableAlpha = 17
 
 // classOrderExpectedInventedReadings is how many classes the second mechanism must cover.
 //
@@ -357,8 +358,10 @@ const classOrderExpectedUnresolvableAlpha = 15
 //
 // Six registry classes on both systems, every one the colour-keyword-plus-alpha shape
 // (`shadow-inherit/50` puts an alpha on a keyword that cannot carry one), plus corpus classes that
-// differ per repository because they are words the repository writes that no namespace holds:
-// `text-ss` and `text-dark-4/70` on ahra. Ten on ahra and nine on connected.
+// differ per repository because they are values the repository writes that its own `@utility` cannot
+// resolve: `edge--7` and `shadow--4` on the public theme, `wash--4`, `line--4` and `stack-4` on the
+// planted one, some behind a variant. Ten on the public theme and twelve on the planted, so the
+// ceiling is the larger.
 //
 // Bounded above rather than below, because this is the direction where a growing number means the
 // port has started inventing readings, which is the failure nothing else in the suite watches for.
@@ -373,8 +376,10 @@ const classOrderExpectedInventedReadings = 12
 // for every class the Go side answers and Tailwind does not.
 //
 // The floors are floors and not exact counts, so the registry can grow without anyone re-tuning a
-// control. Each is far enough above zero that a corruption which changed nothing cannot pass, and
-// far enough below the measured detection count that a token landing in a theme cannot fail it.
+// control. Each sits just under the smaller system's measured detections, so a corruption that
+// reached only part of the population cannot pass, and a token landing in a theme cannot fail it.
+// The three corrupting every answered class detect between 57,054 and 60,097 classes, shifted-order
+// the fewest because a reading with no order has no first index to shift.
 func classOrderControls() []Control {
 	return []Control{
 		{
@@ -395,7 +400,7 @@ func classOrderControls() []Control {
 				}
 			},
 			ExpectedOutcome:   OutcomeDisagreed,
-			MinimumDetections: 10000,
+			MinimumDetections: 55000,
 		},
 		{
 			Name:   "shifted-count",
@@ -412,7 +417,7 @@ func classOrderControls() []Control {
 				}
 			},
 			ExpectedOutcome:   OutcomeDisagreed,
-			MinimumDetections: 10000,
+			MinimumDetections: 55000,
 		},
 		{
 			Name:   "silent-side",
@@ -423,7 +428,7 @@ func classOrderControls() []Control {
 				}}
 			},
 			ExpectedOutcome:   OutcomeGoSilent,
-			MinimumDetections: 10000,
+			MinimumDetections: 55000,
 		},
 		{
 			Name:   "invented-reading",
@@ -441,8 +446,11 @@ func classOrderControls() []Control {
 					},
 				}
 			},
-			ExpectedOutcome:   OutcomeTailwindSilent,
-			MinimumDetections: 40,
+			ExpectedOutcome: OutcomeTailwindSilent,
+			// Every class Tailwind declines lands here, 30 registry and 8 corpus classes on the public
+			// theme and 30 and 6 on the planted, so the floor is the smaller system's 36: a corpus that
+			// stopped carrying its nulls cannot pass as a control that fired.
+			MinimumDetections: 36,
 		},
 	}
 }
@@ -464,8 +472,8 @@ func TestClassOrderDifferential(test *testing.T) {
 		})
 	}
 
-	// One design system at a time, because the table is per repository. Comparing ahra's classes
-	// against connected's table is not a differential, it is the defect this port exists to fix,
+	// One design system at a time, because the table is per repository. Comparing the public theme's
+	// classes against the planted theme's table is not a differential, it is the defect this port exists to fix,
 	// run deliberately.
 	for index := range systems {
 		report := Compare(
@@ -556,10 +564,10 @@ func classOrderAssertReport(test *testing.T, fixture *classOrderFixture, source 
 
 	// Go-side silence is split by mechanism rather than bounded by a rate.
 	//
-	// A rate ceiling was the first design here and it was wrong in a way worth recording: 407 of
-	// ahra's 408 declines are the model's own declared boundary, so any ceiling loose enough to
-	// admit them is loose enough to hide the 408th. Connected has exactly one such class,
-	// `max-w-screen-sm`, and a percentage would have absorbed it without a word.
+	// A rate ceiling was the first design here and it was wrong in a way worth recording: on the
+	// consumer themes this fixture was first recorded on, 407 of one system's 408 declines were the
+	// model's own declared boundary, so any ceiling loose enough to admit them was loose enough to
+	// hide the 408th, a missing descriptor row a percentage would have absorbed without a word.
 	classOrderAssertGoSilence(test, system, source, population, grouped[OutcomeGoSilent])
 
 	// The coverage assertion, stated as its own requirement: a side reporting nothing is a failed
@@ -624,36 +632,15 @@ func classOrderUntrustworthyReasons(report Report) []string {
 	return kept
 }
 
-// classOrderMissingDescriptorRoots are roots the parser reads and the descriptor table cannot answer.
+// classOrderExpectedPerDeclarationDeclines is the floor for declines the model makes on purpose, on
+// a design system that declares per-declaration roots.
 //
-// A finding this tier made, handed to the descriptor table's owner rather than fixed here: this file
-// is the instrument, and an instrument that repairs what it measures stops being one.
-//
-// `max-w-screen` is registered as both a static and a functional utility. The parser correctly reads
-// `max-w-screen-sm` as functional rooted there; the extractor recorded the root as a static and
-// wrote no functional row, so `Lookup` declines a class Tailwind compiles to `[46]#1`. One class
-// on www-connected-app and none on ahra, because ahra's registry does not advertise it.
-//
-// Thirteen further roots are registered functional with no descriptor row and produce no visible
-// decline yet, only because their registry classes happen to parse to other roots:
-// `-backdrop-hue-rotate`, `-col`, `-hue-rotate`, `-row`, `backdrop-filter`, `bg-position`,
-// `bg-size`, `filter`, `flex-grow`, `flex-shrink`, `font-features`, `mask-position` and
-// `max-w-screen`. They are latent rather than acknowledged: this list holds only what actually
-// declined, so a class that starts exercising one of the other twelve fails the run.
-//
-// Named per root rather than waved through by a rate, because that is the whole point. A percentage
-// ceiling loose enough to admit the 407 declines the model makes on purpose is loose enough to hide
-// this one, which is how the first version of this assertion was written and why it is not this one.
-var classOrderMissingDescriptorRoots = map[string]bool{
-	"max-w-screen": true,
-}
-
-// classOrderExpectedPerDeclarationDeclines is the floor for declines the model makes on purpose.
-//
-// The 18 per-declaration roots carry 22 or 23 registry classes each, so the measured figure is 407
-// on ahra and 408 on connected. A floor well under that survives a repository dropping an animation
-// utility and still fails if the boundary stops applying entirely.
-const classOrderExpectedPerDeclarationDeclines = 300
+// The public theme declares five, `appear`, `swell`, `-swell`, `drift-up` and `drift-inline`, and
+// the Go side declines 493 of its classes under them, from 95 to 108 a root across the registry and
+// the corpus. The floor sits under the measured figure by less than the smallest root, so a root
+// whose classes stopped declining, or a fixture that lost one, fails it. The planted theme declares
+// none: its `@utility` roots each resolve to one declaration set whatever their value.
+const classOrderExpectedPerDeclarationDeclines = 480
 
 // classOrderAssertGoSilence checks that every class the Go side declined was declined on purpose.
 //
@@ -663,13 +650,11 @@ const classOrderExpectedPerDeclarationDeclines = 300
 // table can answer them and a plausible reading would be wrong in the one place the model knows its
 // own boundary. Those are expected and counted.
 //
-// Anything else is a table gap, and this is the assertion that finds them. Measured on the first run:
-// 407 of ahra's 408 declines are per-declaration roots, and connected has one more,
-// `max-w-screen-sm`. `max-w-screen` is registered as both a static and a functional utility, the
-// parser correctly reads the class as functional rooted there, and the descriptor table carries no
-// functional row for it: it recorded the root as a static and stopped. Thirteen further roots are
-// registered functional with no descriptor row and produce no visible defect yet only because their
-// registry classes happen to parse to other roots.
+// Anything else is a table gap, and this is the assertion that finds them. Its first run found one:
+// `max-w-screen` is registered as both a static and a functional utility, the parser correctly reads
+// `max-w-screen-sm` as functional rooted there, and the descriptor table then carried no functional
+// row for it. Every functional root on both themes in this fixture now has a row, so no decline
+// outside the per-declaration roots is excused, and a system declaring none must decline nothing.
 //
 // That class of defect is reachable only from a class *name*. A fixture that hands the Go side a
 // pre-parsed candidate has already decided the root, so it can never disagree with the parser about
@@ -687,24 +672,17 @@ func classOrderAssertGoSilence(
 	for _, root := range system.Context.PerDeclarationRoots {
 		perDeclaration[root] = true
 	}
-	if len(perDeclaration) == 0 {
-		test.Errorf(
-			"%s: the fixture names no per-declaration roots, so every decline below is unexplained for the wrong reason",
-			population.SystemName,
-		)
-	}
+	// A system declaring no per-declaration roots has no declared reason to decline anything, so every
+	// decline below is a table gap and the floor does not apply. That a per-declaration boundary is
+	// exercised at all is asserted across the systems, in TestClassOrderAcknowledgementsAreStillEarned.
 
 	byRoot := map[string]int{}
 	example := map[string]string{}
-	declared, acknowledged := 0, 0
+	declared := 0
 	for _, divergence := range silent {
 		root := classOrderRootOf(source, divergence.ClassName)
 		if perDeclaration[root] {
 			declared++
-			continue
-		}
-		if classOrderMissingDescriptorRoots[root] {
-			acknowledged++
 			continue
 		}
 		byRoot[root]++
@@ -713,15 +691,7 @@ func classOrderAssertGoSilence(
 		}
 	}
 
-	// Reported so the excused count is visible next to the unexcused one. Whether the
-	// acknowledgement is still earning its place is asserted once across both systems, in
-	// TestClassOrderAcknowledgementsAreStillEarned, because `max-w-screen` is advertised by only one
-	// of the two registries and a per-system assertion would fail on the other for being right.
-	if acknowledged > 0 {
-		test.Logf("%s: %d declines covered by a known missing descriptor row", population.SystemName, acknowledged)
-	}
-
-	if declared < classOrderExpectedPerDeclarationDeclines {
+	if len(perDeclaration) > 0 && declared < classOrderExpectedPerDeclarationDeclines {
 		// The declared boundary vanishing is as much a finding as an undeclared decline appearing:
 		// it means either the fixture lost the `@utility` roots or the model started answering
 		// classes it has no basis to answer.
@@ -811,13 +781,13 @@ func classOrderSystemNamed(fixture *classOrderFixture, name string) *classOrderS
 // each is required to be exercised by at least one design system.
 //
 // Asserted across both systems rather than within one, because coverage is legitimately per
-// repository: `max-w-screen` is advertised by www-connected-app's registry and not by ahra's, so
-// demanding it fire on ahra would fail the suite for being correct.
+// repository: the per-declaration boundary is declared by the public theme and not by the planted
+// one, so demanding it fire on the planted theme would fail the suite for being correct.
 func TestClassOrderAcknowledgementsAreStillEarned(test *testing.T) {
 	test.Parallel()
 	fixture := classOrderLoadFixture(test)
 
-	exercised := map[string]int{}
+	declared := 0
 	unresolvableAlpha := 0
 	invented := 0
 
@@ -843,22 +813,18 @@ func TestClassOrderAcknowledgementsAreStillEarned(test *testing.T) {
 			case OutcomeTailwindSilent:
 				invented++
 			case OutcomeGoSilent:
-				root := classOrderRootOf(source, aCase.ClassName)
-				if perDeclaration[root] {
-					continue
-				}
-				if classOrderMissingDescriptorRoots[root] {
-					exercised[root]++
+				if perDeclaration[classOrderRootOf(source, aCase.ClassName)] {
+					declared++
 				}
 			}
 		}
 	}
 
-	for root := range classOrderMissingDescriptorRoots {
-		if exercised[root] == 0 {
-			test.Errorf("no design system exercised the acknowledged missing descriptor row for %q; "+
-				"an acknowledgement covering nothing is an excuse waiting for the next defect under that root", root)
-		}
+	if declared == 0 {
+		test.Error(
+			"no design system declined a class under a per-declaration root; the model's one declared boundary " +
+				"is exercised nowhere, so the go-silent assertion excuses nothing it can show",
+		)
 	}
 	if unresolvableAlpha == 0 {
 		test.Error(
@@ -872,10 +838,10 @@ func TestClassOrderAcknowledgementsAreStillEarned(test *testing.T) {
 	}
 
 	test.Logf(
-		"acknowledgements exercised across %d design systems: %d unresolvable-alpha, %d invented readings, %v missing descriptor rows",
+		"acknowledgements exercised across %d design systems: %d unresolvable-alpha, %d invented readings, %d per-declaration declines",
 		len(fixture.Systems),
 		unresolvableAlpha,
 		invented,
-		exercised,
+		declared,
 	)
 }

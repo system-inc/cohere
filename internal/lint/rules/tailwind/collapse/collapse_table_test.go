@@ -380,9 +380,10 @@ func TestPropertiesExcludeAtRuleDescriptors(test *testing.T) {
 // `:dir(ltr)` as if it were a property name. A class declaring nothing was recorded as declaring
 // itself, and any two such classes would have read as conflicting.
 //
-//	`.markdown-content p { ... } .markdown-content code { ... }`
+//	`.prose-flow p { ... } .prose-flow p:first-child { ... }`
 //
-// is a component class emitting several rules, and the regex harvested `p`, `code` and `pre`.
+// is a component class emitting several rules, and the regex harvested the element names in its
+// selectors: `p`, `code` and `pre` on the class it was found on.
 //
 // Both are now excluded at the generator: declarations are read only from inside braces, at-rule
 // blocks are cut first, and a utility emitting more than one rule is skipped entirely because its
@@ -422,7 +423,11 @@ func TestPropertyExtractionRejectsSelectorsAndKeyframes(test *testing.T) {
 	}
 
 	// Multi-rule component classes are skipped entirely rather than merged, so they must be absent.
-	for _, componentClass := range []string{"markdown-content", "prose", "typing-dots"} {
+	// `prose` is the typography plugin's. `prose-flow` (testdata/public_theme/dashed.css) is a
+	// repository `@utility` whose every rule sits on a descendant `p`, and `scroll-quiet`
+	// (testdata/planted_repository/styles/utilities.css) one that emits a second rule on its scrollbar
+	// pseudo-element.
+	for _, componentClass := range []string{"prose-flow", "prose", "scroll-quiet"} {
 		if properties, isPresent := declaredPropertiesOfStatic(componentClass); isPresent {
 			test.Errorf("%q is a component class emitting several rules targeting descendants, so its "+
 				"declarations belong to children rather than to the element. It should be absent, not "+

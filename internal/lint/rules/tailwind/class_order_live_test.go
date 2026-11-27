@@ -32,13 +32,15 @@ import (
 //
 // # The ground truth
 //
-// `internal/lint/rules/tailwind/collapse/testdata/variant_fixtures.json` holds synthetic cases built to
-// separate rules that agree on ordinary input, each class list captured from
-// `designSystem.getClassOrder(classes)`. `sorted` is what Tailwind returned. Nothing here asserts
-// against what the Go code produces; the fixture is the authority and the Go side is the thing under
-// test. Each case carries its own stylesheet, so the suite runs on every machine. The class lists two
-// consumer repositories wrote left the fixture when cohere's tests stopped reading other repositories
-// (#5wj23dd).
+// `internal/lint/rules/tailwind/collapse/testdata/variant_fixtures.json` holds 2,400 repository class
+// lists and synthetic cases built to separate rules that agree on ordinary input, each class list
+// captured from `designSystem.getClassOrder(classes)`. `sorted` is what Tailwind returned. Nothing here
+// asserts against what the Go code produces; the fixture is the authority and the Go side is the thing
+// under test. The repository lists are two repositories written in cohere, `planted` and `public`, each a
+// theme under collapse/testdata and 1,200 lists tools/generate_planted_repository drew from it (#pg78xtp);
+// they replaced the lists two consumer repositories wrote when cohere's tests stopped reading other
+// repositories (#5wj23dd). Every case names a stylesheet in this repository or carries its own, so the
+// suite runs on every machine.
 
 // classOrderLiveCorpus is the slice of variant_fixtures.json this suite reads.
 type classOrderLiveCorpus struct {
@@ -129,6 +131,27 @@ func classOrderLiveLoadCorpus(test *testing.T) []classOrderLiveList {
 		test.Fatal("the fixture yielded no multi-class lists, so every assertion below would pass vacuously")
 	}
 	return lists
+}
+
+// classOrderLiveSystems builds one live design system per entry point the corpus names.
+//
+// Built from the stylesheet on disk rather than from the fixture, which is the whole point of the
+// swap: the thing under test is the rule reading the repository in front of it. The fixture records
+// each entry point relative to this repository's root, so the systems load on every machine.
+func classOrderLiveSystems(test *testing.T, lists []classOrderLiveList) map[string]DesignSystemResult {
+	test.Helper()
+
+	systems := map[string]DesignSystemResult{}
+	for _, list := range lists {
+		if list.entryPath == "" {
+			continue
+		}
+		if _, built := systems[list.entryPath]; built {
+			continue
+		}
+		systems[list.entryPath] = livePlacementSystem(test, list.entryPath)
+	}
+	return systems
 }
 
 // classOrderLiveMeasurement is what one pass over the corpus found.
@@ -310,6 +333,140 @@ func classOrderLiveReversed(classes []string) []string {
 	return reversed
 }
 
+// classOrderLiveCorpusLists is the repository lists of the corpus, by repository name, the prefix of
+// each list's name.
+func classOrderLiveCorpusLists(test *testing.T) map[string][]classOrderLiveList {
+	test.Helper()
+	byRepository := map[string][]classOrderLiveList{}
+	for _, list := range classOrderLiveLoadCorpus(test) {
+		if list.entryPath == "" {
+			continue
+		}
+		repositoryName, _, _ := strings.Cut(list.name, "/")
+		byRepository[repositoryName] = append(byRepository[repositoryName], list)
+	}
+	return byRepository
+}
+
+// TestClassOrderLiveMatchesTailwindOverTheCorpus is the acceptance test for the swap.
+//
+// The shipped depth-first rule disagreed with Tailwind on 15 of 4,265 separable pairs across 7
+// class lists of the consumer corpus, measured by `TestDepthFirstDisagreesWithTailwindOnTheCorpus` in
+// `internal/tailwind`. After the swap that must be zero, and it must be zero over a population that did
+// not shrink, which is what the placed-class floors below are for. Measured per repository, since the
+// planted theme's own variants, breakpoints and `@utility` roots are what a rule reading the framework
+// alone gets wrong, and a population that held in total could hide one repository's half going quiet.
+func TestClassOrderLiveMatchesTailwindOverTheCorpus(test *testing.T) {
+	test.Parallel()
+	byRepository := classOrderLiveCorpusLists(test)
+
+	// The floors, and they come first on purpose. Every assertion below is satisfiable by a rule that
+	// placed nothing, so the denominator is checked before the rate.
+	//
+	// # The floors are tight because a loose one let a real mutation through
+	//
+	// This was written as `< 5000` first over the consumer corpus, on the reasoning that it held ~11,300
+	// classes and half of that was clearly "still measuring something". Then the mutation that removes the
+	// evaluator escalation in `readingFor` was run against it: every repository `@utility` root goes
+	// unanswerable, 724 lists drop out, the population falls from 11,307 to 7,103, and the disagreement
+	// count stays at zero because the classes that would have disagreed are simply not being asked about
+	// any more. The suite passed.
+	//
+	// That is precisely the failure this task exists to prevent, arriving inside the test written to
+	// prevent it: a number that improves because a rule went quiet. A floor only works if it is set
+	// near the real population rather than at a number that merely sounds large.
+	//
+	// Each floor sits just under what that repository places now, every class Tailwind ranks: 6,014 of
+	// planted's 6,021 classes and 6,094 of public's 6,104, the rest being the dead classes and the lists
+	// left with one ranked class. Tight enough that losing one class category fails, loose enough that a
+	// regenerated corpus a few classes larger or smaller does not. Rerun on this corpus, the same mutation
+	// declines 508 of planted's 1,199 lists and places 3,135 classes, and the floor stops it there, with
+	// TestClassOrderLiveDeclinesNoList naming every declined list.
+	floors := map[string]int{"planted": 5900, "public": 6000}
+	if len(byRepository) != len(floors) {
+		test.Fatalf("the corpus holds lists from %d repositories and the generated corpus is %d",
+			len(byRepository), len(floors))
+	}
+
+	for _, repositoryName := range []string{"planted", "public"} {
+		lists := byRepository[repositoryName]
+		measurement := classOrderLiveMeasure(test, lists, classOrderLiveSystems(test, lists))
+		test.Logf(
+			"%s, live rule vs Tailwind: %d disagreeing pairs of %d compared pairs across %d lists "+
+				"(%d classes placed, %d lists declined)",
+			repositoryName, measurement.disagreeingPairs, measurement.comparedPairs, measurement.lists,
+			measurement.placedClasses, measurement.listsSkipped,
+		)
+		for _, example := range measurement.examples {
+			test.Log("  " + example)
+		}
+
+		if measurement.comparedPairs == 0 {
+			test.Fatalf("no pairs were compared on %s, so this measured nothing", repositoryName)
+		}
+		if measurement.placedClasses < floors[repositoryName] {
+			test.Fatalf(
+				"the rule placed %d classes on %s, under the floor of %d; a population that dropped this "+
+					"far means the rule stopped answering for a whole category of class, and the zero "+
+					"disagreements below would be measuring its silence rather than its correctness",
+				measurement.placedClasses, repositoryName, floors[repositoryName],
+			)
+		}
+		// A decline is how classes leave the population, so its count is the leading indicator, and on
+		// this corpus it is zero: TestClassOrderLiveDeclinesNoList names any list declined.
+		if measurement.listsSkipped != 0 {
+			test.Errorf("the rule declined %d of %d lists on %s; a decline means classes are leaving the "+
+				"population rather than being ordered correctly",
+				measurement.listsSkipped, measurement.lists+measurement.listsSkipped, repositoryName)
+		}
+		if measurement.disagreeingPairs != 0 {
+			test.Errorf(
+				"the live rule disagrees with Tailwind on %d of %d pairs across %d lists on %s; the swap was "+
+					"supposed to take this to zero",
+				measurement.disagreeingPairs, measurement.comparedPairs, measurement.disagreeingLists, repositoryName,
+			)
+		}
+	}
+}
+
+// TestClassOrderLiveDeclinesNoList pins that the rule orders every corpus list.
+//
+// `TestClassOrderLiveMatchesTailwindOverTheCorpus` reports how many lists it declined, and a decline is
+// how classes leave the population, so an unexplained one is exactly the thing that would let a future
+// silence hide. This test once named the one consumer list the rule could not order, on
+// `data-[show=false]:fade-out`: sixteen roots there were declared both as a static `@utility` and as a
+// functional one, the design system kept one kind per root, and the bare class read as a functional
+// candidate with no value. Since a root keeps both kinds (TestARootDeclaredBothWaysKeepsBothKinds) that
+// list was placed. The generated corpus holds roots declared both ways in both orders (the planted
+// theme's `stack` and `cluster`, the public theme's `pane`, `rail`, `appear`, `swell` and `drift-up`) and
+// declines none of its 2,400 lists, so any decline now is a class the rule stopped answering for, and
+// fails here by name.
+//
+// TestClassOrderPlacesRootsDeclaredBothWaysOnThePublicTheme is the same question asked of chosen lists.
+func TestClassOrderLiveDeclinesNoList(test *testing.T) {
+	test.Parallel()
+	declined := map[string]string{}
+	for _, lists := range classOrderLiveCorpusLists(test) {
+		systems := classOrderLiveSystems(test, lists)
+		for _, list := range lists {
+			designSystem := systems[list.entryPath]
+			_, placeable := partitionUnranked(classOrderLiveReversed(list.sorted), designSystem)
+			if _, unplaceable, resolved := classOrderKeys(
+				placeable, designSystem.System, designSystem.Table); !resolved {
+				declined[list.name] = unplaceable
+			}
+		}
+	}
+
+	for name, unplaceable := range declined {
+		test.Errorf(
+			"%s declined on %q; the rule orders every corpus list, so it has stopped answering for a class it used to place",
+			name,
+			unplaceable,
+		)
+	}
+}
+
 // TestClassOrderLiveStackedVariantsSortByMaskNotByDepth is the known-dirty control.
 //
 // This is the bug the swap exists to fix, stated as the smallest input that shows it. The shipped
@@ -386,12 +543,12 @@ func TestClassOrderLiveDeclinesRatherThanPartiallySorting(test *testing.T) {
 	forEachTailwindSystem(test, func(test *testing.T, designSystem DesignSystemResult) {
 
 		_, unplaceable, resolved := classOrderKeys(
-			[]string{"items-center", "flex", "ahralia-splash"}, designSystem.System, designSystem.Table)
+			[]string{"items-center", "flex", "quillfern-splash"}, designSystem.System, designSystem.Table)
 		if resolved {
 			test.Fatal("a class outside the design system was placed, so the rule would sort a literal it " +
 				"does not understand")
 		}
-		if unplaceable != "ahralia-splash" {
+		if unplaceable != "quillfern-splash" {
 			test.Errorf("the decline should name the class that caused it, got %q", unplaceable)
 		}
 	})
@@ -444,14 +601,14 @@ func TestClassOrderLiveVariantIndicesAreRanksWithinTheList(test *testing.T) {
 // own Prettier plugin's: every null leads, and two nulls keep the order they were written in.
 //
 // The non-marker nulls are the case #vf1hd6j found missing. `text-dark` and `dark:bg-dark-2` are
-// classes the plugin ranked null on the committed trees, and `ahralia-splash` does not parse at all.
-// `ahra` declares no `dark` colour, which this asserts rather than assumes: the test is about nulls
-// and must not quietly turn into a test about two ranked classes.
+// classes the plugin ranked null on the committed trees, and `quillfern-splash`, a name no theme
+// declares, does not parse at all. No theme here declares a `dark` colour, which this asserts rather
+// than assumes: the test is about nulls and must not quietly turn into a test about two ranked classes.
 func TestClassOrderLiveUnrankedLeadInSourceOrder(test *testing.T) {
 	test.Parallel()
 	forEachTailwindSystem(test, func(test *testing.T, designSystem DesignSystemResult) {
 
-		for _, nullClass := range []string{"peer", "group", "text-dark", "dark:bg-dark-2", "ahralia-splash"} {
+		for _, nullClass := range []string{"peer", "group", "text-dark", "dark:bg-dark-2", "quillfern-splash"} {
 			if !isMarkerClass(nullClass) && classCompilesIn(nullClass, designSystem) {
 				test.Fatalf(
 					"%q compiles in this repository, so it is not a null and this test proves nothing",
@@ -467,8 +624,8 @@ func TestClassOrderLiveUnrankedLeadInSourceOrder(test *testing.T) {
 			{[]string{"flex", "group", "peer", "items-center"}, []string{"group", "peer"}},
 			{[]string{"flex", "text-dark", "peer", "items-center"}, []string{"text-dark", "peer"}},
 			{
-				[]string{"items-center", "ahralia-splash", "dark:bg-dark-2", "flex"},
-				[]string{"ahralia-splash", "dark:bg-dark-2"},
+				[]string{"items-center", "quillfern-splash", "dark:bg-dark-2", "flex"},
+				[]string{"quillfern-splash", "dark:bg-dark-2"},
 			},
 		} {
 			unranked, placeable := partitionUnranked(testCase.input, designSystem)

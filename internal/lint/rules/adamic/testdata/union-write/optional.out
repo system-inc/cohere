@@ -1,0 +1,3 @@
+source 3fa4df568f8d883f866f6fd87c39dd05495a995855e44da2ccdddd28faa66618
+exit 1
+stderr TypeError: (item.label ?? 0).toFixed is not a function

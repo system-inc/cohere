@@ -24,9 +24,10 @@ import "github.com/system-inc/cohere/internal/text_rules/abbreviation"
 // vocabulary reports. A false positive costs one cheap traversal that reports nothing. A false
 // negative silences the rule for that spelling, and a rule that stops firing looks exactly like a
 // clean run. `abbreviation_gate_test.go` asserts the superset property by running the vocabulary
-// itself, with no gate in front of it, over 82,367 distinct identifiers from the ahra tree, and
-// requiring the gate to admit every name it reports. Two earlier attempts at this gate both lost
-// `elapsedMs`, and a hand-written list does not contain the case its author misread.
+// itself, with no gate in front of it, over names generated from the vocabulary's own tables, every
+// abbreviation between every kind of character a name can hold beside it, and requiring the gate to
+// admit every name it reports. Two earlier attempts at this gate both lost `elapsedMs`, and a
+// hand-written list does not contain the case its author misread.
 
 // abbreviationGate is the vocabulary turned into the lookups below, one set per form.
 //

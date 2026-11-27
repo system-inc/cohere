@@ -89,7 +89,7 @@ func TestNoDeprecatedAcrossFiles(test *testing.T) {
 				"}\n" +
 				"      ",
 			withDeprecatedFixture: true,
-			environmentDependent:  true,
+			underNode16:           true,
 			expected:              nil,
 		},
 		{
@@ -580,7 +580,7 @@ func TestNoDeprecatedAcrossFiles(test *testing.T) {
 				"}\n" +
 				"      ",
 			withDeprecatedFixture: true,
-			environmentDependent:  true,
+			underNode16:           true,
 			expected: []noDeprecatedFinding{
 				{messageId: "deprecated", name: "default", reason: ""},
 			},

@@ -33,9 +33,10 @@ func publicThemeSystem(test *testing.T) DesignSystemResult {
 }
 
 // themeSystems are the themes an assertion whose expectations hold on any theme runs on (#f598zk0, tier C): the
-// public theme, everywhere.
+// public theme and the planted repository's (#pg78xtp), everywhere.
 var themeSystems = []tailwindSystem{
 	{name: "public", load: publicThemeSystem},
+	{name: "planted", load: plantedDesignSystem},
 }
 
 // forEachThemeSystem runs an assertion once per theme system, each as its own subtest.
@@ -262,6 +263,48 @@ func TestClassOrderPlacesRootsDeclaredBothWaysOnThePublicTheme(test *testing.T) 
 		}
 		if strings.Join(ordered, " ") != strings.Join(testCase.want, " ") {
 			test.Errorf("%v ordered as %v, the plugin writes %v", testCase.input, ordered, testCase.want)
+		}
+	}
+}
+
+// TestClassOrderBreaksTiesByTailwindsCompareOnThePublicTheme pins the last step of the sort (#9zs88f3): two
+// classes with one variant mask, the same properties and the same count go by Tailwind's `compare`, which reads a
+// digit run as a number, so `swell-5` sorts before `swell-15`. `swell-*` is the theme's per-declaration root and
+// every value here reads alike to both sides: `swell-5` and `swell-15` each keep two declarations of
+// `--swell-scale` (a number and a `--percentage-*` key), `swell-1/2` and `swell-[2]` one, and a custom property
+// has no place in the property order, so the only key left to differ on is the name. `z-*` is a framework root,
+// there because the tie is not the theme's alone. The wanted orders are Tailwind 4.3.3's `getClassOrder` over the
+// public theme.
+func TestClassOrderBreaksTiesByTailwindsCompareOnThePublicTheme(test *testing.T) {
+	test.Parallel()
+	designSystem := publicThemeSystem(test)
+
+	for _, testCase := range []struct {
+		input, want []string
+	}{
+		{[]string{"swell-15", "swell-5"}, []string{"swell-5", "swell-15"}},
+		{[]string{"swell-5", "swell-15"}, []string{"swell-5", "swell-15"}},
+		{
+			[]string{"swell-100", "swell-50", "swell-15", "swell-5", "swell-0"},
+			[]string{"swell-0", "swell-5", "swell-15", "swell-50", "swell-100"},
+		},
+		{
+			[]string{"-swell-15", "appear-100", "-swell-5", "appear-5", "drift-up-15", "drift-up-5"},
+			[]string{"-swell-5", "-swell-15", "appear-5", "appear-100", "drift-up-5", "drift-up-15"},
+		},
+		{
+			[]string{"swell-1/2", "swell-15", "swell-[2]", "swell-5"},
+			[]string{"swell-5", "swell-15", "swell-1/2", "swell-[2]"},
+		},
+		{[]string{"z-50", "z-10", "z-5"}, []string{"z-5", "z-10", "z-50"}},
+	} {
+		ordered, decided := orderClasses(testCase.input, designSystem, defaultClassOrderOptions())
+		if !decided {
+			test.Errorf("%v was declined; Tailwind ranks every class in it", testCase.input)
+			continue
+		}
+		if strings.Join(ordered, " ") != strings.Join(testCase.want, " ") {
+			test.Errorf("%v ordered as %v, Tailwind orders %v", testCase.input, ordered, testCase.want)
 		}
 	}
 }

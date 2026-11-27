@@ -39,9 +39,12 @@ type noDeprecatedCase struct {
 	// jsx compiles the subject as .tsx.
 	jsx bool
 
-	// environmentDependent marks a case whose answer depends on which @types packages are installed
-	// rather than on the rule. Skipped with its reason named, never silently dropped.
-	environmentDependent bool
+	// underNode16 builds the program with `"module"` and `"moduleResolution"` set to `node16`, as
+	// upstream runs the two dynamic-import cases from its moduleResolution-node16 fixture directory.
+	// There `import('./deprecated.js')` of a CommonJS file yields `{ default: module.exports }`, so
+	// `d.default` is the module and only `d.default.default` reaches the tagged export. Under the
+	// harness's own program the import is an ES module's namespace, and valid:65 reports.
+	underNode16 bool
 
 	// withReactModuleTypes adds noDeprecatedReactModuleTypes beside the subject, so `import * as
 	// React from 'react'` resolves to the pinned `React.FC` the case's component is typed with. Without
@@ -210,10 +213,6 @@ func runNoDeprecatedCases(test *testing.T, cases []noDeprecatedCase) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			if testCase.environmentDependent {
-				test.Skip("depends on the installed @types packages rather than on the rule; " +
-					"upstream's declared expectation is recorded above")
-			}
 
 			subjectName := "/repository/source/Subject.ts"
 			if testCase.jsx {
@@ -245,6 +244,9 @@ func runNoDeprecatedCases(test *testing.T, cases []noDeprecatedCase) {
 			var setups []func(directory string)
 			if testCase.asScript {
 				setups = append(setups, writeNoDeprecatedScriptConfiguration(test))
+			}
+			if testCase.underNode16 {
+				setups = append(setups, writeNoDeprecatedNode16Configuration(test))
 			}
 			var result rule_testing.Result
 			if len(setups) > 0 {
@@ -307,6 +309,39 @@ func writeNoDeprecatedScriptConfiguration(test *testing.T) func(string) {
 	}
 }
 
+// writeNoDeprecatedNode16Configuration writes the harness's tsconfig with node16 module resolution, and
+// a package.json that names the fixture CommonJS.
+//
+// The package.json is what decides a file's format under node16, and the resolver looks for the
+// nearest one walking up from the file. Writing it here stops that walk at the fixture directory, so
+// the format is the case's own statement rather than whatever sits above the temporary directory.
+func writeNoDeprecatedNode16Configuration(test *testing.T) func(string) {
+	test.Helper()
+	return func(directory string) {
+		const configuration = `{
+	"compilerOptions": {
+		"strict": true,
+		"target": "ES2022",
+		"lib": ["ES2022"],
+		"module": "node16",
+		"moduleResolution": "node16",
+		"moduleDetection": "force",
+		"types": []
+	},
+	"include": ["**/*.ts", "**/*.tsx"]
+}`
+		files := map[string]string{
+			"tsconfig.json": configuration,
+			"package.json":  `{"type": "commonjs"}`,
+		}
+		for name, contents := range files {
+			if writeError := os.WriteFile(filepath.Join(directory, name), []byte(contents), 0o644); writeError != nil {
+				test.Fatalf("writing the node16 %s: %v", name, writeError)
+			}
+		}
+	}
+}
+
 // describeNoDeprecated renders a result for a failure message.
 func describeNoDeprecated(result rule_testing.Result) string {
 	if len(result.Diagnostics) == 0 {
@@ -330,7 +365,8 @@ func describeNoDeprecated(result rule_testing.Result) string {
 // a real type checker, one program per case so no two cases share an interned type, then checked
 // against upstream's own declared expectations. 259 of the 264 agreed; the five that did not carry
 // upstream's declaration instead. Three of them, valid:79, invalid:75 and invalid:144, now run on the
-// declarations or program mode they needed pinned; the other two are marked environmentDependent.
+// declarations or program mode they needed pinned, and the other two, valid:65 and invalid:134 in
+// TestNoDeprecatedAcrossFiles, under the node16 resolution upstream gives them.
 func TestNoDeprecatedAgainstUpstreamOrdinaryCases(test *testing.T) {
 	test.Parallel()
 

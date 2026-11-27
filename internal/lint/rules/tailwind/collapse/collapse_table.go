@@ -4,8 +4,8 @@
 //
 //	go run ./internal/lint/rules/tailwind/tools/generate_collapse -entry-point <theme.css>
 //
-// Source: Tailwind 4.3.3, enumerated from theme.css.
-// 341 functional roots produced 57970 candidate pairs, of which 45 collapse.
+// Source: Tailwind 4.3.3, enumerated from internal/lint/rules/tailwind/tools/generate_descriptor_base/testdata/independent_theme.css.
+// 316 functional roots produced 49770 candidate pairs, of which 45 collapse.
 //
 // Each entry is a fact about roots rather than about classes: `px + py => p`
 // holds for every value the two roots share, so the table is small and does not grow with the
@@ -13,13 +13,12 @@
 // usage, because a table built from observed classes is silently missing every family nobody has
 // written yet.
 //
-// Only CollapseFamilies is claimed invariant. The other tables in this file are per-repository by
-// construction, and KnownStatics is the proof: it carries markdown-content, one of ahra's own
-// @utility blocks, under a header naming only a Tailwind version. Read this file as one framework
-// fact sitting beside several repository extractions, not as framework data throughout.
+// Only CollapseFamilies is claimed invariant. The entry point and the registry size above are this
+// design system's, and a theme that repeats a default's value under a key of its own can collapse
+// more: read the generator's header for the one measured case.
 //
 // CollapseFamilies re-measured on this run against:
-//	tools/generate_descriptor_base/testdata/independent_theme.css (316 roots, 49770 pairs)
+//	internal/lint/rules/tailwind/collapse/testdata/public_theme/theme.css (328 roots, 53628 pairs)
 //
 // Identical families, down to the value each was discovered at and whether it needs logicalToPhysical.
 
@@ -112,8 +111,8 @@ var CollapseFamilies = []CollapseFamily{
 // internal/rules/tailwind's valueIsColorIn asks the live theme's `--color` namespace, which is what
 // upstream does, with IsColorKeyword beside it for the three keywords that sit in no namespace.
 // Measured before the deletion: 558 of its 561 names answered by the theme and the other 3 by
-// colorKeywords, 0 uncovered, and the table knew nothing of the three colours www-connected-app
-// declares because it was generated from ahra.
+// colorKeywords, 0 uncovered, and the table knew nothing of the colours any other repository
+// declares, because it was generated from one.
 
 // TailwindVersion is the version these families were enumerated from.
 //

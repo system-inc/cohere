@@ -322,6 +322,13 @@ func TestARuleThatPanicsStillBalancesItsFrames(test *testing.T) {
 
 // TestTheWorkersCpuIsAccountedFor holds that the rows and the account add up to what the worker's thread
 // spent, so nothing the table prints is a residual it cannot name.
+//
+// The bounds are one-sided where a busy machine can move them. Whatever else lands on the worker's thread, a
+// collector's assist, an interrupt the kernel charges to it, only ever adds CPU, so the walk is held to at least what
+// was spent outside the call, and below that plus the call's own spin: a call the meter failed to bill would land
+// its whole 20ms in the walk. A tenth's margin either way read 3.6ms billed for a 2ms spin on Shackler's gate, the
+// whole module running beside it (#zvkgr70), which neither a planted garbage-making sibling nor 40 runs of the
+// package at a load of 14 to 17 reproduced on Kirk's Mac.
 func TestTheWorkersCpuIsAccountedFor(test *testing.T) {
 	test.Parallel()
 	needs.NoRace(test, "the walk's own share is held to what a 2ms spin spent, and the race detector's "+
@@ -333,15 +340,20 @@ func TestTheWorkersCpuIsAccountedFor(test *testing.T) {
 	}
 	timing := timings.forRule("spins")
 	outsideSpent := spinFor(test, 2*time.Millisecond)
-	meter.call(timing, func(node *ast.Node) { spinFor(test, 3*time.Millisecond) }, nil)
+	var callSpent time.Duration
+	meter.call(timing, func(node *ast.Node) { callSpent = spinFor(test, 20*time.Millisecond) }, nil)
 	meter.finish()
 
 	account := timings.Account
 	if account.Calls != 1 {
 		test.Fatalf("one call was counted as %d", account.Calls)
 	}
-	if !within(account.WalkCpu, outsideSpent) {
-		test.Fatalf("%v spent outside any call was billed to the walk as %v", outsideSpent, account.WalkCpu)
+	if account.WalkCpu < outsideSpent || account.WalkCpu >= outsideSpent+callSpent {
+		test.Fatalf("%v spent outside the call was billed to the walk as %v, and the call spent %v", outsideSpent,
+			account.WalkCpu, callSpent)
+	}
+	if timing.ListenerCpu < callSpent-time.Microsecond {
+		test.Fatalf("the call spent %v and was billed %v", callSpent, timing.ListenerCpu)
 	}
 	parts := timing.ListenerCpu + account.InstrumentCpu + account.WalkCpu
 	if difference := account.WorkersCpu - parts; difference < -time.Microsecond || difference > time.Microsecond {

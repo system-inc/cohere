@@ -54,7 +54,7 @@ func main() {
 	)
 	output := flag.String(
 		"output",
-		filepath.Join("internal", "tailwind", "testdata", "utility_fixtures.json"),
+		filepath.Join("internal", "lint", "rules", "tailwind", "collapse", "testdata", "utility_fixtures_public.json"),
 		"where to write the fixture",
 	)
 	check := flag.Bool("check", false, "regenerate and fail if the committed fixture disagrees")

@@ -103,12 +103,14 @@ func TestFrameworkStaticsCoverTheDeprecatedRegistrations(test *testing.T) {
 
 // TestFrameworkStaticsExcludeRepositoryUtilities is the other half of the split.
 //
-// `markdown-content` and `typing-dots` are ahra's own `@utility` blocks. A framework table carrying
-// them would be one repository's tokens shipped as framework facts, which is the exact defect this
-// whole port exists to remove, so it is asserted rather than left to the generator's refusal.
+// `surface-card` and `glow-soft` are the public theme's own `@utility` blocks
+// (testdata/public_theme/utilities.css), and `synthetic-static` the independent theme's. A framework
+// table carrying them would be one repository's tokens shipped as framework facts, which is the exact
+// defect this whole port exists to remove, so it is asserted rather than left to the generator's
+// refusal.
 func TestFrameworkStaticsExcludeRepositoryUtilities(test *testing.T) {
 	test.Parallel()
-	for _, name := range []string{"markdown-content", "typing-dots", "synthetic-static"} {
+	for _, name := range []string{"surface-card", "glow-soft", "synthetic-static"} {
 		if _, found := FrameworkStaticDeclarations[name]; found {
 			test.Errorf("%q is a repository utility and must not be in the framework table", name)
 		}

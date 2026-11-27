@@ -1,10 +1,10 @@
 // The ported `handle` bodies of the framework roots whose reading partitions on the value.
 //
 // The third and last slice of the emitter port. frameworkhandlers.go covers the 33 roots that emit
-// one declaration and frameworkmultihandlers.go the 152 that emit a fixed list; both answer a root
+// one declaration and frameworkmultihandlers.go the 154 that emit a fixed list; both answer a root
 // with a single declaration list, because for those roots there is only one.
 //
-// These 57 are the roots where that is false. `border-[3px]` is a width and `border-red-500` is a
+// These 55 are the roots where that is false. `border-[3px]` is a width and `border-red-500` is a
 // colour, `text-[3px]` is a font size and `text-red-500` is a colour, and the two emit different
 // properties from the same registration. So an emitter here is a function of the value rather than a
 // list stored under a root, which is the shape upstream's own handle bodies have: every one of these
@@ -518,18 +518,14 @@ var gapEmitters = map[string]GapEmitter{
 		return declarations("--tw-duration", "transition-duration")
 	},
 
-	// `flex`, `block` and `inline` are three roots where a static utility and a functional one share
-	// a name. The functional `flex` emits `flex`; `block` and `inline` have no functional
-	// registration at all, so a value form emits nothing and only their static form reads. See
-	// TestBlockAndInlineHaveNoFunctionalRegistration.
+	// `flex` shares its name with the static `display: flex` utility, which answers the bare class,
+	// so the functional body emits only for a value.
 	"flex": func(branch UtilityBranch) []*Node {
 		if !branch.HasValue {
 			return nil
 		}
 		return declarations("flex")
 	},
-	"block":  func(branch UtilityBranch) []*Node { return nil },
-	"inline": func(branch UtilityBranch) []*Node { return nil },
 }
 
 // ringEmitter is the shared body of `ring` and `inset-ring`.

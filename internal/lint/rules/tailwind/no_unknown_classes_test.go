@@ -144,7 +144,7 @@ func TestNoUnknownClassesReportsTypos(test *testing.T) {
 			// than a fix. Reported so the choice is deliberate.
 			name:     "stylesheet class Tailwind does not know",
 			fileName: "Component.tsx",
-			source:   `const element = <div className="ahralia-splash" />;`,
+			source:   `const element = <div className="orbit-banner" />;`,
 			wantIds:  []string{"unknownClass"},
 		},
 		{
@@ -417,28 +417,29 @@ func TestNoUnknownClassesAtHolesAndConcatenation(test *testing.T) {
 
 // TestUnknownIgnoreExemptsProjectClasses covers the option this rule cannot ship without.
 //
-// Any project with hand-written CSS has class names Tailwind does not define. On the ahra tree those
-// are the five `ahralia-splash*` classes, and they are the entire real-world finding count.
+// Any project with hand-written CSS has class names Tailwind does not define, usually under a prefix
+// of its own, and on a real tree those can be the entire finding count. `orbit-banner` stands in for
+// one: a hand-written class under the project's `orbit-` prefix, which no theme here declares.
 func TestUnknownIgnoreExemptsProjectClasses(test *testing.T) {
 	test.Parallel()
-	options := NoUnknownClassesOptions{Ignore: []string{`^ahralia-`}}
+	options := NoUnknownClassesOptions{Ignore: []string{`^orbit-`}}
 
 	exempted := runUnknownFixtureWithOptions(test, "Component.tsx",
-		`const element = <div className="ahralia-splash flex" />;`, &options)
+		`const element = <div className="orbit-banner flex" />;`, &options)
 	if len(exempted.Diagnostics) != 0 {
 		test.Errorf("an ignored class should not be reported, got %d findings", len(exempted.Diagnostics))
 	}
 
 	// Without the exemption it reports, so the test above is not passing because the rule is inert.
 	unexempted := runUnknownFixture(test, "Component.tsx",
-		`const element = <div className="ahralia-splash flex" />;`)
+		`const element = <div className="orbit-banner flex" />;`)
 	if len(unexempted.Diagnostics) == 0 {
 		test.Fatal("the rule stayed silent without an ignore option, so the exemption proves nothing")
 	}
 
 	// And the exemption must not swallow real typos alongside it.
 	stillReported := runUnknownFixtureWithOptions(test, "Component.tsx",
-		`const element = <div className="ahralia-splash flx" />;`, &options)
+		`const element = <div className="orbit-banner flx" />;`, &options)
 	if len(stillReported.Diagnostics) != 1 {
 		test.Errorf("the ignore pattern should exempt only what it matches, got %d findings",
 			len(stillReported.Diagnostics))

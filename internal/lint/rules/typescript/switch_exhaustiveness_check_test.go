@@ -3,11 +3,13 @@ package typescript
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
 
 	"github.com/system-inc/cohere/internal/lint/checking"
+	esregexp "github.com/system-inc/cohere/internal/lint/ecmascript/regexp"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -1469,10 +1471,43 @@ func TestSwitchExhaustivenessCheckNamesTheMissingBranches(test *testing.T) {
 	}
 }
 
+// TestSwitchExhaustivenessCheckCommentPatternKeepsTheBound: a pattern from a config, which cannot set matchTimeout,
+// keeps esregexp.MatchTimeout, and only a set matchTimeout replaces it. A short match settles before regexp2's clock
+// first ticks, so the rule's other tests pass even when every config's pattern is left with no bound at all; this
+// reads the bound off the compiled pattern instead.
+func TestSwitchExhaustivenessCheckCommentPatternKeepsTheBound(test *testing.T) {
+	test.Parallel()
+	cases := []struct {
+		name         string
+		matchTimeout time.Duration
+		want         time.Duration
+	}{
+		{"a config's pattern keeps esregexp.MatchTimeout", 0, esregexp.MatchTimeout},
+		{"a test's bound replaces it", time.Nanosecond, time.Nanosecond},
+	}
+	for _, testCase := range cases {
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			commentPattern := commentPatternFor(SwitchExhaustivenessCheckOptions{
+				DefaultCaseCommentPattern: type_checking.Reference("^skip$"),
+				matchTimeout:              testCase.matchTimeout,
+			})
+			if commentPattern == nil {
+				test.Fatal("a valid pattern compiled to nil")
+			}
+			if got := commentPattern.Unwrap().MatchTimeout; got != testCase.want {
+				test.Errorf("compiled with MatchTimeout %s, want %s", got, testCase.want)
+			}
+		})
+	}
+}
+
 // TestSwitchExhaustivenessCheckReportsNoCommentWhoseMatchOverran: a user's pattern whose match overruns the time
 // bound (#7mztrdd) is no answer. It may spare a missing default, and must not be reported as the dangerous default
 // case it would be had it matched. The overrun is noted, so the run names it as a gap (#s4dy4e0). `(a|aa)+$`
-// against a long run of `a` backtracks past the bound, waited out here since the rule compiles its pattern itself.
+// against a long run of `a` backtracks past the bound, which is pulled in to a nanosecond, so the match stops at
+// regexp2's first tick rather than after esregexp.MatchTimeout. A run that took as long as MatchTimeout overran by
+// MatchTimeout rather than by the bound handed it, and fails.
 func TestSwitchExhaustivenessCheckReportsNoCommentWhoseMatchOverran(test *testing.T) {
 	test.Parallel()
 	source := `
@@ -1486,12 +1521,23 @@ switch (myBoolean) {
   // ` + strings.Repeat("a", 64) + `b
 }
 `
+	began := time.Now()
 	result := rule_testing.RunTypedWithOptions(test, SwitchExhaustivenessCheck, switchExhaustivenessFile, source,
 		SwitchExhaustivenessCheckOptions{
 			AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(false),
 			RequireDefaultForNonUnion:           type_checking.Reference(false),
 			DefaultCaseCommentPattern:           type_checking.Reference("(a|aa)+$"),
+			matchTimeout:                        time.Nanosecond,
 		})
+	// Timing assertion: a match that overran by esregexp.MatchTimeout cannot finish in under it, so this fails only
+	// when the rule ran by MatchTimeout rather than the bound handed it, or when building the typed program, about a
+	// second, took ten.
+	if took := time.Since(began); took >= esregexp.MatchTimeout {
+		test.Fatalf(
+			"the run took %s, as long as esregexp.MatchTimeout, so the bound handed it was not the one it ran by",
+			took,
+		)
+	}
 	rule_testing.ExpectClean(test, result)
 	if timedOut := rule.PatternTimedOutNotePrefix + "/(a|aa)+$/u"; result.Notes[timedOut] != 1 {
 		test.Errorf("want %q noted once, got every note %v", timedOut, result.Notes)

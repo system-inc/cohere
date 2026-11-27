@@ -115,7 +115,7 @@ func (one descriptorFixtureCase) parsed() *ParsedCandidate {
 
 func TestDescriptorLookupMatchesTailwind(test *testing.T) {
 	test.Parallel()
-	fixtures := loadDescriptorFixtures(test, "descriptor_fixtures.json")
+	fixtures := loadDescriptorFixtures(test, "descriptor_fixtures_public.json")
 	table := testTable(test)
 
 	if table.TailwindVersion != fixtures.TailwindVersion {
@@ -210,14 +210,16 @@ func TestDescriptorLookupMatchesTailwind(test *testing.T) {
 	test.Logf("  %d arbitrary properties", arbitraryProperties)
 
 	// Volume assertions, in the spirit of the extractor's: a suite that agreed on everything because
-	// it tested almost nothing reports the same green line as one that did the work.
+	// it tested almost nothing reports the same green line as one that did the work. The floors sit just
+	// under the public theme's corpus, 7,186 agreements over 314 roots, so a regeneration that lost a
+	// root's cases fails here rather than passing on a smaller population.
 	if withoutReading > len(fixtures.Cases)/2 {
 		test.Errorf("%d of %d cases had no reading; the corpus is mostly unscored", withoutReading, len(fixtures.Cases))
 	}
-	if agreed < 5000 {
+	if agreed < 7000 {
 		test.Errorf("only %d agreements; the corpus is too small for the number to mean anything", agreed)
 	}
-	if fixtures.Counts.Roots < 300 {
+	if fixtures.Counts.Roots < 310 {
 		test.Errorf("only %d roots in the corpus", fixtures.Counts.Roots)
 	}
 }
@@ -236,7 +238,7 @@ func countPerDeclaration(table *Table) int {
 // rather than for the ones the corpus happened to reach.
 func TestDescriptorLookupCoversEveryRoot(test *testing.T) {
 	test.Parallel()
-	fixtures := loadDescriptorFixtures(test, "descriptor_fixtures.json")
+	fixtures := loadDescriptorFixtures(test, "descriptor_fixtures_public.json")
 	table := testTable(test)
 
 	rootsInCorpus := map[string]bool{}
@@ -267,10 +269,13 @@ func TestDescriptorLookupCoversEveryRoot(test *testing.T) {
 
 // TestPerDeclarationRootsDecline pins the boundary of the model.
 //
-// The 18 `<animation-root>-translate-full` classes resolve per declaration rather than per type, and
-// the table must say so rather than return the reading it would have guessed. This asserts the
-// decline is real, because a lookup that answered them plausibly would be wrong in exactly the place
-// the model knows it cannot answer, and nothing else in the suite would notice.
+// The `<motion-root>-translate-full` classes resolve per declaration rather than per type, and the
+// table must say so rather than return the reading it would have guessed. The public theme has five
+// such roots, `appear`, `swell`, `-swell`, `drift-up` and `drift-inline` in public_theme/motion.css,
+// probed with `translate-full`, the key it declares as `--percentage-translate-full`, which reads as
+// a key of two namespaces at once. This asserts the decline is real, because a lookup that answered
+// them plausibly would be wrong in exactly the place the model knows it cannot answer, and nothing
+// else in the suite would notice.
 func TestPerDeclarationRootsDecline(test *testing.T) {
 	test.Parallel()
 	table := testTable(test)
@@ -291,8 +296,8 @@ func TestPerDeclarationRootsDecline(test *testing.T) {
 		}
 	}
 
-	if perDeclaration != 18 {
-		test.Errorf("expected 18 per-declaration roots, found %d", perDeclaration)
+	if perDeclaration != 5 {
+		test.Errorf("expected 5 per-declaration roots, found %d", perDeclaration)
 	}
 	test.Logf("%d per-declaration roots, all declining", perDeclaration)
 }

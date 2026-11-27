@@ -1,0 +1,4 @@
+source 76d9c12a4f760d2a6a9a8b71e2dd007f34839e36f0a6676ab39762106344c53e
+exit 1
+stdout a
+stderr TypeError: (counter.items[0] ?? 0).toFixed is not a function

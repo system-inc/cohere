@@ -1,7 +1,10 @@
 package comments
 
 import (
+	"strings"
 	"testing"
+
+	"github.com/microsoft/TypeScript/tsc/shim/core"
 )
 
 // The guard must not change which comments are found, only how fast the scan gets there, so each case
@@ -78,5 +81,167 @@ func TestCommentGuardActuallySkips(test *testing.T) {
 		if !canBeginAt(text, 2) {
 			test.Fatalf("guard rejects %q, where a comment does begin", text)
 		}
+	}
+}
+
+// placedComment is one comment a placement fixture expects: its text, and the zero-based line and byte column it
+// starts at.
+type placedComment struct {
+	text   string
+	line   int
+	column int
+}
+
+// The guard must find the same comments as the ungated scan wherever a comment can sit, and both must find each one
+// where it is.
+//
+// A comparison over 1,200 real files held this before, and a sample shows only the placements it happens to hold.
+// Each fixture here is a file holding a comment in every placement of one kind: leading and trailing a statement,
+// dangling in an empty body or list, between decorators, after a trailing comma, and inside JSX. The expected list
+// is written out, so a placement both scans lose fails as surely as one the guard alone loses, which a comparison
+// of the two cannot see.
+func TestCommentGuardFindsTheSameCommentsInEveryPlacement(test *testing.T) {
+	test.Parallel()
+	cases := []struct {
+		name       string
+		scriptKind core.ScriptKind
+		sourceText string
+		want       []placedComment
+	}{
+		{
+			name:       "around a decorated class",
+			scriptKind: core.ScriptKindTS,
+			sourceText: strings.Join([]string{
+				"// leading the file",
+				"import { Injectable, Logged } from './injection'; // trailing an import",
+				"",
+				"/** The service, documented. */",
+				"@Injectable() // trailing a decorator",
+				"/* between decorators */",
+				"@Logged()",
+				"export class Service {",
+				"    // leading a member",
+				"    constructor(/* no parameters */) {}",
+				"",
+				"    run(): void {",
+				"        /* dangling in an empty body */",
+				"    }",
+				"",
+				"    @Logged() /* between a decorator and its method */ stop(): void {}",
+				"",
+				"    names = [",
+				"        'first', // after the first element",
+				"        'second', // after a trailing comma",
+				"    ];",
+				"}",
+				"// after the last statement",
+				"",
+			}, "\n"),
+			want: []placedComment{
+				{"// leading the file", 0, 0},
+				{"// trailing an import", 1, 50},
+				{"/** The service, documented. */", 3, 0},
+				{"// trailing a decorator", 4, 14},
+				{"/* between decorators */", 5, 0},
+				{"// leading a member", 8, 4},
+				{"/* no parameters */", 9, 16},
+				{"/* dangling in an empty body */", 12, 8},
+				{"/* between a decorator and its method */", 15, 14},
+				{"// after the first element", 18, 17},
+				{"// after a trailing comma", 19, 18},
+				{"// after the last statement", 22, 0},
+			},
+		},
+		{
+			name:       "inside JSX",
+			scriptKind: core.ScriptKindTSX,
+			sourceText: strings.Join([]string{
+				"export function Card(properties: { title: string }) {",
+				"    return (",
+				"        <section>",
+				"            {/* an empty expression container */}",
+				"            <span title={properties.title /* trailing an attribute value */}>{properties.title}</span>",
+				"            {",
+				"                // a line comment alone in a container",
+				"            }",
+				"            <input /* between a tag name and its end */ />",
+				"        </section>",
+				"    ); // trailing the return",
+				"}",
+				"",
+			}, "\n"),
+			want: []placedComment{
+				{"/* an empty expression container */", 3, 13},
+				{"/* trailing an attribute value */", 4, 42},
+				{"// a line comment alone in a container", 6, 16},
+				{"/* between a tag name and its end */", 8, 19},
+				{"// trailing the return", 10, 7},
+			},
+		},
+		{
+			name:       "dangling in empty lists and bodies",
+			scriptKind: core.ScriptKindTS,
+			sourceText: strings.Join([]string{
+				"#!/usr/bin/env node",
+				"/* after a shebang */",
+				"enum Empty { /* no members */ }",
+				"interface Nothing {",
+				"    // no members either",
+				"}",
+				"const call = run(/* no arguments */);",
+				"const pair: [first: string /* the key */, second: number] = ['a', 1];",
+				"switch (call) {",
+				"    case 1: {",
+				"        // falls through",
+				"    }",
+				"    default: /* the rest */",
+				"}",
+			}, "\n"),
+			want: []placedComment{
+				{"/* after a shebang */", 1, 0},
+				{"/* no members */", 2, 13},
+				{"// no members either", 4, 4},
+				{"/* no arguments */", 6, 17},
+				{"/* the key */", 7, 27},
+				{"// falls through", 10, 8},
+				{"/* the rest */", 12, 13},
+			},
+		},
+	}
+	for _, testCase := range cases {
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			sourceFile := parseSourceForTestAs(test, testCase.sourceText, testCase.scriptKind)
+
+			guarded := All(sourceFile)
+			reference := AllWithoutGuard(sourceFile)
+
+			got := make([]placedComment, 0, len(guarded))
+			for _, comment := range guarded {
+				got = append(got, placedComment{
+					text:   comment.Text,
+					line:   comment.StartLine,
+					column: comment.StartColumn,
+				})
+			}
+			if len(got) != len(testCase.want) {
+				test.Fatalf("the guarded scan found %d comments, want %d", len(got), len(testCase.want))
+			}
+			for index, want := range testCase.want {
+				if got[index] != want {
+					test.Errorf("comment %d: the guarded scan found %+v, want %+v", index, got[index], want)
+				}
+			}
+
+			if len(guarded) != len(reference) {
+				test.Fatalf("the guard found %d comments, the ungated scan %d", len(guarded), len(reference))
+			}
+			for index := range guarded {
+				if guarded[index].Range != reference[index].Range || guarded[index].Text != reference[index].Text {
+					test.Errorf("comment %d: the guard found %q at %v, the ungated scan %q at %v", index,
+						guarded[index].Text, guarded[index].Range, reference[index].Text, reference[index].Range)
+				}
+			}
+		})
 	}
 }

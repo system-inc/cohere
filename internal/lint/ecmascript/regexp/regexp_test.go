@@ -3,12 +3,8 @@ package regexp
 import (
 	"errors"
 	"strings"
-	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
-
-	"github.com/dlclark/regexp2/v2"
 )
 
 // Every expectation below is what `new RegExp(source, flags).test(subject)`
@@ -356,41 +352,64 @@ func TestOverrunIsNamedEitherWay(test *testing.T) {
 	}
 }
 
-// TestAStaleClockIsNoOverrun covers regexp2's clock restarting after it went
-// idle (dlclark/regexp2#117): a burst of callers races to restart it, and one
-// that read the clock before the idle spell keeps a deadline already past, so
-// `Base` against `XBaseY` timed out on its first step. Measured on v2.5.2 over
-// twenty rounds of 128 callers, regexp2 alone timed out 2 of 1,280 such matches,
-// and 7 under -race; through TestOrError none did, the slowest settling in
-// 0.8 ms. So no round here may time out.
-//
-// Not parallel: stopping regexp2's clock is process-wide, and a test beside it
-// reading regexp2 directly would meet the stale clock this sets up. A test that
-// is not parallel runs before the package's parallel ones are let go.
+// TestAStaleClockIsNoOverrun covers regexp2's clock running behind, which
+// hands a match a deadline already past, so `Base` against `XBaseY` timed out on
+// its first step (dlclark/regexp2#117, and a ticking goroutine starved under
+// load). Measured on v2.5.2 over twenty rounds of 128 callers racing to restart
+// a clock gone idle, regexp2 alone timed out 2 of 1,280 such matches, and 7 under
+// -race; through TestOrError none did. An overrun is believed only once the bound
+// has passed on Go's clock, so here that clock is injected and regexp2 is stood
+// in for by an attempt that says it timed out: before the bound has passed it is
+// asked again and its answer stands, and once the bound has passed its overrun
+// is believed, so a pathological pattern still stops.
 func TestAStaleClockIsNoOverrun(test *testing.T) {
-	re := MustCompile("Base", "u")
-	// Short enough that a clock idle for the sleep below hands a deadline already past, since regexp2 adds its
-	// tick of a tenth of a second to the bound, and over a thousand times what the match was measured to take.
-	re.Unwrap().MatchTimeout = time.Second
-	var overran atomic.Int64
-	for range 2 {
-		regexp2.StopTimeoutClock()
-		time.Sleep(1200 * time.Millisecond)
-		var group sync.WaitGroup
-		start := make(chan struct{})
-		for range 128 {
-			group.Go(func() {
-				<-start
-				if _, testOrError := re.TestOrError("XBaseY"); testOrError != nil {
-					overran.Add(1)
-				}
-			})
-		}
-		close(start)
-		group.Wait()
+	test.Parallel()
+	const bound = time.Second
+	errorTimedOut := errors.New("match timeout")
+	cases := []struct {
+		name string
+		// staleAttempts is how many attempts say they timed out before one answers, and step is how far the
+		// injected clock moves on each reading.
+		staleAttempts int
+		step          time.Duration
+		wantAnswer    bool
+		wantError     error
+		wantAttempts  int
+	}{
+		{"a stale clock is asked again", 3, time.Millisecond, true, nil, 4},
+		{"an overrun past the bound is believed", -1, bound / 2, false, errorTimedOut, 2},
 	}
-	if overran.Load() > 0 {
-		test.Errorf("%d matches of /Base/u against XBaseY were read as overrunning off a stale clock", overran.Load())
+	for _, testCase := range cases {
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			readings := 0
+			now := func() time.Time {
+				readings++
+				return time.Unix(0, 0).Add(time.Duration(readings) * testCase.step)
+			}
+			attempts := 0
+			answer, attemptError := untilSettled(bound, now, func() (bool, error) {
+				attempts++
+				// Past a hundred attempts an overrun was never believed; answering ends the loop so the test
+				// fails rather than hangs.
+				if attempts > 100 || (testCase.staleAttempts >= 0 && attempts > testCase.staleAttempts) {
+					return true, nil
+				}
+				return false, errorTimedOut
+			})
+			if answer != testCase.wantAnswer || !errors.Is(attemptError, testCase.wantError) ||
+				attempts != testCase.wantAttempts {
+				test.Errorf(
+					"untilSettled = %t, %v after %d attempts, want %t, %v after %d",
+					answer,
+					attemptError,
+					attempts,
+					testCase.wantAnswer,
+					testCase.wantError,
+					testCase.wantAttempts,
+				)
+			}
+		})
 	}
 }
 

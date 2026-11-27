@@ -1,9 +1,10 @@
 package nexus
 
 import (
-	"os"
-	"strings"
+	"slices"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/text_rules/abbreviation"
 )
 
 // The gate must be a superset of what the vocabulary reports, and this is the only thing that proves
@@ -18,16 +19,19 @@ import (
 // stops firing looks exactly like a clean run. So over-approximation passes and under-approximation
 // fails loudly.
 //
-// The corpus is every distinct identifier in the ahra tree rather than a hand-written list, because
-// a hand-written list is exactly where this goes wrong. Two independent attempts at this gate lost
+// The corpus is generated from the vocabulary's own tables rather than written by hand, because a
+// hand-written list is exactly where this goes wrong. Two independent attempts at this gate lost
 // `elapsedMs` to the same subtle cause: splitting a name at every uppercase letter puts `Ms` in its
 // own word and discards the lowercase letter before it, and that boundary is precisely what the
 // `[a-z]Ms($|[A-Z])` arm tests. A list somebody wrote from reading the pattern does not contain the
-// case they misread.
+// case they misread. abbreviation.SyntheticNames sets every abbreviation between every kind of
+// character a name can hold on either side of it, which holds `userMs` and `userMsName`, and
+// abbreviation.SyntheticCleanNames adds the expansions the rule tells a writer to use, which it must
+// not report.
 func TestAbbreviationGateHasNoFalseNegatives(test *testing.T) {
 	test.Parallel()
 
-	corpus := loadIdentifierCorpus(test)
+	corpus := slices.Concat(abbreviation.SyntheticNames(vocabulary), abbreviation.SyntheticCleanNames(vocabulary))
 
 	falseNegatives := []string{}
 	for _, name := range corpus {
@@ -49,39 +53,63 @@ func TestAbbreviationGateHasNoFalseNegatives(test *testing.T) {
 // Over-approximation is allowed, but a gate that admits everything is not a gate.
 //
 // This is the vacuous-pass guard: a gate returning true unconditionally has zero false negatives and
-// is worthless, and the test above would call it correct. Measuring the over-approximation rate
-// turns "no false negatives" into a claim about a real filter.
+// is worthless, and the test above would call it correct. Measuring how many clean names the gate
+// admits turns "no false negatives" into a claim about a real filter. The clean names are where the
+// measure means something: each holds an expansion of some abbreviation and none is reported, so
+// every one the gate admits is a traversal spent for nothing. And a gate returning false
+// unconditionally would admit no clean name and pass that measure, so the gate must also admit the
+// synthetic names the vocabulary reports.
 func TestAbbreviationGateStaysSelective(test *testing.T) {
 	test.Parallel()
 
-	corpus := loadIdentifierCorpus(test)
-
+	clean := abbreviation.SyntheticCleanNames(vocabulary)
+	// A clean set that came back nearly empty would make any fraction of it meaningless.
+	if len(clean) < 2000 {
+		test.Fatalf("only %d clean names, too few to measure the gate by", len(clean))
+	}
 	admitted := 0
-	reported := 0
-	for _, name := range corpus {
+	for _, name := range clean {
 		if isAbbreviationCandidate(name) {
 			admitted++
 		}
-		if _, found := findAbbreviation(name, true); found {
-			reported++
-		}
 	}
 
-	// The vocabulary reports a small fraction of real identifiers. The gate may admit more, but not
-	// by a margin that would put the expensive work back.
-	const maximumAdmittedFraction = 0.10
-	if float64(admitted) > float64(len(corpus))*maximumAdmittedFraction {
-		test.Fatalf("gate admits %d of %d names (%.1f%%), which is too coarse to be worth having",
-			admitted, len(corpus), 100*float64(admitted)/float64(len(corpus)))
+	synthetic := abbreviation.SyntheticNames(vocabulary)
+	syntheticAdmitted := 0
+	reported := 0
+	reportedAndAdmitted := 0
+	for _, name := range synthetic {
+		if isAbbreviationCandidate(name) {
+			syntheticAdmitted++
+		}
+		if _, found := findAbbreviation(name, true); found {
+			reported++
+			if isAbbreviationCandidate(name) {
+				reportedAndAdmitted++
+			}
+		}
 	}
-	test.Logf("corpus %d, vocabulary reports %d, gate admits %d", len(corpus), reported, admitted)
+	if reportedAndAdmitted == 0 {
+		test.Fatalf("gate admits none of the %d synthetic names the vocabulary reports, so it filters nothing in",
+			reported)
+	}
+
+	// Measured on 2026-11-25: the gate admitted 0 of 29,280 clean names, 0%. The bound, 1%, leaves
+	// headroom for a vocabulary that grows, but not for a gate that puts the expensive work back.
+	const maximumAdmittedFraction = 0.01
+	if float64(admitted) > float64(len(clean))*maximumAdmittedFraction {
+		test.Fatalf("gate admits %d of %d clean names (%.1f%%), which is too coarse to be worth having",
+			admitted, len(clean), 100*float64(admitted)/float64(len(clean)))
+	}
+	test.Logf("clean %d, gate admits %d; synthetic %d, gate admits %d, vocabulary reports %d, gate admits %d of those",
+		len(clean), admitted, len(synthetic), syntheticAdmitted, reported, reportedAndAdmitted)
 }
 
 // The arms the two failed attempts lost, pinned by name so a regression names itself.
 //
-// Every one of these is a real spelling from the tree that the vocabulary reports. They are here in
-// addition to the corpus test, not instead of it: the corpus proves the gate today, and these say
-// which shapes were historically easy to drop.
+// Every one of these is a spelling the vocabulary reports. They are here in addition to the corpus
+// test, not instead of it: the corpus proves the gate today, and these say which shapes were
+// historically easy to drop.
 func TestAbbreviationGateCoversTheArmsThatWereLost(test *testing.T) {
 	test.Parallel()
 
@@ -109,20 +137,4 @@ func TestAbbreviationGateCoversTheArmsThatWereLost(test *testing.T) {
 			}
 		})
 	}
-}
-
-// loadIdentifierCorpus reads every distinct identifier collected from the ahra tree.
-func loadIdentifierCorpus(test *testing.T) []string {
-	test.Helper()
-
-	data, readError := os.ReadFile("testdata/identifiers.txt")
-	if readError != nil {
-		test.Fatalf("could not read the identifier corpus: %v", readError)
-	}
-	corpus := strings.Split(strings.TrimSpace(string(data)), "\n")
-	// A corpus that failed to load would make every assertion above pass vacuously.
-	if len(corpus) < 10000 {
-		test.Fatalf("corpus holds only %d identifiers, which is too few to have been read correctly", len(corpus))
-	}
-	return corpus
 }

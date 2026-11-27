@@ -166,7 +166,7 @@ func TestEnforceConsistentClassOrderReportsMisordering(test *testing.T) {
 			// until #vf1hd6j measured the plugin hoisting classes like `text-dark`.
 			name:     "unknown class written last",
 			fileName: "Component.tsx",
-			source:   `const element = <div className="items-center flex ahralia-splash" />;`,
+			source:   `const element = <div className="items-center flex quillfern-splash" />;`,
 			wantIds:  []string{"inconsistentClassOrder"},
 		},
 		{
@@ -276,10 +276,10 @@ func TestEnforceConsistentClassOrderStaysSilent(test *testing.T) {
 		},
 		{
 			// A class Tailwind ranks null leads, in source order, so this is already in order. It
-			// is `no-unknown-classes` that has something to say about `ahralia-splash`.
+			// is `no-unknown-classes` that has something to say about `quillfern-splash`.
 			name:     "unknown class written first",
 			fileName: "Component.tsx",
-			source:   `const element = <div className="ahralia-splash flex items-center" />;`,
+			source:   `const element = <div className="quillfern-splash flex items-center" />;`,
 		},
 		{
 			name:     "unrelated attribute",
@@ -345,8 +345,8 @@ func TestClassOrderFixMatchesThePlugin(test *testing.T) {
 		},
 		{
 			name:   "a null leads in source order",
-			source: `const element = <div className="items-center peer flex ahralia-splash" />;`,
-			want:   `const element = <div className="peer ahralia-splash flex items-center" />;`,
+			source: `const element = <div className="items-center peer flex quillfern-splash" />;`,
+			want:   `const element = <div className="peer quillfern-splash flex items-center" />;`,
 		},
 		{
 			name:   "a wrapped list stays wrapped",

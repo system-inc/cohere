@@ -2517,19 +2517,19 @@
       "canonical": "has-data-[slot=description]:flex!"
     },
     {
-      "className": "border-y-(--color-border-informative)",
+      "className": "border-y-(--color-rim-notice)",
       "origin": "consumer",
-      "canonical": "border-y-(--color-border-informative)"
+      "canonical": "border-y-(--color-rim-notice)"
     },
     {
-      "className": "border-t-(--color-border-informative)",
+      "className": "border-t-(--color-rim-notice)",
       "origin": "consumer",
-      "canonical": "border-t-(--color-border-informative)"
+      "canonical": "border-t-(--color-rim-notice)"
     },
     {
-      "className": "border-b-(--color-border-informative)",
+      "className": "border-b-(--color-rim-notice)",
       "origin": "consumer",
-      "canonical": "border-b-(--color-border-informative)"
+      "canonical": "border-b-(--color-rim-notice)"
     },
     {
       "className": "start-0",
@@ -2542,9 +2542,9 @@
       "canonical": "inset-e-0"
     },
     {
-      "className": "data-[state=selected]:[&>*]:[--table-pinned-background:var(--color-background--2)]",
+      "className": "data-[state=selected]:[&>*]:[--grid-frozen-fill:var(--color-wash--2)]",
       "origin": "consumer",
-      "canonical": "data-[state=selected]:*:[--table-pinned-background:var(--color-background--2)]"
+      "canonical": "data-[state=selected]:*:[--grid-frozen-fill:var(--color-wash--2)]"
     },
     {
       "className": "[&>*]:border-b",
@@ -2557,34 +2557,34 @@
       "canonical": "*:data-[dot=true]:bg-red-600!"
     },
     {
-      "className": "ring-(--color-content-1)",
+      "className": "ring-(--color-glyph-1)",
       "origin": "consumer",
-      "canonical": "ring-(--color-content-1)"
+      "canonical": "ring-(--color-glyph-1)"
     },
     {
-      "className": "ring-(--color-background-negative)",
+      "className": "ring-(--color-fill-alarm)",
       "origin": "consumer",
-      "canonical": "ring-(--color-background-negative)"
+      "canonical": "ring-(--color-fill-alarm)"
     },
     {
-      "className": "text-(--color-border-0)",
+      "className": "text-(--color-rim-0)",
       "origin": "consumer",
-      "canonical": "text-(--color-border-0)"
+      "canonical": "text-(--color-rim-0)"
     },
     {
-      "className": "border-(--color-content-1)",
+      "className": "border-(--color-glyph-1)",
       "origin": "consumer",
-      "canonical": "border-(--color-content-1)"
+      "canonical": "border-(--color-glyph-1)"
     },
     {
-      "className": "bg-(--color-content-1)",
+      "className": "bg-(--color-glyph-1)",
       "origin": "consumer",
-      "canonical": "bg-(--color-content-1)"
+      "canonical": "bg-(--color-glyph-1)"
     },
     {
-      "className": "bg-(--color-border-0)",
+      "className": "bg-(--color-rim-0)",
       "origin": "consumer",
-      "canonical": "bg-(--color-border-0)"
+      "canonical": "bg-(--color-rim-0)"
     },
     {
       "className": "bg-(--color-blue-500)",
@@ -2597,9 +2597,9 @@
       "canonical": "ring-blue-500"
     },
     {
-      "className": "bg-[var(--table-pinned-background)]",
+      "className": "bg-[var(--grid-frozen-fill)]",
       "origin": "consumer",
-      "canonical": "bg-(--table-pinned-background)"
+      "canonical": "bg-(--grid-frozen-fill)"
     },
     {
       "className": "!outline",

@@ -13,6 +13,12 @@ import (
 // It is generated rather than transcribed, because a hand-copied expectation is a claim about
 // Tailwind rather than a measurement of it, and every one of the three approaches that lost findings
 // during the migration looked correct when read.
+//
+// The generator that captured it is not in this repository. Its one project-specific literal, a
+// numbered root ending in a dash with a modifier, is spelled on the planted repository's `wash--*`
+// (#gd38z12): asked of testdata/planted_repository/styles, Tailwind parses `wash--2/50` as root `wash-`,
+// value `2`, fraction `2/50`, compiles it to nothing and rewrites nothing, as it did the consumer's
+// token this literal first held, and the bucket key reads no root, so every recorded answer stands.
 
 // fixtureCorpus is the shape of testdata/gate_fixtures.json.
 type fixtureCorpus struct {
@@ -353,7 +359,7 @@ func contains(values []string, want string) bool {
 
 // TestUnparseableClassesNeverGroup guards the case that has no Tailwind answer at all.
 //
-// A project-specific class such as `background--2/50` is not something Tailwind can read. Grouping
+// A project-specific class such as `wash--2/50` is not something Tailwind can read. Grouping
 // every unreadable class under one empty key would make them send each other to Tailwind forever,
 // and grouping them with a real class would let one suppress a question about the other.
 func TestUnparseableClassesNeverGroup(test *testing.T) {

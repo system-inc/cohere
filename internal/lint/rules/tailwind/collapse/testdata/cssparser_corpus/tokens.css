@@ -1,0 +1,138 @@
+/* Fernwood design tokens
+ *
+ * Everything in a @theme block becomes a Tailwind utility as well as a CSS variable:
+ *
+ *   --color-moss-500   -> bg-moss-500, text-moss-500, border-moss-500
+ *   --font-display     -> font-display
+ *   --radius-pill      -> rounded-pill
+ *
+ * Variables that should not generate utilities live on :root below the theme instead.
+ * Don't add a token here "just in case"; every entry ships a utility to every page.
+ */
+@theme {
+    /* Start from an empty palette so only Fernwood's colors exist */
+    --color-*: initial;
+
+    /* Spacing: one step is a quarter of the base line */
+    --spacing: 0.25rem;
+
+    /* Fonts
+     * Söhne is licensed for the web app only; the fallbacks are what the marketing site gets.
+     *   --font-sans: Söhne, ui-sans-serif, system-ui, sans-serif;
+     * The stack below keeps its line breaks because a custom property's value is kept verbatim.
+     */
+    --font-sans:
+        'Söhne', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+        'Helvetica Neue', Arial, sans-serif;
+    --font-display: 'Fraunces', 'Iowan Old Style',
+        'Palatino Linotype', serif;
+    --font-mono:
+        'Berkeley Mono', ui-monospace, SFMono-Regular, Menlo, Consolas,
+        monospace;
+    --font-display--font-variation-settings: 'opsz' 72, 'SOFT' 50;
+
+    /* Radii */
+    --radius-sm: 0.25rem;
+    --radius-md: 0.5rem;
+    --radius-lg: 0.875rem;
+    --radius-pill: 9999px;
+
+    /* Moss */
+    --color-moss-50: oklch(0.98 0.056 145); /* step 50 */
+    --color-moss-100: oklch(0.95 0.058 145); /* step 100 */
+    --color-moss-200: oklch(0.9 0.063 145); /* step 200 */
+    --color-moss-300: oklch(0.83 0.069 145); /* step 300 */
+    --color-moss-400: oklch(0.74 0.077 145); /* step 400 */
+    --color-moss-500: oklch(0.64 0.086 145); /* step 500 */
+    --color-moss-600: oklch(0.55 0.086 145); /* step 600 */
+    --color-moss-700: oklch(0.47 0.078 145); /* step 700 */
+    --color-moss-800: oklch(0.39 0.071 145); /* step 800 */
+    --color-moss-900: oklch(0.31 0.064 145); /* step 900 */
+    --color-moss-950: oklch(0.24 0.058 145); /* step 950 */
+
+    /* Paper */
+    --color-paper-50: oklch(0.995 0.006 85); /* step 50 */
+    --color-paper-100: oklch(0.985 0.006 85); /* step 100 */
+    --color-paper-200: oklch(0.96 0.006 85); /* step 200 */
+    --color-paper-300: oklch(0.93 0.007 85); /* step 300 */
+    --color-paper-400: oklch(0.88 0.007 85); /* step 400 */
+    --color-paper-500: oklch(0.8 0.008 85); /* step 500 */
+    --color-paper-600: oklch(0.7 0.009 85); /* step 600 */
+    --color-paper-700: oklch(0.6 0.01 85); /* step 700 */
+    --color-paper-800: oklch(0.5 0.009 85); /* step 800 */
+    --color-paper-900: oklch(0.4 0.008 85); /* step 900 */
+    --color-paper-950: oklch(0.3 0.007 85); /* step 950 */
+
+    /* Ink */
+    --color-ink-50: oklch(0.97 0.013 260); /* step 50 */
+    --color-ink-100: oklch(0.92 0.014 260); /* step 100 */
+    --color-ink-200: oklch(0.85 0.015 260); /* step 200 */
+    --color-ink-300: oklch(0.76 0.017 260); /* step 300 */
+    --color-ink-400: oklch(0.66 0.019 260); /* step 400 */
+    --color-ink-500: oklch(0.56 0.019 260); /* step 500 */
+    --color-ink-600: oklch(0.46 0.017 260); /* step 600 */
+    --color-ink-700: oklch(0.38 0.016 260); /* step 700 */
+    --color-ink-800: oklch(0.3 0.014 260); /* step 800 */
+    --color-ink-900: oklch(0.22 0.012 260); /* step 900 */
+    --color-ink-950: oklch(0.16 0.011 260); /* step 950 */
+
+    /* Ember: warnings and destructive actions */
+    --color-ember-50: oklch(0.97 0.107 40); /* step 50 */
+    --color-ember-100: oklch(0.93 0.114 40); /* step 100 */
+    --color-ember-200: oklch(0.87 0.124 40); /* step 200 */
+    --color-ember-300: oklch(0.8 0.136 40); /* step 300 */
+    --color-ember-400: oklch(0.72 0.15 40); /* step 400 */
+    --color-ember-500: oklch(0.64 0.163 40); /* step 500 */
+    --color-ember-600: oklch(0.57 0.165 40); /* step 600 */
+    --color-ember-700: oklch(0.5 0.153 40); /* step 700 */
+    --color-ember-800: oklch(0.43 0.141 40); /* step 800 */
+    --color-ember-900: oklch(0.36 0.129 40); /* step 900 */
+    --color-ember-950: oklch(0.29 0.117 40); /* step 950 */
+
+    /* Named colors the brand guide refers to by name */
+    --color-lichen: var(--color-moss-300);
+    --color-bark: color-mix(in oklab, var(--color-ink-800) 70%, var(--color-ember-900));
+    --color-highlight: light-dark(var(--color-ember-100), var(--color-ember-900));
+
+    /* Shadows, each layer on its own line */
+    --shadow-card:
+        0 1px 2px rgb(0 0 0 / 0.06),
+        0 8px 24px rgb(0 0 0 / 0.08);
+    --shadow-lifted:
+        0 2px 4px rgb(0 0 0 / 0.08), /* contact */
+        0 16px 40px -8px rgb(0 0 0 / 0.16); /* ambient */
+    --inset-shadow-well: inset 0 1px 2px rgb(0 0 0 / 0.1);
+
+    /* Breakpoints */
+    --breakpoint-tablet: 48rem;
+    --breakpoint-desk: 80rem;
+
+    /* Easing */
+    --ease-settle: cubic-bezier(0.2, 0.8, 0.2, 1);
+    --ease-flick: linear(0, 0.4 12%, 0.85 30%, 1.02 55%, 1);
+}
+
+/* Variables that should not become utilities, on the document and inside every shadow root */
+:root,
+:host {
+    --reader-measure: 68ch;
+    --toolbar-height: calc(var(--spacing) * 12);
+    --separator-glyph: ' ; ';
+    --empty-note-label: "Nothing here yet";
+    --icon-search: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg'/>");
+    --grid-notes: [full-start] minmax(1rem, 1fr) [content-start] minmax(0, var(--reader-measure)) [content-end] minmax(1rem, 1fr) [full-end];
+    --focus-ring: { outline: 2px solid currentColor; };
+    --unset-on-purpose: ;
+}
+
+@supports (color: oklch(0 0 0)) {
+    :root {
+        --paper-tint: oklch(0.99 0.01 85 / 0.9);
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    @theme {
+        --color-surface: var(--color-ink-950);
+    }
+}
