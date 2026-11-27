@@ -1,0 +1,101 @@
+/*
+ * Fernwood motion
+ *
+ * Enter and exit transitions compose from small utilities:
+ *   animate-arrive fade-from-0 rise-from-2
+ *
+ * How it works:
+ * - `animate-arrive` runs the `arrive` keyframes, which read --arrive-* properties
+ * - each utility below sets one of those properties
+ * - @property registrations stop the properties inheriting, so a parent's animation never leaks
+ */
+
+/* Registrations that stop inheritance */
+@property --arrive-opacity {
+    syntax: '*';
+    inherits: false;
+    initial-value: 1;
+}
+@property --arrive-rise {
+    syntax: '<length>';
+    inherits: false;
+    initial-value: 0px;
+}
+@property --leave-opacity {
+    syntax: '*';
+    inherits: false;
+    initial-value: 1;
+}
+@property --leave-sink {
+    syntax: '<length>';
+    inherits: false;
+    initial-value: 0px;
+}
+
+/* Reserved for per-page overrides; intentionally empty */
+@theme {
+}
+
+@theme inline {
+    --animate-arrive: arrive var(--duration-arrive, 180ms) var(--ease-settle) both;
+    --animate-leave: leave var(--duration-leave, 120ms) ease-in both;
+    --animate-pulse-soft: pulse-soft 2s ease-in-out infinite;
+
+    @keyframes arrive {
+        from {
+            opacity: var(--arrive-opacity);
+            translate: 0 var(--arrive-rise);
+        }
+    }
+    @keyframes leave {
+        to {
+            opacity: var(--leave-opacity);
+            translate: 0 var(--leave-sink);
+        }
+    }
+    @keyframes pulse-soft {
+        0%,
+        100% {
+            opacity: 1;
+        }
+        50% {
+            opacity: 0.6;
+        }
+    }
+}
+
+@utility fade-from-* {
+    --arrive-opacity: calc(--value(integer) / 100);
+}
+@utility fade-to-* {
+    --leave-opacity: calc(--value(integer) / 100);
+}
+@utility rise-from-* {
+    --arrive-rise: calc(var(--spacing) * --value(integer));
+}
+@utility sink-to-* {
+    --leave-sink: calc(var(--spacing) * --value(integer));
+}
+
+/* The ticker on the activity feed */
+@keyframes ticker {
+    0% {
+        transform: translateX(0);
+    }
+    100% {
+        transform: translateX(-50%);
+    }
+}
+
+/* Reduced motion keeps the ticker still rather than removing it */
+@media (prefers-reduced-motion: reduce) {
+    @keyframes ticker {
+        0%,
+        100% {
+            transform: translateX(0);
+        }
+    }
+    @theme inline {
+        --animate-pulse-soft: none;
+    }
+}
