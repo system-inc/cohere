@@ -15,6 +15,7 @@ import (
 	"golang.org/x/tools/go/packages"
 
 	"github.com/system-inc/cohere/internal/go_language/cgo_testing"
+	"github.com/system-inc/cohere/internal/testing/go_root"
 )
 
 // The cgoseed fixture's packages: native, which has the cgo file, and user, which has none.
@@ -44,20 +45,17 @@ var (
 // what the cgo tool writes, and loads only where it runs.
 func requireCCompiler(test *testing.T) {
 	test.Helper()
-	named, goEnvironmentError := exec.Command("go", "env", "CC").Output()
-	if goEnvironmentError != nil {
-		test.Fatalf("reading CC with go env: %v", goEnvironmentError)
-	}
-	compiler := strings.Fields(string(named))
+	named := go_root.CCompiler(test)
+	compiler := strings.Fields(named)
 	found := len(compiler) > 0
 	if found {
 		_, lookPathError := exec.LookPath(compiler[0])
 		found = lookPathError == nil
 	}
 	if !found {
-		test.Skipf("no C compiler is found here (go env CC names %q), and this test loads a cgo package with cgo on, "+
+		test.Skipf("no C compiler is found here (CC names %q), and this test loads a cgo package with cgo on, "+
 			"which runs one: put a C compiler on the path, or name one in CC, and run `go run ./command/cohere-dev "+
-			"test ./internal/go_language/build_dependence -run %s`", strings.TrimSpace(string(named)), test.Name())
+			"test ./internal/go_language/build_dependence -run %s`", named, test.Name())
 	}
 	cgo_testing.RequireTranslation(test)
 }

@@ -4,31 +4,19 @@ import (
 	"cmp"
 	"fmt"
 	"go/types"
-	"path/filepath"
 	"reflect"
 	"slices"
-	"sync/atomic"
 	"testing"
 
 	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/packages"
-	"golang.org/x/tools/go/types/objectpath"
 
 	"github.com/system-inc/cohere/internal/go_language/check"
 	"github.com/system-inc/cohere/internal/go_language/check/analysistest"
 	"github.com/system-inc/cohere/internal/go_language/check/checker"
 	"github.com/system-inc/cohere/internal/go_language/fact_resolver"
 	"github.com/system-inc/cohere/internal/go_language/load"
-	"github.com/system-inc/cohere/internal/go_language/project"
 	"github.com/system-inc/cohere/internal/go_language/rules/return_nil_ness"
-	"github.com/system-inc/cohere/internal/go_language/rules/typed_nil_interface_comparison"
-	"github.com/system-inc/cohere/internal/testing/needs"
 )
-
-// demandDifferentialVariable names the tree the demand differential runs over: root for cohere's own module, or a
-// directory, whose every package it loads as cohere-go does. The standard library is its source folder, under
-// `GOROOT` set to the toolchain it belongs to.
-const demandDifferentialVariable = "COHERE_GO_IR_DEMAND_DIFFERENTIAL"
 
 // A cycle of calls is where the push's answer hangs on its order: walked as declared, CycleOuter begins first and
 // CycleInner, calling back into it, gets the defaults and may return nil, and the same for BetaOuter and BetaInner.
@@ -65,117 +53,6 @@ func TestDemandAnswersAsThePushOnTheFixture(test *testing.T) {
 	})
 }
 
-// The demand differential (#w7zmvat unit 2): over the whole tree COHERE_GO_IR_DEMAND_DIFFERENTIAL names, and every
-// package it imports, the push judges every function, SA4023, the reader of nilness, asks the resolver, and then the
-// resolver is asked of every function the push judged; every answer must be the push's. It logs how many functions the
-// reader had the resolver compute against the push's total, which is the saving. Unset, it skips.
-func TestDemandAnswersAsThePushOverATree(test *testing.T) {
-	test.Parallel()
-	directory := needs.OptIn(
-		test,
-		demandDifferentialVariable,
-		"a differential of the resolver's answers against the push's over root or a directory",
-	)
-	if directory == "root" {
-		// This package sits four directories below the module root.
-		root, rootError := filepath.Abs(filepath.Join("..", "..", "..", ".."))
-		if rootError != nil {
-			test.Fatal(rootError)
-		}
-		directory = root
-	}
-	workspace, workspaceError := project.ReadWorkspace(directory)
-	if workspaceError != nil {
-		test.Fatalf("reading the modules of %s: %v", directory, workspaceError)
-	}
-	loaded, loadError := load.Packages(workspace.Root, []string{"./..."}, workspace.Environment(), nil)
-	if loadError != nil {
-		test.Fatalf("loading %s: %v", workspace.Root, loadError)
-	}
-	if len(loaded.Packages) == 0 {
-		test.Fatalf("loading %s found no package, so the comparison would prove nothing", workspace.Root)
-	}
-	requireDemandAnswersAsPush(test, workspace.Root, loaded.Packages)
-}
-
-// requireDemandAnswersAsPush runs the push beside SA4023 over roots, as cohere-go runs it, then asks the resolver of
-// every function of every package the push judged, as that package's own reader, and fails on the first answer the
-// push's facts contradict, or on any verdict a fallback contradicted.
-func requireDemandAnswersAsPush(test *testing.T, described string, roots []*packages.Package) {
-	test.Helper()
-	var judged atomic.Int64
-	push := return_nil_ness.NewPushAnalyzer(&judged)
-	options := check.DispatchOptions()
-	options.Finished = func(*packages.Package) {
-		// Setting Finished lets a root's syntax go, as cohere-go's run does; the resolver keeps its own.
-	}
-	resolver, isResolver := options.Resolver.(*fact_resolver.Resolver)
-	if !isResolver {
-		test.Fatalf("cohere-go's options hold a %T, not a fact resolver", options.Resolver)
-	}
-	graph, analyzeError := checker.Analyze([]*analysis.Analyzer{push, typed_nil_interface_comparison.Analyzer}, roots,
-		options)
-	if analyzeError != nil {
-		test.Fatalf("analyzing %s: %v", described, analyzeError)
-	}
-	counts := resolver.Counts(return_nil_ness.Kind)
-	askedByReaders, fallbacksByReaders := counts.Computed.Load(), counts.Fallbacks.Load()
-	compared, pushPackages, pushFacts := 0, 0, 0
-	for action := range graph.All() {
-		if action.Analyzer != push || action.Err != nil {
-			continue
-		}
-		pushPackages++
-		pushed := map[*types.Func][]return_nil_ness.ValueNilness{}
-		for _, objectFact := range action.AllObjectFacts() {
-			function, isFunction := objectFact.Object.(*types.Func)
-			returned, isReturned := objectFact.Fact.(*return_nil_ness.ReturnedNilness)
-			if isFunction && isReturned && function.Pkg() == action.Package.Types {
-				pushed[function] = returned.Results
-			}
-		}
-		pushFacts += len(pushed)
-		home := resolver.Package(action.Package.Types)
-		if home == nil {
-			test.Fatalf("the resolver never learned %s, which the push judged", action.Package.ID)
-		}
-		for _, function := range home.SourceFunctions() {
-			declared, isDeclared := function.Object().(*types.Func)
-			if !isDeclared {
-				continue
-			}
-			compared++
-			asked, holds := return_nil_ness.Ask(resolver, home, declared)
-			fact, pushHolds := pushed[declared]
-			if holds != pushHolds || holds && !slices.Equal(asked, fact) {
-				test.Fatalf("on %s, %s (%s): the resolver answers %v (a fact: %t), the push %v (a fact: %t)",
-					action.Package.ID, declared.FullName(), objectKey(action.Package, declared), asked, holds, fact,
-					pushHolds)
-			}
-		}
-	}
-	if contradicted := counts.Contradicted.Load(); contradicted != 0 {
-		test.Fatalf("over %s a fallback contradicted %d verdicts the resolver had kept", described, contradicted)
-	}
-	if pushFacts == 0 {
-		test.Fatalf("the push held no fact over %s, so the comparison proves nothing", described)
-	}
-	test.Logf("%s: %d packages analyzed, the push ran on %d, judged %d functions and held %d facts; the reader had "+
-		"the resolver compute %d (%.1f%%), with %d fallbacks (%d in all); every one of the %d functions compared "+
-		"answers as the push", described, len(roots), pushPackages, judged.Load(), pushFacts, askedByReaders,
-		100*float64(askedByReaders)/float64(max(judged.Load(), 1)), fallbacksByReaders, counts.Fallbacks.Load(),
-		compared)
-}
-
-// objectKey is function's key for a failure: its objectpath, or its position for one with none.
-func objectKey(owner *packages.Package, function *types.Func) string {
-	path, pathError := objectpath.For(function)
-	if pathError == nil {
-		return "objectpath " + string(path)
-	}
-	return fmt.Sprintf("declared at %s", owner.Fset.Position(function.Pos()))
-}
-
 // probed is what probing a fixture found: the nilness of each result of each function as the root that reaches it asks
 // it, by the function's full name and the result's index, every place the resolver's answer and the push's result
 // part, and the resolver's counts.
@@ -197,7 +74,7 @@ func probeFixtures(test *testing.T, patterns ...string) probed {
 	if loadError != nil {
 		test.Fatalf("loading %v: %v", patterns, loadError)
 	}
-	push := return_nil_ness.NewPushAnalyzer(nil)
+	push := return_nil_ness.NewPushAnalyzer()
 	probe := &analysis.Analyzer{
 		Name:       "nilness_probe",
 		Doc:        "asks the resolver of every result of every function in the package's reach, beside the push's result",

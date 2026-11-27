@@ -1,0 +1,33 @@
+library is a repository of its own, judged by its own ignore files, info/exclude and index: the
+parent's `*.log` and `vendor/` do not reach into it.
+
+repository .
+	.gitignore
+	main.go
+repository library
+	.gitignore
+	kept.tmp
+-- .gitignore --
+*.log
+vendor/
+-- app.log --
+log
+-- library/.git/info/exclude --
+# library's own
+local-only
+-- library/.gitignore --
+*.tmp
+-- library/debug.log --
+log
+-- library/kept.tmp --
+kept
+-- library/local-only --
+local
+-- library/scratch.tmp --
+scratch
+-- library/vendor/module.go --
+package module
+-- main.go --
+package main
+-- vendor/module.go --
+package module

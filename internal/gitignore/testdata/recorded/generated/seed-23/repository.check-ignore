@@ -1,0 +1,6 @@
+::	.gitignore
+::	a
+.gitignore:1:?/	a/.gitignore
+::	a/keep
+::	build
+::	keep

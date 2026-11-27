@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"flag"
 	"fmt"
 	"io/fs"
 	"os"
@@ -17,6 +18,8 @@ import (
 
 	"github.com/system-inc/cohere/internal/testing/build_inputs"
 	"github.com/system-inc/cohere/internal/testing/executable_testing"
+	"github.com/system-inc/cohere/internal/testing/own_go_cache"
+	"github.com/system-inc/cohere/internal/testing/process_reading"
 )
 
 func TestWholeModuleAndCountOnceAreReadFromTheArguments(test *testing.T) {
@@ -261,14 +264,39 @@ func TestOrdinalSaysAPlaceAsAPersonWould(test *testing.T) {
 	}
 }
 
+// niceHelperVariable, set to anything, has TestARunIsNiceUnlessItAsksForFullPriority stand in for go: it prints how
+// nice it runs and what it was asked, as `nice=<n> <arguments>`, and passes.
+const niceHelperVariable = "COHERE_DEV_TEST_NICE_HELPER"
+
+// printOwnNiceness is the stand-in go's whole run: its own nice, read in process, and the arguments after `--`.
+func printOwnNiceness(test *testing.T) {
+	nice, niceError := process_reading.Niceness(os.Getpid())
+	if niceError != nil {
+		test.Fatal(niceError)
+	}
+	if _, printError := fmt.Printf("nice=%d %s\n", nice, strings.Join(flag.Args(), " ")); printError != nil {
+		test.Fatal(printError)
+	}
+}
+
 // A run makes itself nice, so the go command and test binaries it starts inherit it and yield the machine
 // to a person; --full-priority keeps the priority it was started with, for a timed measurement, and never
 // reaches go test (#2qc6j8g). Shown at nice 19 through COHERE_DEV_NICENESS, since the house runs its tests
-// at nice 10 already, where a run that failed to lower itself would look the same as one that did.
+// at nice 10 already, where a run that failed to lower itself would look the same as one that did. Each nice is read
+// in process (process_reading), never through ps, which is setuid on macOS and refused in an integrate job's sandbox,
+// so the stand-in go is this test binary, run as niceHelperVariable says.
 func TestARunIsNiceUnlessItAsksForFullPriority(test *testing.T) {
 	test.Parallel()
+	if os.Getenv(niceHelperVariable) != "" {
+		printOwnNiceness(test)
+		return
+	}
 	if runtime.GOOS == "windows" {
 		test.Skip("nice is a Unix priority")
+	}
+	executable, executableError := os.Executable()
+	if executableError != nil {
+		test.Fatal(executableError)
 	}
 	wrapper := filepath.Join(test.TempDir(), "cohere-dev")
 	build_inputs.Record(test, ".", ".")
@@ -279,7 +307,8 @@ func TestARunIsNiceUnlessItAsksForFullPriority(test *testing.T) {
 	bin := test.TempDir()
 	if writeError := executable_testing.WriteFile(
 		filepath.Join(bin, "go"),
-		[]byte("#!/bin/sh\necho nice=$(ps -o nice= -p $$ | tr -d ' ') \"$@\"\n"),
+		[]byte("#!/bin/sh\n"+niceHelperVariable+"=1 exec '"+executable+
+			"' -test.run='^TestARunIsNiceUnlessItAsksForFullPriority$' -- \"$@\"\n"),
 		0o755,
 	); writeError != nil {
 		test.Fatal(writeError)
@@ -312,13 +341,9 @@ func TestARunIsNiceUnlessItAsksForFullPriority(test *testing.T) {
 		}
 		return nice, strings.Join(fields[1:], " ")
 	}
-	output, outputError := exec.Command("ps", "-o", "nice=", "-p", strconv.Itoa(os.Getpid())).Output()
-	if outputError != nil {
-		test.Fatal(outputError)
-	}
-	own, parseError := strconv.Atoi(strings.TrimSpace(string(output)))
-	if parseError != nil {
-		test.Fatalf("ps printed %q for this test's nice", output)
+	own, ownError := process_reading.Niceness(os.Getpid())
+	if ownError != nil {
+		test.Fatal(ownError)
 	}
 
 	if own == 19 {
@@ -588,8 +613,8 @@ func TestTheCacheTrimRunsBesideABusyPoolAndKeepsTheFloor(test *testing.T) {
 	insideFloor := put("b0"+strings.Repeat("b", 62)+"-a", 90*time.Minute)
 	// A cap of 6 KB, so the trim brings 12 KB down to three quarters of it.
 	capGigabytes := strconv.FormatFloat(6*1024.0/(1<<30), 'g', -1, 64)
-	environment := append(outsideThePool(os.Environ()), homeVariable+"="+home, "HOME="+scratchHome(test),
-		"GOCACHE="+cache, tokensVariable+"=2", cacheCapVariable+"="+capGigabytes)
+	environment := append(own_go_cache.Environment(outsideThePool(os.Environ()), cache), homeVariable+"="+home,
+		"HOME="+scratchHome(test), tokensVariable+"=2", cacheCapVariable+"="+capGigabytes)
 
 	// A run holds a token the whole time, and the trim runs beside it on the other.
 	held, takeSlotError := takeSlot(slots, 2, "a run that holds a token")
@@ -631,6 +656,75 @@ func TestTheCacheTrimRunsBesideABusyPoolAndKeepsTheFloor(test *testing.T) {
 	claimCacheLook(rationed, time.Now())
 	if claimCacheLook(rationed, time.Now().Add(time.Minute)) {
 		test.Error("a second look a minute later was due, inside the ten minutes")
+	}
+}
+
+// A Go cache a program serves is never trimmed (#e94a6r4): Loom's runner names its program and its layer for an
+// integrate job and keeps the layer's life itself, so the trim measures and removes nothing there, over its cap or
+// not, and its status says why.
+func TestTheCacheTrimLeavesACacheAProgramServes(test *testing.T) {
+	test.Parallel()
+	if runtime.GOOS == "windows" {
+		test.Skip("the trim holds tokens, a Unix lock")
+	}
+	wrapper := filepath.Join(test.TempDir(), "cohere-dev")
+	build_inputs.Record(test, ".", ".")
+	if output, outputError := exec.Command("go", "build", "-o", wrapper, ".").CombinedOutput(); outputError != nil {
+		test.Fatalf("building: %v\n%s", outputError, output)
+	}
+	home := test.TempDir()
+	if createDirectoryError := os.MkdirAll(
+		filepath.Join(userCacheDirectoryIn(home), "cohere", "test-slots"),
+		0o755,
+	); createDirectoryError != nil {
+		test.Fatal(createDirectoryError)
+	}
+	// Ten 1 KB entries three hours old, in the pool home's cache, over a 6 KB cap, so a trim would take most.
+	cache := filepath.Join(userCacheDirectoryIn(home), "go-build")
+	if createDirectoryError := os.MkdirAll(cache, 0o755); createDirectoryError != nil {
+		test.Fatal(createDirectoryError)
+	}
+	if writeError := os.WriteFile(
+		filepath.Join(cache, "README"),
+		[]byte("This directory holds cached build artifacts from the Go build system.\n"),
+		0o644,
+	); writeError != nil {
+		test.Fatal(writeError)
+	}
+	entries := []string{}
+	for index := 0; index < 10; index++ {
+		name := fmt.Sprintf("%02x%s-d", index, strings.Repeat("a", 62))
+		path := filepath.Join(cache, name[:2], name)
+		if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
+			test.Fatal(createDirectoryError)
+		}
+		if writeError := os.WriteFile(path, make([]byte, 1024), 0o644); writeError != nil {
+			test.Fatal(writeError)
+		}
+		when := time.Now().Add(-3 * time.Hour)
+		if changeTimesError := os.Chtimes(path, when, when); changeTimesError != nil {
+			test.Fatal(changeTimesError)
+		}
+		entries = append(entries, path)
+	}
+	// The program is named and never started: go env only reports it, and the trim reads no more than that.
+	trim := exec.Command(wrapper, trimCacheVerb)
+	trim.Env = append(own_go_cache.Environment(outsideThePool(os.Environ()), cache),
+		"GOCACHEPROG=loom-job-runner gocacheprog", homeVariable+"="+home, "HOME="+scratchHome(test),
+		tokensVariable+"=2", cacheCapVariable+"="+strconv.FormatFloat(6*1024.0/(1<<30), 'g', -1, 64))
+	if output, trimError := trim.CombinedOutput(); trimError != nil {
+		test.Fatalf("the trim of a cache a program serves failed: %v\n%s", trimError, output)
+	}
+	for _, entry := range entries {
+		if _, statError := os.Stat(entry); statError != nil {
+			test.Errorf("the trim removed %s from a cache a program serves: %v", entry, statError)
+		}
+	}
+	status := readMaybeMissing(test, filepath.Join(userCacheDirectoryIn(home), "cohere", "test-slots",
+		"gocache.status"))
+	if !strings.Contains(string(status), "not trimmed: the Go cache at "+cache+
+		" is served by a cache program, loom-job-runner gocacheprog") {
+		test.Errorf("the trim's status doesn't say it left the program's cache alone: %q", status)
 	}
 }
 
@@ -750,8 +844,9 @@ func TestTheCacheTrimWaitsItsTurnWhenEveryTokenIsHeld(test *testing.T) {
 		test.Fatalf("taking token 2: %v", takeSlotError)
 	}
 	trim := exec.Command(wrapper, trimCacheVerb)
-	trim.Env = append(outsideThePool(os.Environ()), homeVariable+"="+home, "HOME="+scratchHome(test),
-		"GOCACHE="+cache, tokensVariable+"=2", cacheCapVariable+"="+strconv.FormatFloat(6*1024.0/(1<<30), 'g', -1, 64))
+	trim.Env = append(own_go_cache.Environment(outsideThePool(os.Environ()), cache), homeVariable+"="+home,
+		"HOME="+scratchHome(test), tokensVariable+"=2",
+		cacheCapVariable+"="+strconv.FormatFloat(6*1024.0/(1<<30), 'g', -1, 64))
 	if startError := trim.Start(); startError != nil {
 		first.release()
 		second.release()

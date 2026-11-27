@@ -767,8 +767,8 @@ func runModuleTests(
 // verdictLine says a box's verdict on a landing's tests, read whole (readBoxRun), and returns the exit code and where
 // they ran, as the land line says it after what was tested, trust saying what the verdict holds against: a refusal, a
 // failing test or a failing -race run refuses the landing, saying why, and a pass is said with its packages, the tests
-// it skipped or never compiled and where its time went. The land job says its own verdict through it too
-// (land_job_run.go).
+// it skipped or never compiled and where its time went. The integrate job says its own verdict through it too
+// (integrate_job_run.go).
 func verdictLine(worktree string, covered project.Workspace, verdict boxVerdict, trust string) (int, string) {
 	if verdict.refused != "" {
 		fmt.Fprintf(streams.Errors, "cohere-dev: %s refused to test this landing, so nothing landed: %s\n",

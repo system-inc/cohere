@@ -1,0 +1,23 @@
+A directory a rule excludes that holds a tracked path is not ignored, so a walk enters it; beside the
+tracked files, the untracked ones read ignored by the rule that excluded the directory, and a directory
+there holding nothing tracked is ignored.
+
+repository .
+	.gitignore
+	build/deep/inner.go
+	build/kept.go
+	main.go
+-- .gitignore --
+build/
+-- build/cache/blob --
+blob
+-- build/deep/inner.go --
+package deep
+-- build/deep/loose.go --
+package deep
+-- build/kept.go --
+package build
+-- build/scratch.go --
+package build
+-- main.go --
+package main
