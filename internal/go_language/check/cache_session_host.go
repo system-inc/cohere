@@ -1232,9 +1232,10 @@ func (session *CacheSession) hostCounts() HostRestoreCounts {
 // keepForBuilds is what the host's run keeps of each package it analyzed from source, among analyzed and what they
 // reach, whose reads can hold, for its extra builds to restore from (#b2t9xmf): the package's entry, read back from the
 // store the run wrote it to, the system cache's for a standard-library package (storeFor), or else encoded here, as
-// saveMisses encodes it, and held in memory, which a run under `--no-cache` never stores. A package the run restored,
-// from either store, is not kept: each build reads its own. Each package's portable digest is the one Restore keyed
-// it by, before the load gave anything its syntax (KeepForBuilds). Only a run with extra builds asks it, so a run
+// saveMisses encodes it, and held in memory: every package under `--no-cache`, which never stores, and each one a
+// session reading its store cold did not write, since the store held it already (ReadColdWhen). A package the run
+// restored, from either store, is not kept: each build reads its own. Each package's portable digest is the one Restore
+// keyed it by, before the load gave anything its syntax (KeepForBuilds). Only a run with extra builds asks it, so a run
 // without pays nothing. gathered gives the findings the run's gather made of each root action, which an encoded entry
 // holds rather than convert them again (see encodeEntry).
 func (session *CacheSession) keepForBuilds(
@@ -1321,8 +1322,11 @@ func (session *CacheSession) keepForBuilds(
 			continue
 		}
 		unsure := session.resolver != nil && keptPackage.Types != nil && session.resolver.Unsure(keptPackage.Types)
-		if session.caching.Store == nil && len(keptPackage.Errors) == 0 && !keptPackage.IllTyped &&
-			len(actionsOf[keptPackage]) > 0 && finishedClean(actionsOf[keptPackage]) && !unsure {
+		// A session reading its store cold wrote no package the store held already (saveMisses), so each it did not
+		// write is kept from memory, as a run without a store keeps every one.
+		if (session.caching.Store == nil || session.readsColdFrom(session.caching.Store)) &&
+			len(keptPackage.Errors) == 0 && !keptPackage.IllTyped && len(actionsOf[keptPackage]) > 0 &&
+			finishedClean(actionsOf[keptPackage]) && !unsure {
 			encoding = append(encoding, keptPackage)
 			host.entries[keptPackage.ID] = kept
 		}

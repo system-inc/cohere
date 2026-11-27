@@ -58,18 +58,25 @@ func (session *CacheSession) openPacks(loader string) {
 	packs.opened = true
 	packs.counts.RefusedBy = map[string]int{}
 	if store := session.caching.Store; store != nil && store.ShardStamps() != nil {
-		keyContext := session.keyContextOf(loader)
-		// The project's pack is named by every part of the context its keys hold, so another build, rule set or
-		// executable never reads it, and a run with another loader has its own.
-		packs.open(store, false, cache.PackPlace{Identity: cache.PackIdentity(keyContext.ExecutableIdentity),
-			Name: cache.PackName([]string{"project"}, []string{keyContext.FormatVersion, keyContext.ExecutableIdentity},
-				keyContext.Build, keyContext.RuleSet)})
+		packs.open(store, false, ProjectPackPlace(session.caching.Context, session.caching.CgoToolchain, loader))
 	}
 	if session.KeepsSystemCache() && session.standardLibraryContext != nil &&
 		session.caching.StandardLibrary.System.ShardStamps() != nil {
 		packs.open(session.caching.StandardLibrary.System, true,
 			systemPackPlace(*session.standardLibraryContext, packs.project))
 	}
+}
+
+// ProjectPackPlace is where the project's store keeps the pack of a build whose session's Caching holds context and
+// cgoToolchain, for its loads under loader: named by every part of the context its keys hold (keyContextOf), so another
+// build, rule set or executable never reads it, and a run with another loader has its own. The build's session opens
+// it (openPacks), and the host's run asks, before its first restore, whether every build's is missing (#s8e6z0n), so
+// the two name it alike by construction.
+func ProjectPackPlace(context cache.Context, cgoToolchain []string, loader string) cache.PackPlace {
+	keyContext := keyContextOf(context, cgoToolchain, loader)
+	return cache.PackPlace{Identity: cache.PackIdentity(keyContext.ExecutableIdentity),
+		Name: cache.PackName([]string{"project"}, []string{keyContext.FormatVersion, keyContext.ExecutableIdentity},
+			keyContext.Build, keyContext.RuleSet)}
 }
 
 // systemPackPlace is where the system cache's pack of a build is: named by every part of the standard library's

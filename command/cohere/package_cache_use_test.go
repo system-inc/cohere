@@ -182,3 +182,28 @@ func TestThePackageCacheLineSaysWhatTheBuildsPacksDid(test *testing.T) {
 		}
 	}
 }
+
+// The account says beside its counts why the host's build read its findings store cold, every package a miss though
+// the store may hold it (#s8e6z0n), and `--json` carries the reason, and a run whose host read as always says and
+// carries nothing of it.
+func TestThePackageCacheLineSaysTheHostReadCold(test *testing.T) {
+	test.Parallel()
+
+	for _, testCase := range []struct {
+		cache packageCacheUse
+		want  string
+	}{
+		{cache: packageCacheUse{On: true, Missed: 3, HostReadCold: "buildPacksMissing"},
+			want: "package cache hit 0, missed 3, wrote 0, host read cold (buildPacksMissing)"},
+		{cache: packageCacheUse{On: true, Hit: 3}, want: "package cache hit 3, missed 0, wrote 0"},
+	} {
+		if got := testCase.cache.line(); got != testCase.want {
+			test.Errorf("got %q, want %q", got, testCase.want)
+		}
+		encoded := jsonLine(summaryAsJson(runSummary{PackageCache: &testCase.cache}))
+		carried := strings.Contains(encoded, `"hostReadCold":"buildPacksMissing"`)
+		if carried != (testCase.cache.HostReadCold != "") || !carried && strings.Contains(encoded, `"hostReadCold"`) {
+			test.Errorf("want the reason carried %t in %s", testCase.cache.HostReadCold != "", encoded)
+		}
+	}
+}

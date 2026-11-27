@@ -116,18 +116,26 @@ func lintCache(
 		return &check.Caching{StandardLibrary: standardLibrary, CgoToolchain: cgoToolchain(values)}, nil
 	}
 	return &check.Caching{
-		Store:       cache.Open(workspace.Root, stamps),
-		ExtraInputs: newStaticcheckConfigurationInputs().inputs,
-		Context: cache.Context{
-			FormatVersion:      check.CacheFormatVersion,
-			ExecutableIdentity: identity,
-			Build:              cacheBuild(values),
-			RuleSet:            cacheRuleSet(enabled),
-		},
+		Store:           cache.Open(workspace.Root, stamps),
+		ExtraInputs:     newStaticcheckConfigurationInputs().inputs,
+		Context:         projectCacheContext(identity, values, enabled),
 		StandardLibrary: standardLibrary,
 		CgoToolchain:    cgoToolchain(values),
 		AnswersInPart:   request.answersInPart,
 	}, nil
+}
+
+// projectCacheContext is what every key of the project's store shares but the loader, for a build whose go env
+// answered values, under the run's enabled rules and cohere-go's identity: the Context lintCache gives a build's
+// session, and the one the host's run names each extra build's pack by before that session is made
+// (hostReadColdReason), so the two never drift.
+func projectCacheContext(identity string, values map[string]string, enabled []rule.Rule) cache.Context {
+	return cache.Context{
+		FormatVersion:      check.CacheFormatVersion,
+		ExecutableIdentity: identity,
+		Build:              cacheBuild(values),
+		RuleSet:            cacheRuleSet(enabled),
+	}
 }
 
 // overlaidGoFlags reports whether goFlags, `GOFLAGS` as go env reports it, from the environment or go's own env file,

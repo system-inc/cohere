@@ -491,6 +491,11 @@ func (pipeline *pipeline) run() int {
 				pipeline.session.KeepDeclarationsRecords(decodeDeclarationsRecord)
 			}
 		}
+		// Asked at the host's first restore whatever the builds, so the reason's own judgment of them is the one that
+		// decides whether the host reads its store cold (#s8e6z0n).
+		if pipeline.session != nil {
+			pipeline.session.ReadColdWhen(pipeline.hostReadColdReason)
+		}
 	}
 	// Every go command the run's builds need starts now, before the first load grows the heap (#sktb2y8), and is joined
 	// on every way out, a return or a panic, so none outlives the run.

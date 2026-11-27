@@ -186,6 +186,8 @@ func (pipeline *pipeline) runLint(loaded *load.Loaded, loadError error, earlier 
 		SystemCacheWritten: result.Cache.SystemCacheWritten,
 		SystemCacheOff:     pipeline.systemCache.off,
 		SystemCacheNotKept: systemCacheNotKept,
+
+		HostReadCold: contract.HostReadColdReason(result.Cache.HostReadCold),
 	}
 	if record.Cache.SystemCacheNotKept != "" {
 		pipeline.note("the system cache was not kept: %s", record.Cache.SystemCacheNotKept)

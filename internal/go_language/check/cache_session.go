@@ -81,6 +81,10 @@ type CacheCounts struct {
 	// FactsSkipped of what it restored, and Problems.
 	On bool
 
+	// HostReadCold is why the host's session read the project's store cold this run (ReadColdWhen, #s8e6z0n), empty
+	// when it did not: every package of that store is then a miss, though the store may hold it.
+	HostReadCold string
+
 	// Hit is the packages restored from an entry in the store, which nothing analyzed, and on the load from source
 	// nothing parsed or type-checked unless the second key restored it (see SecondKeyHit).
 	Hit int
@@ -291,6 +295,12 @@ type CacheSession struct {
 	// packs are an extra build's packs of its stores (KeepBuildPacks), nil for any other session.
 	packs *buildPacks
 
+	// decideReadCold is what the host's session asks, once, at its first Restore, whether it reads the project's store
+	// cold this run, nil once asked and for any other session (ReadColdWhen); readCold is its answer, why the session
+	// reads cold, empty when it does not (readsColdFrom).
+	decideReadCold func() string
+	readCold       string
+
 	// kept is set once keepForBuilds has let go of the resolver and the answer memo, and cleared by the next Restore,
 	// which starts both afresh. A read of either while it is set is a problem the run reports (readAfterKeep), never
 	// a quiet empty answer (#px1yxq8).
@@ -328,10 +338,16 @@ func NewCacheSession(caching *Caching, rules []rule.Rule, reports ...*analysis.A
 // checked from what the cgo tool made with it, and the toolchain's flags and headers change that (#syscache). Under the
 // source loader the cgo tool never runs, so the toolchain changes no key.
 func (session *CacheSession) keyContextOf(loader string) cache.Context {
-	keyContext := session.caching.Context
+	return keyContextOf(session.caching.Context, session.caching.CgoToolchain, loader)
+}
+
+// keyContextOf is the context a session whose Caching holds context and cgoToolchain keys a load under loader by
+// (CacheSession.keyContextOf), for one who names a build's pack before that session is made (ProjectPackPlace).
+func keyContextOf(context cache.Context, cgoToolchain []string, loader string) cache.Context {
+	keyContext := context
 	keyContext.Build = append(slices.Clone(keyContext.Build), "loader="+loader)
 	if loader == load.LoaderCgoTranslated {
-		keyContext.Build = append(keyContext.Build, session.caching.CgoToolchain...)
+		keyContext.Build = append(keyContext.Build, cgoToolchain...)
 	}
 	return keyContext
 }
@@ -377,6 +393,8 @@ func (session *CacheSession) Restore(
 	reachable []*packages.Package,
 	analyzed []*packages.Package,
 ) map[*packages.Package]*load.Restored {
+	// Before anything of the project's store is read, and before the counts start over, which carry the answer.
+	session.takeReadCold()
 	session.opened = true
 	// Every map starts empty, the keys and the files' digests too, since cohere-go restores a second load when the
 	// long-line wrap wrote a file, and keys this restore could not compute must not leave the first load's in their
@@ -410,7 +428,8 @@ func (session *CacheSession) Restore(
 	// The counts are of the run over this load, the one whose result stands, which is the last: a load again to check
 	// a package from source to answer a question drops the pass before it (see Reload), and its packages that pass
 	// saved are this one's hits. The problems stay, since every one of them was met.
-	session.counts = CacheCounts{On: session.counts.On, Problems: session.counts.Problems}
+	session.counts = CacheCounts{On: session.counts.On, Problems: session.counts.Problems,
+		HostReadCold: session.readCold}
 	session.factsSkipped.Store(0)
 	if session.known == nil {
 		return nil
@@ -607,7 +626,8 @@ func (session *CacheSession) hitAt(restoring *packages.Package, key cache.Key) b
 // and its decode is added, so the next build that names the body shares it.
 func (session *CacheSession) readHit(restoring *packages.Package, key cache.Key, bodies *decodedBodies) storeHit {
 	store := session.storeFor(restoring)
-	if store == nil {
+	// A session reading its store cold looks up nothing there, by its first key or its second.
+	if store == nil || session.readsColdFrom(store) {
 		return storeHit{}
 	}
 	contents, storedKey, found := session.entryAt(store, key)
@@ -1026,11 +1046,15 @@ func (session *CacheSession) saveMisses(
 		store := session.storeFor(saved)
 		toSystemCache := store != nil && store != session.caching.Store
 		return func() {
+			// A session reading its store cold writes no entry the store holds already, under the same key, so a warm
+			// store it read nothing of stays exactly as it was, and a cold one is filled as any run fills it
+			// (ReadColdWhen). Its keep holds what it did not write from memory (keepForBuilds).
+			heldAlready := encodeError == nil && session.readsColdFrom(store) && store.Holds(session.keys[saved])
 			var putError error
-			if encodeError == nil && store != nil {
+			if encodeError == nil && store != nil && !heldAlready {
 				putError = session.putRecord(store, session.keys[saved], entry)
 			}
-			writesRecord := keepsRecord && store != nil
+			writesRecord := keepsRecord && store != nil && !heldAlready
 			// A dependence record follows its entry, and only an entry whose write held (#6a3kjvz).
 			var recordError error
 			if writesRecord && encodeError == nil && putError == nil {
@@ -1061,6 +1085,8 @@ func (session *CacheSession) saveMisses(
 			case store == nil:
 				// A run without the project's store keys only the standard library (keyStandardLibraryApart), so no
 				// package without a store is saved; nothing keeps it.
+			case heldAlready:
+				// Not written, since the store holds its key: neither a write nor a failure, and a miss all the same.
 			case putError != nil && toSystemCache:
 				session.systemCacheFailed(putError)
 			case putError != nil:

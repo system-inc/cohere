@@ -203,8 +203,10 @@ func (session *CacheSession) readDependenceRecords(reachable []*packages.Package
 	records.counts = DependenceRecordCounts{}
 	var keyed []*packages.Package
 	for _, each := range reachable {
-		// A session with no store of its own, a plain run's under `--no-cache`, keeps only the system cache's records.
-		if _, hasKey := session.keys[each]; hasKey && session.caching.Store != nil {
+		// A session with no store of its own, a plain run's under `--no-cache`, keeps only the system cache's records,
+		// and so does one reading that store cold, which looks up nothing there (ReadColdWhen).
+		if _, hasKey := session.keys[each]; hasKey && session.caching.Store != nil &&
+			!session.readsColdFrom(session.caching.Store) {
 			keyed = append(keyed, each)
 		}
 	}
