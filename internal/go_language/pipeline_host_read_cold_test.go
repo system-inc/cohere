@@ -90,6 +90,30 @@ func TestASettledTreeKeepsTheHostsHits(test *testing.T) {
 	}
 }
 
+// A fully cold start fills the host's store (#s8e6z0n): over an empty store, a run checking every build finds every
+// build's pack missing and reads cold, yet writes each entry its host checked, since the store held none of them, so
+// the run after it, its builds' packs written, reads as always and restores its host from that store rather than
+// checking every package from source a second time.
+func TestAColdStartFillsTheHostsStore(test *testing.T) {
+	test.Parallel()
+
+	root := copyFixture(test, filepath.Join("testdata", "other-builds"))
+	sharing := packingLater(test.TempDir())
+	_, cold := runOverConfigured(test, root, exitFindings, sharing)
+	first := lintRecordOf(test, cold).Cache
+	if first.HostReadCold != contract.HostReadColdBuildPacksMissing || first.Written == 0 ||
+		first.Written != first.Missed {
+		test.Errorf("want the cold start read cold for %q and every miss written, got %q with %d of %d written",
+			contract.HostReadColdBuildPacksMissing, first.HostReadCold, first.Written, first.Missed)
+	}
+	_, second := runOverConfigured(test, root, exitFindings, sharing)
+	after := lintRecordOf(test, second).Cache
+	if after.HostReadCold != "" || after.Hit == 0 || after.Missed != 0 {
+		test.Errorf("want the run after the cold start to read as always and restore its host whole, got %q with %d "+
+			"hit and %d missed", after.HostReadCold, after.Hit, after.Missed)
+	}
+}
+
 // The cliff (#s8e6z0n): a host whose store holds everything, filled by a run of the host's build alone, beside extra
 // builds whose stores hold nothing of their own, every pack missing. The host reads cold, which the record says,
 // checks every package from source and keeps each for the builds, so each build restores from it rather than check its
@@ -136,6 +160,45 @@ func TestTheHostReadsColdWhenEveryBuildsPackIsMissing(test *testing.T) {
 			test.Errorf("want %s to restore from the host and check less than its %d packages from source, got %d "+
 				"restored, %d untouched and %d checked from source", build.Target, build.PackagesLoaded,
 				build.RestoredFromHost, build.Untouched, build.CheckedFromSource)
+		}
+	}
+}
+
+// A tree whose every extra build fails to type-check takes the cold read on its first run alone (#s8e6z0n): such a
+// build runs no rule and never saves, so without its packs written all the same every later run's host would take it
+// for a build that has never run, and read its store cold forever, as a project that builds only on its own platform
+// would.
+func TestATreeWhoseEveryBuildIsBrokenReadsColdOnce(test *testing.T) {
+	test.Parallel()
+
+	root := copyFixture(test, filepath.Join("testdata", "rename-platforms"))
+	if breakError := breakUnderWindows(root); breakError != nil {
+		test.Fatal(breakError)
+	}
+	brokenUnderFreebsd := "//go:build freebsd\n\npackage limits\n\n" +
+		"// extra is what freebsd adds to a read, mistyped.\nfunc extra() int {\n\treturn maxBytes + \"quarter\"\n}\n"
+	freebsdFile := filepath.Join(root, "internal", "limits", "limits_bsd.go")
+	if writeError := os.WriteFile(freebsdFile, []byte(brokenUnderFreebsd), 0o644); writeError != nil {
+		test.Fatal(writeError)
+	}
+	sharing := packingLater(test.TempDir())
+	_, first := runOverConfigured(test, root, exitFindings, sharing)
+	lint := lintRecordOf(test, first)
+	if lint.Cache.HostReadCold != contract.HostReadColdBuildPacksMissing {
+		test.Errorf("the first run read cold for %q, want %q", lint.Cache.HostReadCold,
+			contract.HostReadColdBuildPacksMissing)
+	}
+	// The premise: every extra build of the run found a type error, so none of them ran its rules.
+	for _, build := range lint.Builds[1:] {
+		if build.AnalyzedPackages != 0 {
+			test.Fatalf("want every extra build broken, got %s analyzing %d packages", build.Target,
+				build.AnalyzedPackages)
+		}
+	}
+	for run := range 2 {
+		_, later := runOverConfigured(test, root, exitFindings, sharing)
+		if reason := lintRecordOf(test, later).Cache.HostReadCold; reason != "" {
+			test.Errorf("run %d after the first read cold for %q, want its store read as always", run+2, reason)
 		}
 	}
 }

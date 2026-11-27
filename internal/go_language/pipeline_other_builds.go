@@ -743,6 +743,11 @@ func (pipeline *pipeline) extraBuildRun(
 		pipeline.keepMustCheckSet(extra, mustCheck)
 	}
 	if len(loaded.Diagnostics) > 0 {
+		// It runs no rule, so it never saves; its packs are written all the same, so a later run's host knows this
+		// build has run and reads its own store as always (#s8e6z0n).
+		if session != nil {
+			session.WritePacksWithoutSave()
+		}
 		return run, nil
 	}
 	run.packagesLoaded = loaded.PackagesLoaded

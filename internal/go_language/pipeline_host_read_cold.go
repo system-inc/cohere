@@ -20,8 +20,9 @@ func (pipeline *pipeline) hostReadColdReason() string {
 	if !pipeline.keepsForBuilds() {
 		return ""
 	}
-	// Builds that restore nothing from the host's run gain nothing from what it keeps, and a host with no store reads
-	// nothing of one.
+	// Asked only where the builds restore from the host's run: builds that restore nothing from it, under a test's
+	// keepsHostRestoreOff or the `--build-dependence` facts census, gain nothing from what it keeps, so a cold host
+	// there would only be slower. A host with no store reads nothing of one.
 	if pipeline.keepsHostRestoreOff || pipeline.censusKeepsHostRestoreOff || !pipeline.session.HasStore() {
 		return ""
 	}
@@ -54,6 +55,7 @@ func (pipeline *pipeline) buildPacksMissing() bool {
 		}
 		values := goEnvironment.Values()
 		context := projectCacheContext(identity, values, enabled)
+		// Missing under every loader the build could run, since its loader is known only after its own listing.
 		for _, loader := range []string{load.LoaderSource, load.LoaderCgoTranslated} {
 			if store.HasPack(check.ProjectPackPlace(context, cgoToolchain(values), loader)) {
 				return false

@@ -1262,9 +1262,11 @@ func storedEntryAt(store *cache.Store, key cache.Key) (cacheEntry, entryRecord, 
 // alias keeps each alias, a second key or the first key of a package a second key restored, with the key of the entry
 // it stands for, in the build's alias table, one write for the round (#m7w1ncy), so the next run with the same inputs
 // hits on it. The table keeps the newest four times as many as the packages the run keyed, or aliasTableFloor. A
-// failed write is a problem, never a finding: the next run misses where it would have hit.
+// failed write is a problem, never a finding: the next run misses where it would have hit. A session reading its store
+// cold writes none (ReadColdWhen): the table is one file of one shard, and a write there moves that shard's stamp this
+// run, which each build's pack then records as none, so the next run reads the shard from the store.
 func (session *CacheSession) alias(aliases map[cache.Key]cache.Key) {
-	if session.aliases == nil {
+	if session.aliases == nil || session.readsColdFrom(session.caching.Store) {
 		return
 	}
 	if addError := session.aliases.add(aliases, max(aliasTableFloor, 4*len(session.keys))); addError != nil {

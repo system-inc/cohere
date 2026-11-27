@@ -171,6 +171,19 @@ func (session *CacheSession) putRecord(store *cache.Store, key cache.Key, entry 
 	return putError
 }
 
+// WritePacksWithoutSave writes the session's packs, an extra build's, from what its loads read, for a build whose load
+// found type errors: it runs no rule, so it never saves, and with no pack the host of every later run would take this
+// build for one that has never run, and read its own store cold each time (the host reading cold, #s8e6z0n). A
+// project that builds only on its own platform has every extra build fail so, and its host would read cold forever.
+// It writes nothing for a session whose save already wrote them, and nothing for one that keeps no packs or opened
+// none.
+func (session *CacheSession) WritePacksWithoutSave() {
+	if session.packs == nil || session.packs.written {
+		return
+	}
+	session.writePacks()
+}
+
 // writePacks writes each pack that changed, was missing or was refused, or whose shards' stamps moved, with what the
 // run read and wrote of its store and the stamp of each shard it was read from, at the save, once every write of the
 // save has run, and counts what the packs did over the run. Each shard's stamp is the run's, taken before anything of
@@ -185,6 +198,7 @@ func (session *CacheSession) writePacks() {
 	if packs == nil {
 		return
 	}
+	packs.written = true
 	for _, pack := range packs.byStore {
 		pack.lock.Lock()
 		entries := slices.Collect(maps.Values(pack.held))
