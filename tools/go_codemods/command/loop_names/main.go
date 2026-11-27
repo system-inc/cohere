@@ -842,9 +842,10 @@ func literalParameterOf(identifier *ast.Ident, stack []ast.Node) (*ast.FuncLit, 
 }
 
 // receiverDecisions names every letter receiver, all of one type together: the name the type's other receivers
-// already share, then the names its type gives, then the name the package's own code most often gives a value of
-// the type (`state := &reactivity{...}`), then its package's name before its own (`ruleContext`) when the
-// package's name is a word.
+// already share, then the names its type gives, then its package's name before its own (`ruleContext`) when the
+// package's name is a word. A name some local of the type carries is never one: it says what that one value is,
+// not what the type is, and borrowing it named every `*Constant` receiver of the copied go/ir `vFalse`, after
+// builder.go's `vFalse := NewConstant(constant.MakeBool(false), ...)` (#64r1v42).
 func receiverDecisions(
 	info *types.Info,
 	fileSet *token.FileSet,
@@ -906,7 +907,6 @@ func receiverDecisions(
 			}
 		}
 		names = append(names, namesFromType(group.letters[0].Type(), words)...)
-		names = append(names, packageNamesFor(info, files, typeName)...)
 		if typeName.Pkg() != nil && !strings.Contains(typeName.Pkg().Name(), "_") {
 			qualified := houseLowerCamel(append([]string{typeName.Pkg().Name()}, camelWords(typeName.Name())...), words)
 			names = append(names, qualified)
@@ -924,29 +924,6 @@ func receiverDecisions(
 		}
 	}
 	return decisions
-}
-
-// packageNamesFor is the name of three letters or more the package's own code most often gives a variable
-// holding a value of typeName, or a pointer to one; a name it gives one value among others says what that value
-// is, not what the type is.
-func packageNamesFor(info *types.Info, files []*ast.File, typeName *types.TypeName) []string {
-	counts := map[string]int{}
-	for _, file := range files {
-		ast.Inspect(file, func(node ast.Node) bool {
-			identifier, isIdentifier := node.(*ast.Ident)
-			if !isIdentifier || len(identifier.Name) < 3 {
-				return true
-			}
-			if variable, isVariable := info.Defs[identifier].(*types.Var); isVariable && !variable.IsField() &&
-				receiverTypeName(variable) == typeName {
-				counts[variable.Name()]++
-			}
-			return true
-		})
-	}
-	names := sortedKeys(counts)
-	sort.SliceStable(names, func(left, right int) bool { return counts[names[left]] > counts[names[right]] })
-	return names[:min(len(names), 1)]
 }
 
 // receiverTypeName is the declared type a receiver's method belongs to: the origin of a generic type, through a
