@@ -48,12 +48,13 @@ func NoRace(test testing.TB, why string) {
 	}
 }
 
-// SwiftUnlaidVariable is set to SwiftUnlaidSetting by `cohere-dev integrate-job` for the tests it runs, on Shackler,
-// where cohere-swift can't be built: its build fetches packages from github.com, writes Swift's caches and starts
-// SwiftPM's own sandbox, none of which an integrate job's sandbox allows (#5wj23dd). It stays until Machines lays Swift
-// there (#je1r32a). SwiftUnlaid is what the skip, the integrate job's refusal and its account all say. The variable's
-// value keeps the old road's name: main's judge sets it for a candidate's tests, and the judge that runs is main's, so
-// it flips with the finisher's markers once integrate-job judges (#je6yfxt).
+// SwiftUnlaidVariable was set to SwiftUnlaidSetting by `cohere-dev integrate-job` for the tests it ran on Shackler,
+// while cohere-swift couldn't be built there: its build fetched packages from github.com, wrote Swift's caches and
+// started SwiftPM's own sandbox, none of which an integrate job's sandbox allows (#5wj23dd). Machines laid Swift there
+// and the judge builds from the laid set now (#je1r32a), so it sets the variable no more. The skip stays one pull
+// request longer, because the judge that runs is main's: the pull request that stopped setting it was judged by the
+// judge before it, which still set it, and its tests skipped by it there. The one after it deletes the skip.
+// SwiftUnlaid is what the skip says.
 const (
 	SwiftUnlaidVariable = "COHERE_DEV_LAND_JOB_SWIFT"
 	SwiftUnlaidSetting  = "unlaid"
