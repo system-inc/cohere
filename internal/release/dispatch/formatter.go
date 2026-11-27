@@ -135,10 +135,12 @@ func hashFormatterInputs(goVersion string, inputs []FormatterInput) string {
 	return hex.EncodeToString(digest.Sum(nil))[:hashLength]
 }
 
+// fileSum is a file's sha256 in lowercase hex, for a formatter input and for a shared cohere-swift alike
+// (swift_shared.go).
 func fileSum(path string) (string, error) {
 	contents, readError := os.ReadFile(path)
 	if readError != nil {
-		return "", fmt.Errorf("reading formatter input %s: %w", path, readError)
+		return "", fmt.Errorf("reading %s to checksum it: %w", path, readError)
 	}
 	sum := sha256.Sum256(contents)
 	return hex.EncodeToString(sum[:]), nil
