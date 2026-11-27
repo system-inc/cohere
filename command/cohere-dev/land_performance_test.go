@@ -6,7 +6,6 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"io/fs"
 	"os"
@@ -70,8 +69,11 @@ func (fixture *performanceFixture) landing(environment ...string) (bool, string,
 	return landed, string(output), string(readMaybeMissing(fixture.test, filepath.Join(fixture.replies, "calls")))
 }
 
-// performanceMainBinary is the digest of the binary main's file before the landing measured, another program's.
+// performanceMainBinary is the digest of the binary main's record before the landing measured, another program's.
 const performanceMainBinary = "0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a69788796a5b4c3d2e1f0"
+
+// noBaselineNote is the note of a measurement handed no baseline.
+const noBaselineNote = "no baseline was handed (COHERE_PERFORMANCE_BASELINE unset), so nothing is compared"
 
 // performanceFixtureBinary is the digest the stand-in Shackler says her binary has.
 const performanceFixtureBinary = "5f0c3a9e1d2b4c6a8e0f1a3b5c7d9e1f2a4b6c8d0e2f4a6b8c0d2e4f6a8b0c2d"
@@ -142,17 +144,17 @@ func performanceSpreadOf(median int64, least int64, most int64) performanceSprea
 	return performanceSpread{Median: median, Minimum: least, Maximum: most}
 }
 
-// previousPerformance is a Performance.jsonc main holds before the landing, measured at commit on the machine named,
-// its cold root row's wall and user given and every other row the stand-in's own, so only that row can move.
+// previousPerformance is main's last landed record before the landing, measured at commit on the machine named, its
+// cold root row's wall and user given and every other row the stand-in's own, so only that row can move.
 func previousPerformance(test *testing.T, commit string, machine string, wall performanceSpread,
-	user performanceSpread) []byte {
+	user performanceSpread) performanceFile {
 	test.Helper()
 	measurement, problem := readPerformance([]byte(strings.ReplaceAll(shacklerSays([]int64{9700, 9800, 9900}),
 		"COMMIT", commit)), commit, nil)
 	if problem != "" {
 		test.Fatal(problem)
 	}
-	file := performanceFileOf(measurement, commit, time.Unix(0, 0))
+	file := performanceFileOf(measurement, commit, "", time.Unix(0, 0))
 	file.Machine.Name = machine
 	if machine != performanceBox {
 		file.Machine.Cpu, file.Machine.Cores = "Apple M1", 8
@@ -160,185 +162,209 @@ func previousPerformance(test *testing.T, commit string, machine string, wall pe
 	file.Checks.Cold.Root.Wall, file.Checks.Cold.Root.User = wall, user
 	// main's binary was another program than the one being landed, as a landing that changes cohere builds.
 	file.Tools.Binary = performanceMainBinary
-	file.Note = "the first measurement, so nothing to compare"
-	contents, renderError := renderPerformance(file)
-	if renderError != nil {
-		test.Fatal(renderError)
-	}
-	return contents
+	file.Note = noBaselineNote
+	return file
 }
 
-// sameBinaryPerformance is a previous file's contents with its binary the one the stand-in Shackler says she built,
-// as main's file reads before a landing that changed nothing cohere compiles.
-func sameBinaryPerformance(test *testing.T, contents []byte) []byte {
-	test.Helper()
-	file := performanceFile{}
-	if decodeError := json.Unmarshal([]byte(performanceBody(string(contents))), &file); decodeError != nil {
-		test.Fatal(decodeError)
-	}
-	file.Tools.Binary = performanceFixtureBinary
-	same, renderError := renderPerformance(file)
-	if renderError != nil {
-		test.Fatal(renderError)
-	}
-	return same
+// copiedRecord is record with checks of its own, so a test changing them leaves record's as they were.
+func copiedRecord(record performanceFile) performanceFile {
+	checks := *record.Checks
+	record.Checks = &checks
+	return record
 }
 
-// uncountedPerformance is a previous file's contents as main's files read before each row recorded what it checked.
-func uncountedPerformance(test *testing.T, contents []byte) []byte {
+// baselineSetting is performanceBaselineVariable holding record, as Loom hands it: its JSON in base64.
+func baselineSetting(test *testing.T, record performanceFile) string {
 	test.Helper()
-	file := performanceFile{}
-	if decodeError := json.Unmarshal([]byte(performanceBody(string(contents))), &file); decodeError != nil {
-		test.Fatal(decodeError)
-	}
-	file.Checks.Cold.Root.Checked, file.Checks.Cold.Deeafbf4.Checked, file.Checks.Warm.Root.Checked = nil, nil, nil
-	uncounted, renderError := renderPerformance(file)
+	contents, renderError := renderPerformance(record)
 	if renderError != nil {
 		test.Fatal(renderError)
 	}
-	if strings.Contains(string(uncounted), `"checked"`) {
-		test.Fatalf("a file with no checked counts still records some:\n%s", uncounted)
+	return performanceBaselineVariable + "=" + base64.StdEncoding.EncodeToString(contents)
+}
+
+// sameBinaryPerformance is a previous record with its binary the one the stand-in Shackler says she built, as main's
+// record reads before a landing that changed nothing cohere compiles.
+func sameBinaryPerformance(record performanceFile) performanceFile {
+	record.Tools.Binary = performanceFixtureBinary
+	return record
+}
+
+// uncountedPerformance is a previous record as main's records read before each row recorded what it checked.
+func uncountedPerformance(test *testing.T, record performanceFile) performanceFile {
+	test.Helper()
+	uncounted := copiedRecord(record)
+	uncounted.Checks.Cold.Root.Checked, uncounted.Checks.Cold.Deeafbf4.Checked = nil, nil
+	uncounted.Checks.Warm.Root.Checked = nil
+	rendered, renderError := renderPerformance(uncounted)
+	if renderError != nil {
+		test.Fatal(renderError)
+	}
+	if strings.Contains(string(rendered), `"checked"`) {
+		test.Fatalf("a record with no checked counts still records some:\n%s", rendered)
 	}
 	return uncounted
 }
 
-// performancePreviousCommit is the commit a previous file names, as main's file before the landing.
+// checkMeasuredRecord checks that record is the stand-in Shackler's measurement of commit, whose first parent is
+// parent: its numbers as medians with their ranges, her load before and after, that she was held quiet, the build, the
+// timeline's areas and what each row checked.
+func checkMeasuredRecord(test *testing.T, record performanceFile, commit string, parent string) {
+	test.Helper()
+	if record.Checks == nil {
+		test.Fatalf("the record holds no checks: %+v", record)
+	}
+	cold, warm := record.Checks.Cold, record.Checks.Warm
+	for _, check := range []struct {
+		what      string
+		got, want any
+	}{
+		{"commit", record.Commit, commit},
+		{"parent", record.Parent, parent},
+		{"measured", record.Measured, true},
+		{"skipped", record.Skipped, ""},
+		{"cold root wall", cold.Root.Wall, performanceSpreadOf(9800, 9700, 9900)},
+		{"cold root user", cold.Root.User, performanceSpreadOf(39200, 38800, 39600)},
+		{"cold root sys", cold.Root.System, performanceSpreadOf(980, 970, 990)},
+		{"cold deeafbf4 wall", cold.Deeafbf4.Wall, performanceSpreadOf(4100, 4000, 4200)},
+		{"warm root wall", warm.Root.Wall, performanceSpreadOf(800, 800, 800)},
+		{"cold root checked", cold.Root.Checked, &performanceChecked{Files: 120, Findings: 0}},
+		{"cold deeafbf4 checked", cold.Deeafbf4.Checked, &performanceChecked{Files: 95, Findings: 7}},
+		{"warm root checked", warm.Root.Checked, &performanceChecked{Files: 120, Findings: 0}},
+		{"rounds", record.Checks.Rounds, performanceRounds{Cold: performanceColdRounds,
+			Deeafbf4: performanceReferenceRounds, Warm: performanceWarmRounds}},
+		{"timeline", record.Checks.Timeline.Root,
+			performanceTimeline{Listing: 812, Handover: 5100, Builds: 6201, Run: 9700}},
+		{"machine", fmt.Sprint(record.Machine), fmt.Sprint(performanceMachine{Name: "Shackler",
+			Cpu: "Apple M2 Max", Cores: 12, LoadBefore: []float64{0.89, 0.91, 1.28},
+			LoadAfter: []float64{1.1, 0.95, 1.27}, HeldQuiet: true})},
+		{"tools", record.Tools, performanceTools{Cohere: shortCommit(commit) +
+			" CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags='-s -w', darwin/arm64, on a cache " +
+			"the box kept", Go: "go1.27.1", Binary: performanceFixtureBinary}},
+		{"schema", record.Schema, 3},
+	} {
+		if fmt.Sprint(check.got) != fmt.Sprint(check.want) {
+			test.Errorf("the record's %s is %+v, want %+v", check.what, check.got, check.want)
+		}
+	}
+}
+
+// performancePreviousCommit is the commit a previous record names, as main's last landed record.
 const performancePreviousCommit = "1111111111111111111111111111111111111111"
 
+// plantRecordFile commits a Performance.jsonc to the fixture's main before a landing, as main held one until
+// #6v8r4nn, and returns its blob: nothing a landing does writes or removes it any more, so the tree that lands carries
+// it unchanged.
+func plantRecordFile(fixture *landFixture) string {
+	fixture.test.Helper()
+	writeFixtureFile(fixture.test, filepath.Join(fixture.repository, "Performance.jsonc"), "{\"schema\": 3}\n")
+	fixture.git(fixture.repository, "add", "Performance.jsonc")
+	fixture.git(fixture.repository, "commit", "-q", "-m", "main's record as it was kept")
+	return fixture.git(fixture.repository, "rev-parse", "main:Performance.jsonc")
+}
+
 // A landing measured (#6wnsnq2): the push puts the gated commit in Loom's feed, Shackler's gap runs the script on it,
-// and the landing commit's tree is the gated tree with Performance.jsonc and nothing else changed. The file opens with
-// its header, names the gated commit, and holds the stand-in's numbers as medians with their ranges, her load before
-// and after, that she was held quiet, the build, the timeline's areas and what each row checked. Its note reads against
-// main's file before it: none is the first measurement, overlapping ranges read level, disjoint ones moved, another
-// machine is a line of its own, never compared, and a file with no checked counts says so and compares its times. The
-// land line and the landing's body say the note.
-func TestALandingIsMeasuredOnShacklerAndLandsItsNumbers(test *testing.T) {
+// and the landing commit's tree is the gated tree itself, nothing written into it (#6v8r4nn), main's old
+// Performance.jsonc carried through untouched. Its note reads against the baseline performanceBaselineVariable holds:
+// none says none was handed, overlapping ranges read level, disjoint ones moved, another machine is a line of its own,
+// never compared, and a record with no checked counts says so and compares its times. The land line and the landing's
+// body say the note, with what each phase cost.
+func TestALandingIsMeasuredOnShacklerAndSaysItsNote(test *testing.T) {
 	test.Parallel()
+	level := previousPerformance(test, performancePreviousCommit, performanceBox,
+		performanceSpreadOf(9850, 9600, 10000), performanceSpreadOf(39000, 38000, 40000))
+	moved := previousPerformance(test, performancePreviousCommit, performanceBox,
+		performanceSpreadOf(12000, 11900, 12100), performanceSpreadOf(48000, 47600, 48400))
+	sameBinary, uncounted := sameBinaryPerformance(moved), uncountedPerformance(test, level)
+	otherMachine := previousPerformance(test, performancePreviousCommit, "Marin",
+		performanceSpreadOf(9850, 9600, 10000), performanceSpreadOf(39000, 38000, 40000))
 	for _, testCase := range []struct {
 		name     string
-		previous []byte
+		previous *performanceFile
 		note     string
 	}{
-		{name: "the first measurement", note: "the first measurement, so nothing to compare"},
+		{name: "no baseline", note: noBaselineNote},
 		{
-			name: "overlapping ranges read level",
-			previous: previousPerformance(test, performancePreviousCommit, performanceBox,
-				performanceSpreadOf(9850, 9600, 10000), performanceSpreadOf(39000, 38000, 40000)),
+			name:     "overlapping ranges read level",
+			previous: &level,
 			note: "against 11111111: cold root wall level (9800 ms, was 9850), user level (39200 ms, was 39000); " +
 				"cold deeafbf4 wall level (4100 ms, was 4100), user level (16400 ms, was 16400); " +
 				"warm root wall level (800 ms, was 800), user level (3200 ms, was 3200)",
 		},
 		{
-			name: "disjoint ranges read moved",
-			previous: previousPerformance(test, performancePreviousCommit, performanceBox,
-				performanceSpreadOf(12000, 11900, 12100), performanceSpreadOf(48000, 47600, 48400)),
+			name:     "disjoint ranges read moved",
+			previous: &moved,
 			note: "against 11111111: cold root wall faster by 2200 ms, 18%, ranges apart (9800 ms, was 12000), " +
 				"user faster by 8800 ms, 18%, ranges apart (39200 ms, was 48000); cold deeafbf4 wall level",
 		},
 		{
-			name: "the same binary reads as the box's drift",
-			previous: sameBinaryPerformance(test, previousPerformance(test, performancePreviousCommit,
-				performanceBox, performanceSpreadOf(12000, 11900, 12100), performanceSpreadOf(48000, 47600, 48400))),
+			name:     "the same binary reads as the box's drift",
+			previous: &sameBinary,
 			note: "against 11111111, the same binary (sha256 5f0c3a9e1d2b), so no change to cohere and any " +
 				"difference is the box's: cold root wall drifted down by 2200 ms, 18%, the box's ranges apart " +
 				"(9800 ms, was 12000), user drifted down by 8800 ms, 18%, the box's ranges apart (39200 ms, was " +
 				"48000); cold deeafbf4 wall level",
 		},
 		{
-			name: "another machine reads as its own line",
-			previous: previousPerformance(test, performancePreviousCommit, "Marin",
-				performanceSpreadOf(9850, 9600, 10000), performanceSpreadOf(39000, 38000, 40000)),
+			name:     "another machine reads as its own line",
+			previous: &otherMachine,
 			note: "measured on Shackler (Apple M2 Max, 12 cores), and main's at 11111111 on Marin (Apple M1, " +
 				"8 cores): another machine, so not compared",
 		},
 		{
-			name: "a file with no checked counts says so and compares",
-			previous: uncountedPerformance(test, previousPerformance(test, performancePreviousCommit,
-				performanceBox, performanceSpreadOf(9850, 9600, 10000), performanceSpreadOf(39000, 38000, 40000))),
-			note: "against 11111111: main's file records no checked counts; cold root wall level (9800 ms, was " +
+			name:     "a record with no checked counts says so and compares",
+			previous: &uncounted,
+			note: "against 11111111: main's record holds no checked counts; cold root wall level (9800 ms, was " +
 				"9850), user level (39200 ms, was 39000); cold deeafbf4 wall level",
 		},
 	} {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			fixture := newPerformanceFixture(test)
+			planted := plantRecordFile(fixture.landFixture)
+			environment := []string{}
 			if testCase.previous != nil {
-				writeFixtureFile(test, filepath.Join(fixture.repository, performanceFileName),
-					string(testCase.previous))
-				fixture.git(fixture.repository, "add", performanceFileName)
-				fixture.git(fixture.repository, "commit", "-q", "-m", "main's measurement before")
+				environment = append(environment, baselineSetting(test, *testCase.previous))
 			}
 			writeFixtureFile(test, filepath.Join(fixture.replies, performanceBox+".run"),
 				shacklerSays([]int64{9900, 9700, 9800}))
-			landed, output, calls := fixture.landing()
+			landed, output, calls := fixture.landing(environment...)
 			if !landed {
 				test.Fatalf("the landing did not land:\n%s", output)
 			}
 			gatedTree := fixture.treeGated("a")
-			if changed := fixture.git(fixture.repository, "diff-tree", "-r", "--name-only", gatedTree,
-				"main^{tree}"); changed != performanceFileName {
-				test.Errorf("the landing changed %q from the gated tree, want %s alone", changed, performanceFileName)
+			if tree := fixture.git(fixture.repository, "rev-parse", "main^{tree}"); tree != gatedTree {
+				test.Errorf("main's tree is %s, not the gated %s", tree, gatedTree)
 			}
-			contents := fixture.git(fixture.repository, "show", "main:"+performanceFileName)
-			if !strings.HasPrefix(contents+"\n", performanceHeader) {
-				test.Errorf("the file does not open with its header:\n%s", contents)
-			}
-			measured := performanceFile{}
-			if decodeError := json.Unmarshal([]byte(performanceBody(contents)), &measured); decodeError != nil {
-				test.Fatalf("the file does not parse: %v\n%s", decodeError, contents)
-			}
-			if gated := fixture.git(fixture.repository, "rev-parse", measured.Commit+"^{tree}"); gated != gatedTree {
-				test.Errorf("the file names %s, whose tree is %s, not the gated %s", measured.Commit, gated, gatedTree)
-			}
-			cold, warm := measured.Checks.Cold, measured.Checks.Warm
-			for _, check := range []struct {
-				what      string
-				got, want any
-			}{
-				{"cold root wall", cold.Root.Wall, performanceSpreadOf(9800, 9700, 9900)},
-				{"cold root user", cold.Root.User, performanceSpreadOf(39200, 38800, 39600)},
-				{"cold root sys", cold.Root.System, performanceSpreadOf(980, 970, 990)},
-				{"cold deeafbf4 wall", cold.Deeafbf4.Wall, performanceSpreadOf(4100, 4000, 4200)},
-				{"warm root wall", warm.Root.Wall, performanceSpreadOf(800, 800, 800)},
-				{"cold root checked", cold.Root.Checked, &performanceChecked{Files: 120, Findings: 0}},
-				{"cold deeafbf4 checked", cold.Deeafbf4.Checked, &performanceChecked{Files: 95, Findings: 7}},
-				{"warm root checked", warm.Root.Checked, &performanceChecked{Files: 120, Findings: 0}},
-				{"rounds", measured.Checks.Rounds, performanceRounds{Cold: performanceColdRounds,
-					Deeafbf4: performanceReferenceRounds, Warm: performanceWarmRounds}},
-				{"timeline", measured.Checks.Timeline.Root,
-					performanceTimeline{Listing: 812, Handover: 5100, Builds: 6201, Run: 9700}},
-				{"machine", fmt.Sprint(measured.Machine), fmt.Sprint(performanceMachine{Name: "Shackler",
-					Cpu: "Apple M2 Max", Cores: 12, LoadBefore: []float64{0.89, 0.91, 1.28},
-					LoadAfter: []float64{1.1, 0.95, 1.27}, HeldQuiet: true})},
-				{"tools", measured.Tools, performanceTools{Cohere: shortCommit(measured.Commit) +
-					" CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags='-s -w', darwin/arm64, on a cache " +
-					"the box kept", Go: "go1.27.1", Binary: performanceFixtureBinary}},
-				{"schema", measured.Schema, 3},
-			} {
-				if fmt.Sprint(check.got) != fmt.Sprint(check.want) {
-					test.Errorf("the file's %s is %+v, want %+v", check.what, check.got, check.want)
-				}
-			}
-			if !strings.HasPrefix(measured.Note, testCase.note) {
-				test.Errorf("the note reads\n%s\nwant it to open\n%s", measured.Note, testCase.note)
-			}
-			body := fixture.git(fixture.repository, "log", "-1", "--format=%b", "main")
-			for _, said := range []string{output, body} {
-				if !strings.Contains(said, "Measured on Shackler for Performance.jsonc: "+measured.Note+".") {
-					test.Errorf("the landing does not say the note:\n%s", said)
-				}
-			}
-			if !strings.Contains(output, "Shackler measured "+shortCommit(measured.Commit)+" in ") ||
-				!strings.Contains(output, ": mirror 0.3s, lay 4.1s, toolchain 3.0s, modules 0.6s, build 11.9s, "+
-					"cold-root 54.8s, cold-deeafbf4 17.1s, warm-root 9.8s, timeline-root 9.9s") {
-				test.Errorf("the landing does not say what each phase cost:\n%s", output)
+			if kept := fixture.git(fixture.repository, "rev-parse", "main:Performance.jsonc"); kept != planted {
+				test.Errorf("main's Performance.jsonc is %s after the landing, not the %s it held", kept, planted)
 			}
 			remote, readError := os.ReadFile(filepath.Join(fixture.replies, performanceBox+".remote"))
 			if readError != nil {
 				test.Fatal(readError)
 			}
+			found := regexp.MustCompile(`^echo ([A-Za-z0-9+/=]+) \| base64 -d \| bash -s -- (.*)$`).
+				FindSubmatch(remote)
+			if found == nil {
+				test.Fatalf("the gap's remote is not the encoded script and its arguments:\n%s", remote)
+			}
+			gating := strings.Fields(string(found[2]))[0]
+			if gated := fixture.git(fixture.repository, "rev-parse", gating+"^{tree}"); gated != gatedTree {
+				test.Errorf("the gap measured %s, whose tree is %s, not the gated %s", gating, gated, gatedTree)
+			}
+			body := fixture.git(fixture.repository, "log", "-1", "--format=%b", "main")
+			for _, said := range []string{output, body} {
+				if !strings.Contains(said, "Measured on Shackler: "+testCase.note) {
+					test.Errorf("the landing does not say the note %q:\n%s", testCase.note, said)
+				}
+			}
+			if !strings.Contains(output, "Shackler measured "+shortCommit(gating)+" in ") ||
+				!strings.Contains(output, ": mirror 0.3s, lay 4.1s, toolchain 3.0s, modules 0.6s, build 11.9s, "+
+					"cold-root 54.8s, cold-deeafbf4 17.1s, warm-root 9.8s, timeline-root 9.9s") {
+				test.Errorf("the landing does not say what each phase cost:\n%s", output)
+			}
 			for _, want := range []string{
-				"loom push --feed " + measured.Commit + " --repository cohere",
+				"loom push --feed " + gating + " --repository cohere",
 				"loom gap --box Shackler",
 				"loom gap --box Shackler --within 30m -- ssh Shackler " + string(remote),
 			} {
@@ -346,21 +372,36 @@ func TestALandingIsMeasuredOnShacklerAndLandsItsNumbers(test *testing.T) {
 					test.Errorf("ahra was not asked %q:\n%s", want, calls)
 				}
 			}
-			found := regexp.MustCompile(`^echo ([A-Za-z0-9+/=]+) \| base64 -d \| bash -s -- (.*)$`).
-				FindSubmatch(remote)
-			if found == nil {
-				test.Fatalf("the gap's remote is not the encoded script and its arguments:\n%s", remote)
-			}
 			script, decodeError := base64.StdEncoding.DecodeString(string(found[1]))
 			if decodeError != nil {
 				test.Fatal(decodeError)
 			}
 			if string(script) != performanceScript || string(found[2]) != fmt.Sprintf("%s %s %d %d %d %d",
-				measured.Commit, performanceReference, performanceFills, performanceColdRounds,
+				gating, performanceReference, performanceFills, performanceColdRounds,
 				performanceReferenceRounds, performanceWarmRounds) {
 				test.Errorf("the gap ran another script, or handed it %q", found[2])
 			}
 		})
+	}
+}
+
+// A landing's fixture never reads the baseline of the process that runs the tests (#6v8r4nn): the integrate job that
+// runs them is handed main's real record in performanceBaselineVariable, and outsideThePool strips it, so a landing
+// handed none says none was handed.
+// Not parallel: it sets the variable in this process with test.Setenv, which the fixture's environment starts from.
+func TestALandingNeverReadsTheTestsOwnBaseline(test *testing.T) {
+	test.Setenv(performanceBaselineVariable, strings.TrimPrefix(baselineSetting(test, previousPerformance(test,
+		performancePreviousCommit, performanceBox, performanceSpreadOf(9850, 9600, 10000),
+		performanceSpreadOf(39000, 38000, 40000))), performanceBaselineVariable+"="))
+	fixture := newPerformanceFixture(test)
+	writeFixtureFile(test, filepath.Join(fixture.replies, performanceBox+".run"),
+		shacklerSays([]int64{9900, 9700, 9800}))
+	landed, output, _ := fixture.landing()
+	if !landed {
+		test.Fatalf("the landing did not land:\n%s", output)
+	}
+	if !strings.Contains(output, "Measured on Shackler: "+noBaselineNote+".") {
+		test.Errorf("the landing read a baseline it was never handed:\n%s", output)
 	}
 }
 
@@ -531,8 +572,9 @@ func TestALandingWithNoCohereLandsSayingThereIsNothingToMeasure(test *testing.T)
 
 // The note's other lines: another build and another shape of measurement are each a line of their own, a row that
 // checked other files or findings than main's same row is a line of its own while the rows that checked the same
-// compare, and a file main holds that doesn't read is named, never compared. A level range touching the old one at its
-// edge is level, and moved says by how much of the old median.
+// compare, a baseline that doesn't read is named, never compared, and so is one that measured nothing, one of another
+// schema, even with no checks, and one taken on a box that wasn't quiet, as the seed was, or that says no load. A
+// level range touching the old one at its edge is level, and moved says by how much of the old median.
 func TestThePerformanceNoteComparesOnlyLikeWithLike(test *testing.T) {
 	test.Parallel()
 	measurement, problem := readPerformance([]byte(strings.ReplaceAll(shacklerSays([]int64{9700, 9800, 9900}),
@@ -540,16 +582,29 @@ func TestThePerformanceNoteComparesOnlyLikeWithLike(test *testing.T) {
 	if problem != "" {
 		test.Fatal(problem)
 	}
-	current := performanceFileOf(measurement, performancePreviousCommit, time.Unix(0, 0))
-	otherBuild, otherShape, otherChecked, sameBinary, otherBinary := current, current, current, current, current
+	current := performanceFileOf(measurement, performancePreviousCommit, "", time.Unix(0, 0))
+	otherBuild, otherShape, otherChecked := copiedRecord(current), copiedRecord(current), copiedRecord(current)
+	sameBinary, otherBinary := copiedRecord(current), copiedRecord(current)
 	otherBuild.Tools.Go = "go1.27.2"
 	otherShape.Checks.Rounds.Cold = 5
-	// A file written before keys were spelled whole, schema 1, reads as another shape, its min and max never read.
-	oldSpelling := current
+	// A baseline that measured nothing, as a landing on a loaded box records, has no numbers to compare.
+	skipped := current
+	skipped.Measured, skipped.Checks, skipped.Skipped = false, nil, "Shackler wasn't quiet"
+	// A record written before keys were spelled whole, schema 1, reads as another shape, its min and max never read,
+	// and so does one of schema 2, which names its numbers engine and so holds no checks of schema 3's.
+	oldSpelling, schemaTwo := current, current
 	oldSpelling.Schema = 1
+	schemaTwo.Schema, schemaTwo.Checks = 2, nil
+	// The seed of Loom's series, a7867bf3 as main's Performance.jsonc held it, measured at a one-minute load of 12.57
+	// before and 11.46 after on 16 cores, and a record that says no load at all.
+	seed, unloaded := copiedRecord(current), copiedRecord(current)
+	seed.Commit = "a7867bf3b8c3dc52884fe2ced31409a554d286d6"
+	seed.Machine = performanceMachine{Name: performanceBox, Cpu: "Apple M3 Max", Cores: 16,
+		LoadBefore: []float64{12.57, 5.45, 3.33}, LoadAfter: []float64{11.46, 6.23, 3.74}, HeldQuiet: true}
+	unloaded.Machine.LoadBefore, unloaded.Machine.LoadAfter = nil, nil
 	otherChecked.Checks.Cold.Deeafbf4.Checked = &performanceChecked{Files: 2210, Findings: 1100}
 	otherChecked.Tools.Binary = performanceMainBinary
-	// main's file measured the same binary a little faster at the root, and another binary just the same.
+	// main's record measured the same binary a little faster at the root, and another binary just the same.
 	sameBinary.Checks.Cold.Root.Wall = performanceSpreadOf(9500, 9450, 9550)
 	otherBinary.Checks.Cold.Root.Wall = sameBinary.Checks.Cold.Root.Wall
 	otherBinary.Tools.Binary = performanceMainBinary
@@ -568,8 +623,18 @@ func TestThePerformanceNoteComparesOnlyLikeWithLike(test *testing.T) {
 		{"the old spelling", oldSpelling, "", fmt.Sprintf("main's at 11111111 was measured in another shape "+
 			"(schema 1, rounds %d/%d/%d), so not compared", performanceColdRounds, performanceReferenceRounds,
 			performanceWarmRounds)},
-		{"a file that doesn't read", current, "unexpected end of JSON input", "main's Performance.jsonc didn't " +
+		{"a baseline that doesn't read", current, "unexpected end of JSON input", "the baseline record didn't " +
 			"read (unexpected end of JSON input), so nothing is compared"},
+		{"a schema 2 record with no checks", schemaTwo, "", "main's at 11111111 was measured in another shape " +
+			"(schema 2), so not compared"},
+		{"the seed, measured on a loaded box", seed, "", "main's record at a7867bf3 was measured on a box its " +
+			"record doesn't show as quiet (her one-minute load 12.57 before and 11.46 after on 16 cores, where a " +
+			"quiet box stays at or under 4.00), so nothing is compared"},
+		{"a record that says no load", unloaded, "", "main's record at 11111111 was measured on a box its record " +
+			"doesn't show as quiet (her record says no one-minute load before and after or no cores, so she can't be " +
+			"read as quiet), so nothing is compared"},
+		{"a baseline that measured nothing", skipped, "", "main's record at 11111111 measured nothing (Shackler " +
+			"wasn't quiet), so nothing is compared"},
 		{"a row that checked otherwise", otherChecked, "", "against 11111111: cold root wall level (9800 ms, was " +
 			"9800), user level (39200 ms, was 39200); cold deeafbf4 checked 95 files and 7 findings, and main's 2210 " +
 			"and 1100, so not compared; warm root wall level (800 ms, was 800), user level (3200 ms, was 3200)"},
@@ -582,7 +647,8 @@ func TestThePerformanceNoteComparesOnlyLikeWithLike(test *testing.T) {
 			"(9800 ms, was 9500), user level (39200 ms, was 39200); cold deeafbf4 wall level (4100 ms, was 4100), " +
 			"user level (16400 ms, was 16400); warm root wall level (800 ms, was 800), user level (3200 ms, was 3200)"},
 	} {
-		if note := performanceNote(current, row.previous, true, row.unread); note != row.want {
+		if note := performanceNote(current, performanceBaseline{record: row.previous, found: true,
+			unread: row.unread}); note != row.want {
 			test.Errorf("%s: the note reads\n%s\nwant\n%s", row.name, note, row.want)
 		}
 	}
@@ -895,8 +961,8 @@ func TestThePerformanceScriptMeasuresInItsScratch(test *testing.T) {
 		})
 	}
 
-	// Handed main's binary, which is the one it builds here, the script says so after its build and stops before any
-	// run, as the integrate job reads it (#6ex523f).
+	// Handed main's binary, which is the one it builds here, the script says so after its build, and the platform it
+	// tested on, and stops before any run, as the integrate job reads it (#6ex523f).
 	sum := sha256.Sum256([]byte(binaryScript))
 	mainBinary := hex.EncodeToString(sum[:])
 	ranBefore := len(readMaybeMissing(test, runs))
@@ -905,10 +971,10 @@ func TestThePerformanceScriptMeasuresInItsScratch(test *testing.T) {
 	same.Dir, same.Stdin = test.TempDir(), strings.NewReader(script)
 	same.Env = slices.Concat(environment, []string{"HOME=" + home})
 	output, sameError := same.CombinedOutput()
-	if isSame, problem := sameBinaryAsMain(output, commit, mainBinary, sameError); !isSame || problem != "" ||
-		len(readMaybeMissing(test, runs)) != ranBefore {
-		test.Errorf("handed main's binary, the script read as the same binary %t (%s), cohere running after it %t:\n%s",
-			isSame, problem, len(readMaybeMissing(test, runs)) != ranBefore, output)
+	isSame, platform, problem := sameBinaryAsMain(output, commit, mainBinary, sameError)
+	if !isSame || platform != "darwin/arm64" || problem != "" || len(readMaybeMissing(test, runs)) != ranBefore {
+		test.Errorf("handed main's binary, the script read as the same binary %t on %q (%s), cohere running after "+
+			"it %t:\n%s", isSame, platform, problem, len(readMaybeMissing(test, runs)) != ranBefore, output)
 	}
 }
 
