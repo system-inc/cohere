@@ -109,12 +109,11 @@ func storedList(
 		listed, listError := list(goEnvironment, patterns, held, shared, walks, collector)
 		return listed, false, listError
 	}
-	rewritesModules := goFlagsRewriteModules(goEnvironment.value("GOFLAGS"))
 	if contents, stored := listings.Kept(key); stored {
 		var kept keptListing
 		if gob.NewDecoder(bytes.NewReader(contents)).Decode(&kept) == nil {
-			fingerprint, certain := listingFingerprint(kept.Roots, kept.Directories, kept.ModuleFiles, rewritesModules,
-				held, fingerprints)
+			fingerprint, certain := listingFingerprint(kept.Roots, kept.Directories, kept.ModuleFiles, held,
+				fingerprints)
 			if certain && fingerprint == kept.Fingerprint {
 				return kept.listing(), true, nil
 			}
@@ -125,7 +124,7 @@ func storedList(
 		return nil, false, listError
 	}
 	kept, keepable := keepListing(goEnvironment.workspace, goEnvironment.value("GOMODCACHE"),
-		goEnvironment.value("GOROOT"), listed, rewritesModules, held, fingerprints)
+		goEnvironment.value("GOROOT"), listed, held, fingerprints)
 	var encoded bytes.Buffer
 	if keepable && gob.NewEncoder(&encoded).Encode(kept) == nil {
 		// Ignored: a listing that cannot be kept is asked of go list again next run, which is all its keeping saves.
@@ -167,13 +166,12 @@ func listingKey(goEnvironment *GoEnvironment, patterns []string) [sha256.Size]by
 // keepListing is listed as the store keeps it: what it was read from (listingInputs), and their fingerprint as it is
 // now. It reports whether the listing may be kept at all: one with an error in it, an import that does not resolve,
 // say, or a fingerprint with anything unreadable, never is. Each file held holds is fingerprinted from its held bytes,
-// and the fingerprint read as listingFingerprint reads it, under rewritesModules, through fingerprints when it is set.
+// and the fingerprint read as listingFingerprint reads it, through fingerprints when it is set.
 func keepListing(
 	workspace string,
 	moduleCache string,
 	toolchainRoot string,
 	listed *listing,
-	rewritesModules bool,
 	held Held,
 	fingerprints *Fingerprints,
 ) (keptListing, bool) {
@@ -181,8 +179,7 @@ func keepListing(
 	if !keepable {
 		return keptListing{}, false
 	}
-	fingerprint, certain := listingFingerprint(kept.Roots, kept.Directories, kept.ModuleFiles, rewritesModules, held,
-		fingerprints)
+	fingerprint, certain := listingFingerprint(kept.Roots, kept.Directories, kept.ModuleFiles, held, fingerprints)
 	kept.Fingerprint = fingerprint
 	return kept, certain
 }
@@ -275,22 +272,21 @@ func isUnder(path string, roots []string) bool {
 // file, is a doubt, and a doubt is never taken for nothing having moved.
 //
 // It is the steady fingerprint of every input no go command of the run can rewrite (steadyFingerprint), read through
-// fingerprints, which a nil one reads again (Fingerprints), and then each module file one can (rewritableByGo, under
-// rewritesModules), read from disk by every caller, so a build asking after another build's go list rewrote one reads
+// fingerprints, which a nil one reads again (Fingerprints), and then each module file one can (rewritableByGo), read
+// from disk by every caller, so a build asking after another build's go list rewrote one reads
 // the bytes it left. A go.work root's every listing names its go.work.sum, so each ask there reads that one file again
 // and the walk, the directories and the other module files once a run.
 func listingFingerprint(
 	roots []string,
 	directories []string,
 	moduleFiles []string,
-	rewritesModules bool,
 	held Held,
 	fingerprints *Fingerprints,
 ) ([sha256.Size]byte, bool) {
 	var steadyFiles []string
 	var rewritableFiles []string
 	for _, file := range moduleFiles {
-		if rewritableByGo(file, rewritesModules) {
+		if rewritableByGo(file) {
 			rewritableFiles = append(rewritableFiles, file)
 			continue
 		}
@@ -308,32 +304,11 @@ func listingFingerprint(
 
 // rewritableByGo reports whether a go command of a run can rewrite file, a module file a kept listing names, while
 // the run's builds read it: a go.work.sum, which go writes in workspace mode whatever -mod says and a build's go list
-// writes in the tree when the workspace's guard cannot run it beside a side copy of the go.work (workspaceSumGuard),
-// and, when rewritesModules, a go.mod or a go.sum, which go list may rewrite under -mod=mod. Any other module file go
-// reads and never writes under -mod=readonly, its default, or -mod=vendor.
-func rewritableByGo(file string, rewritesModules bool) bool {
-	switch filepath.Base(file) {
-	case "go.work.sum":
-		return true
-	case "go.mod", "go.sum":
-		return rewritesModules
-	}
-	return false
-}
-
-// goFlagsRewriteModules reports whether go commands under goFlags, `GOFLAGS` as go env reports it, run with -mod=mod,
-// under which go list may rewrite go.mod and go.sum. go reads `GOFLAGS` as fields, each `-name=value`, one dash or
-// two, and the last -mod is the one it keeps. Every extra build of a run carries the host's flags but its tags
-// (project.Build), so every build of one run reads it alike, and none holds a go.mod another build's go list may
-// rewrite.
-func goFlagsRewriteModules(goFlags string) bool {
-	mode := ""
-	for _, flag := range strings.Fields(goFlags) {
-		if value, found := strings.CutPrefix(strings.TrimLeft(flag, "-"), "mod="); found {
-			mode = value
-		}
-	}
-	return mode == "mod"
+// writes in the tree when the workspace's guard cannot run it beside a side copy of the go.work (workspaceSumGuard).
+// go.mod and go.sum it never writes: every go command of a load runs at -mod=readonly or -mod=vendor, a user's
+// -mod=mod included (ReadGoEnvironment, #ycf4240).
+func rewritableByGo(file string) bool {
+	return filepath.Base(file) == "go.work.sum"
 }
 
 // steadyFingerprint is listingFingerprint of every input it names but the module files a go command of the run can

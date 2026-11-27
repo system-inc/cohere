@@ -9,7 +9,7 @@ import (
 // reads as it did (#32594zm). With no store, as under `--no-cache`, a build lists, asks again through the same
 // fingerprints and is answered with the listing it made; then the file is rewritten, standing in for another build's
 // go list, and the next ask lists again, and the listing it makes is the one remembered after it. It holds for
-// go.work.sum in a go.work root, and for go.mod under -mod=mod.
+// go.work.sum in a go.work root, the one module file a run's go can rewrite (rewritableByGo).
 func TestARememberedListingIsRefusedOnceARewritableModuleFileMoved(test *testing.T) {
 	test.Parallel()
 	for _, rewritten := range rewrittenModuleFiles {
