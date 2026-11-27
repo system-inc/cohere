@@ -252,6 +252,9 @@ func runBuildToolUntil(command *exec.Cmd, signals <-chan os.Signal) error {
 // Copied rather than linked to SwiftPM's product, because the next build replaces the product in place,
 // and a link would turn every hash-named binary into whichever binary was built last. The copy is
 // installed without replacing a binary already at binaryPath, for the reason copyExecutable gives.
+//
+// With release.SwiftResolvedVariable naming a laid resolved set, as in an integrate job, it builds from that set with
+// no network (release.SwiftResolvedArguments).
 func buildSwiftProductWithSwiftPm(
 	packageDirectory string,
 	scratchDirectory string,
@@ -281,6 +284,13 @@ func buildSwiftProductWithSwiftPm(
 		"--manifest-cache", "none",
 		"--product", "cohere-swift",
 	}
+	// A laid resolved set, when one is named, builds offline, its flags on the build and on its `--show-bin-path`
+	// below alike, so the two name the same build.
+	offline, swiftResolvedArgumentsError := release.SwiftResolvedArguments(scratchDirectory)
+	if swiftResolvedArgumentsError != nil {
+		return swiftResolvedArgumentsError
+	}
+	arguments = append(arguments, offline...)
 	// SwiftPM's own lines stream under --verbose. Otherwise they are kept, so a default run prints cohere's
 	// report alone (#ytqqv8v), and a build that fails quotes their end in its error.
 	// The tree's state comes from the caller alone. One inherited from this process's environment would be a
