@@ -40,6 +40,16 @@ func TestARootReachedThroughALinkChecksWhatItsRealPathDoes(test *testing.T) {
 	}
 }
 
+// emptyCensus makes a described project's census one that counted no Go file, as a walk that never reached the tree
+// would, every count it feeds read 0, so a test can show what a run does with a census that is wrong.
+func emptyCensus(pipeline *pipeline) {
+	pipeline.described.census.Files, pipeline.described.census.Ours = nil, nil
+	pipeline.described.inScope, pipeline.described.readableOurs = nil, nil
+	pipeline.described.inScopeSet = map[string]bool{}
+	pipeline.described.record.FilesInPackage, pipeline.described.record.FilesOurs = 0, 0
+	pipeline.described.record.FilesInScope = 0
+}
+
 // A run whose census counted no Go file while its load reached packages in the workspace is never complete, and says
 // why (#yyv7nr2): the two read one tree, so a census of nothing is one that never walked it, and every count it feeds
 // would read 0 over work never done. With the census emptied over a module of two files, the types record names both
@@ -48,15 +58,8 @@ func TestARootReachedThroughALinkChecksWhatItsRealPathDoes(test *testing.T) {
 func TestACensusOfNothingBesideALoadOfPackagesIsNeverComplete(test *testing.T) {
 	test.Parallel()
 
-	emptied := func(pipeline *pipeline) {
-		pipeline.described.census.Files, pipeline.described.census.Ours = nil, nil
-		pipeline.described.inScope, pipeline.described.readableOurs = nil, nil
-		pipeline.described.inScopeSet = map[string]bool{}
-		pipeline.described.record.FilesInPackage, pipeline.described.record.FilesOurs = 0, 0
-		pipeline.described.record.FilesInScope = 0
-	}
 	pipeline, stream, noted := runOverNoted(test, copyFixture(test, filepath.Join("testdata", "clean")), exitFindings,
-		emptied, "--no-cache", "--no-fix")
+		emptyCensus, "--no-cache", "--no-fix")
 	if len(pipeline.censusMissed) != 2 || !strings.Contains(stream, `"censusMissed":[`) ||
 		!strings.Contains(stream, `"complete":false`) {
 		test.Errorf("want the types record to name the 2 files the census missed and the run incomplete, got %v:\n%s",

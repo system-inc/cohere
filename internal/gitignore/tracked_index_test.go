@@ -7,34 +7,21 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"sort"
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/testing/git_index_testing"
 )
 
 // writeIndex writes a version 2 index of paths, each a regular file at stage 0, into gitDirectory, with SHA-1 object
-// names and the checksum git writes. The fixtures in testdata/index and cohere-swift's samples are git's own bytes;
-// this writes the small indexes the matcher's tests need around a tree.
+// names and the checksum git writes (git_index_testing.Write). The fixtures in testdata/index and cohere-swift's
+// samples are git's own bytes; this writes the small indexes the matcher's tests need around a tree.
 func writeIndex(test *testing.T, gitDirectory string, paths ...string) {
 	test.Helper()
-	sorted := slices.Clone(paths)
-	sort.Strings(sorted)
-	contents := []byte("DIRC")
-	contents = binary.BigEndian.AppendUint32(contents, 2)
-	contents = binary.BigEndian.AppendUint32(contents, uint32(len(sorted)))
-	for _, path := range sorted {
-		entry := make([]byte, indexEntryStatBytes+sha1.Size)
-		binary.BigEndian.PutUint32(entry[24:28], 0o100644)
-		entry = binary.BigEndian.AppendUint16(entry, uint16(min(len(path), indexFlagNameLength)))
-		entry = append(entry, path...)
-		// One to eight NUL bytes, to a multiple of eight.
-		entry = append(entry, make([]byte, 8-len(entry)%8)...)
-		contents = append(contents, entry...)
+	if writeError := git_index_testing.Write(gitDirectory, paths...); writeError != nil {
+		test.Fatal(writeError)
 	}
-	checksum := sha1.Sum(contents)
-	contents = append(contents, checksum[:]...)
-	placeIndex(test, gitDirectory, contents)
 }
 
 // placeIndex writes contents as gitDirectory's index.
@@ -102,6 +89,30 @@ func TestTheIndexReaderYieldsEveryTrackedPathAtEachVersion(test *testing.T) {
 		if !slices.Equal(index.paths, want) {
 			test.Errorf("%s.index yields %q, want %q", name, index.paths, want)
 		}
+	}
+}
+
+// TrackedPaths reads a repository's index alone (#td4wp62): every path it tracks, sorted by bytes, whatever order they
+// were given in, and none of the files beside them it does not track. A root with no `.git`, and a repository whose
+// index is not there yet, are an index that says nothing, never an empty list.
+func TestTrackedPathsReadsTheIndexAndNothingElse(test *testing.T) {
+	test.Parallel()
+	root := test.TempDir()
+	writeTree(test, root, map[string]string{"go.mod": "", "untracked.go": "", "kept/kept.go": ""})
+	writeIndex(test, filepath.Join(root, ".git"), "kept/kept.go", "go.mod")
+	tracked, trackedError := TrackedPaths(root)
+	if trackedError != nil || !slices.Equal(tracked, []string{"go.mod", "kept/kept.go"}) {
+		test.Errorf("TrackedPaths read %q and %v, want go.mod and kept/kept.go", tracked, trackedError)
+	}
+	if _, noRepositoryError := TrackedPaths(test.TempDir()); !errors.Is(noRepositoryError, ErrNoIndex) {
+		test.Errorf("a root with no .git reads %v, want %v", noRepositoryError, ErrNoIndex)
+	}
+	fresh := test.TempDir()
+	if makeError := os.MkdirAll(filepath.Join(fresh, ".git"), 0o755); makeError != nil {
+		test.Fatal(makeError)
+	}
+	if _, noIndexError := TrackedPaths(fresh); !errors.Is(noIndexError, ErrNoIndex) {
+		test.Errorf("a repository with no index reads %v, want %v", noIndexError, ErrNoIndex)
 	}
 }
 
