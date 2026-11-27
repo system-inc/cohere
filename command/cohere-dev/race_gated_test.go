@@ -282,7 +282,7 @@ func TestConcurrencyTestsAreFoundByNameAndFile(test *testing.T) {
 var goroutineStartersDirectory = filepath.Join("..", "..", "internal", "go_language", "bounded")
 
 // skippersDirectories are the packages whose exported functions are the house's ways for a test to skip: the needs a
-// test states (needs.Tool, OptIn, NoRace, SwiftLaid, Platform) and cgo translation's requirement.
+// test states (needs.Tool, OptIn, NoRace, Platform) and cgo translation's requirement.
 var skippersDirectories = []string{
 	filepath.Join("..", "..", "internal", "testing", "needs"),
 	filepath.Join("..", "..", "internal", "go_language", "cgo_testing"),

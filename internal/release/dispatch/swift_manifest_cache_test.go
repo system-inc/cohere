@@ -7,8 +7,6 @@ import (
 	"runtime"
 	"strings"
 	"testing"
-
-	"github.com/system-inc/cohere/internal/testing/needs"
 )
 
 // A binary rebuilt after a tracked file was edited says its tree was modified. The manifest reads git's
@@ -18,7 +16,6 @@ import (
 func TestASwiftBinaryRebuiltAfterAnEditSaysTheTreeWasModified(test *testing.T) {
 	test.Parallel()
 	// A land job, where cohere-swift can't be built, skips it by name.
-	needs.SwiftLaid(test)
 
 	if runtime.GOOS != "darwin" {
 		test.Skip("cohere-swift is built only on macOS")
