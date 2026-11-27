@@ -33,9 +33,10 @@ func publicThemeSystem(test *testing.T) DesignSystemResult {
 }
 
 // themeSystems are the themes an assertion whose expectations hold on any theme runs on (#f598zk0, tier C): the
-// public theme, everywhere.
+// public theme and the planted repository's (#pg78xtp), everywhere.
 var themeSystems = []tailwindSystem{
 	{name: "public", load: publicThemeSystem},
+	{name: "planted", load: plantedDesignSystem},
 }
 
 // forEachThemeSystem runs an assertion once per theme system, each as its own subtest.

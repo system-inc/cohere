@@ -1,0 +1,46 @@
+{
+    "tailwindVersion": "4.3.3",
+    "entryPoint": "internal/lint/rules/tailwind/collapse/testdata/public_theme/theme.css",
+    "lists": 1200,
+    "classes": 6104,
+    "deadClasses": [
+        "drift-inline-huge",
+        "marker:drift-inline-huge",
+        "drift-up-huge",
+        "invalid:drift-up-huge",
+        "edge--7",
+        "any-pointer-fine:edge--7",
+        "shadow--4",
+        "in-range:shadow--4"
+    ],
+    "collapses": [
+        {
+            "inputs": [
+                "ml-2.5",
+                "mr-2.5"
+            ],
+            "output": "mx-2.5"
+        },
+        {
+            "inputs": [
+                "pt-4",
+                "pb-4"
+            ],
+            "output": "py-4"
+        },
+        {
+            "inputs": [
+                "w-2.5",
+                "h-2.5"
+            ],
+            "output": "size-2.5"
+        },
+        {
+            "inputs": [
+                "w-px",
+                "h-px"
+            ],
+            "output": "size-px"
+        }
+    ]
+}
