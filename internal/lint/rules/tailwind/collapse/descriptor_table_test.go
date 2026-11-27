@@ -35,7 +35,7 @@ var (
 func testTable(test *testing.T) *Table {
 	test.Helper()
 	testTableOnce.Do(func() {
-		testTableValue, testTableError = loadTestTable("descriptor_table.json", "descriptor_context.json")
+		testTableValue, testTableError = loadTestTable("descriptor_table_public.json", "descriptor_context_public.json")
 	})
 	if testTableError != nil {
 		test.Fatalf("building the test table: %v", testTableError)

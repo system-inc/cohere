@@ -840,7 +840,7 @@ func TestUtilityNormalizesValueArguments(test *testing.T) {
 // point so `@import "tailwindcss"` resolves, measures it, and deletes it.
 func TestUtilitySyntheticCasesMatchTailwind(test *testing.T) {
 	test.Parallel()
-	fixture := utilityLoadCorpus(test, "utility_fixtures.json")
+	fixture := utilityLoadCorpus(test, "utility_fixtures_public.json")
 
 	if len(fixture.SyntheticCases) == 0 {
 		test.Fatal("the fixture holds no synthetic cases; four ported branches then have no test at all")

@@ -50,7 +50,7 @@ func loadFunctionalFixture(test *testing.T, name string) functionalFixture {
 // different branch.
 func TestFunctionalResolutionRejectsWhatTailwindRejects(test *testing.T) {
 	test.Parallel()
-	fixture := loadFunctionalFixture(test, "functional_fixtures.json")
+	fixture := loadFunctionalFixture(test, "functional_fixtures_public.json")
 
 	if fixture.RejectedCount < 4 {
 		test.Fatalf(
