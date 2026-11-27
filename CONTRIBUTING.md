@@ -623,9 +623,9 @@ the first staged release checks with `npm audit signatures` before the README's 
 
 A released binary formats with cohere's native Go printers and embeds none of the Prettier fork's
 bundles, so `--version` names no formatter: there are no bytes in it for a stamp to vouch for. The
-bundles remain in `internal/format/prettier` as the test oracle the printers are measured against,
-and `prettier.DigestBundles` keys the oracle's cache so a rebuilt fork invalidates every cached
-answer rather than comparing against output from bundles nobody loads.
+bundles have left the repository too (#mjecaaw). What they answered for each test's fixtures stays as
+read-only goldens (`internal/format/oracle_testing`), each stamped with the digest of the bundles that
+recorded it, so a golden from any other bundles is refused rather than compared.
 
 `COHERE_BINARY=/path/to/cohere` points every `cohere` on the machine at a local build. A broken
 override is fatal rather than a fallback, even when a good install is sitting right there: someone

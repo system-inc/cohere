@@ -197,8 +197,8 @@ func extensionOf(fileName string) string {
 //
 // The formatter is cohere's native printers. They replaced the goja Prettier fork when they matched it
 // on every file of ahra, www-phi-health and api-phi-health, and when a whole-tree run of each language
-// over the same ahra snapshot wrote the same bytes. The fork stays in internal/format/prettier as the
-// differential's oracle, and is not linked into this binary.
+// over the same ahra snapshot wrote the same bytes. The fork has since left the repository (#mjecaaw);
+// the tests hold the printers to its recorded answers.
 func configuredFormatter(enabled bool) (fileFormatter, error) {
 	if !enabled {
 		return nil, nil

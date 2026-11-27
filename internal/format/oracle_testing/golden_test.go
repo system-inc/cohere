@@ -3,6 +3,8 @@ package oracle_testing
 import (
 	"compress/gzip"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -30,7 +32,7 @@ func writeGolden(test *testing.T, contents record) string {
 }
 
 // TestAGoldenFromOtherBundlesIsRefused is the property the golden exists to keep: answers recorded from
-// bundles this build does not embed are never compared against.
+// bundles other than the ones named are never compared against.
 func TestAGoldenFromOtherBundlesIsRefused(test *testing.T) {
 	test.Parallel()
 	path := writeGolden(test, record{Digest: "recorded", Answers: map[string]Answer{"k": {Output: "x"}}})
@@ -47,7 +49,7 @@ func TestAGoldenFromOtherBundlesIsRefused(test *testing.T) {
 	}
 }
 
-// TestAMissingGoldenIsRefused: no golden is a failure that says how to record one, never an empty pass.
+// TestAMissingGoldenIsRefused: no golden is a failure, never an empty pass.
 func TestAMissingGoldenIsRefused(test *testing.T) {
 	test.Parallel()
 	if _, readError := read(filepath.Join(test.TempDir(), "absent.json.gz"), "embedded"); readError == nil {
@@ -86,11 +88,55 @@ func TestKeysDoNotRunTogether(test *testing.T) {
 	}
 }
 
-// TestTheBundlesHaveADigest: the digest every golden is stamped with is readable from this build.
-func TestTheBundlesHaveADigest(test *testing.T) {
+// recordingTest is a testing.TB whose errors are kept rather than failing the test that holds it, so a
+// golden's own complaint can be asserted.
+type recordingTest struct {
+	testing.TB
+	errors []string
+}
+
+func (recording *recordingTest) Errorf(format string, arguments ...any) {
+	recording.errors = append(recording.errors, fmt.Sprintf(format, arguments...))
+}
+
+// TestAnAnswerIsWhatWasRecorded: a recorded output comes back as the output and a recorded refusal as the
+// error, while an answer never recorded fails the test and is ErrNotRecorded, never an empty pass.
+func TestAnAnswerIsWhatWasRecorded(test *testing.T) {
 	test.Parallel()
-	digest, bundlesDigestError := BundlesDigest()
-	if bundlesDigestError != nil || len(digest) != 64 {
-		test.Fatalf("no digest for the embedded bundles: %q, %v", digest, bundlesDigestError)
+	recording := &recordingTest{TB: test}
+	golden := &Golden{
+		test:    recording,
+		path:    "golden.json.gz",
+		answers: map[string]Answer{Key("printed"): {Output: "x"}, Key("refused"): {Error: "SyntaxError"}},
+	}
+	if output, answerError := golden.Answer(Key("printed")); answerError != nil || output != "x" {
+		test.Errorf("a recorded output answered %q, %v", output, answerError)
+	}
+	if _, answerError := golden.Answer(Key("refused")); answerError == nil || answerError.Error() != "SyntaxError" {
+		test.Errorf("a recorded refusal answered %v", answerError)
+	}
+	if len(recording.errors) != 0 {
+		test.Fatalf("recorded answers failed the test: %v", recording.errors)
+	}
+	if _, answerError := golden.Answer(Key("never")); !errors.Is(answerError, ErrNotRecorded) ||
+		len(recording.errors) != 1 {
+		test.Errorf("an answer never recorded gave %v and failed the test %d times", answerError, len(recording.errors))
+	}
+}
+
+// TestAGoldenStampedOtherwiseIsRefused: Open holds every golden to the pinned digest, so one stamped with any
+// other is refused, not compared.
+func TestAGoldenStampedOtherwiseIsRefused(test *testing.T) {
+	test.Parallel()
+	path := writeGolden(test, record{Digest: "recorded", Answers: map[string]Answer{"k": {Output: "x"}}})
+	if _, openError := openAt(test, path); openError == nil ||
+		!strings.Contains(openError.Error(), "pinned to "+pinnedBundlesDigest) {
+		test.Fatalf("a golden stamped with another digest was opened: %v", openError)
+	}
+	// The control: the same answers stamped with the pinned digest open.
+	pinned := writeGolden(test, record{Digest: pinnedBundlesDigest, Answers: map[string]Answer{"k": {Output: "x"}}})
+	golden, openError := openAt(test, pinned)
+	if openError != nil || golden.answers["k"].Output != "x" {
+		test.Fatalf("a golden stamped with the pinned digest was refused: %v", openError)
 	}
 }

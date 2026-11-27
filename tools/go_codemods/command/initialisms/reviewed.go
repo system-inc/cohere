@@ -49,9 +49,8 @@ var reviewedLiterals = map[string]map[string]string{
 		"internal/lint/rules/typescript/restrict_template_expressions.go": "a TypeScript library type the rule allows by default",
 	},
 	"YAML": {
-		"internal/text_rules/shouting/shouting.go":                  shoutingWord,
-		"internal/format/markdown/languages_generated.go":           "Linguist's name for the language, in the generated language table",
-		"internal/format/markdown/tools/generate_languages/main.go": "a language name the generator checks Linguist's table against",
+		"internal/text_rules/shouting/shouting.go":        shoutingWord,
+		"internal/format/markdown/languages_generated.go": "Linguist's name for the language, in the generated language table",
 	},
 	"BOM": {
 		"internal/text_rules/shouting/shouting.go": shoutingWord,

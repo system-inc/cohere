@@ -1,5 +1,7 @@
 package micromark
 
+import "testing"
+
 // attentionFixtures hold no autolink, block quote, code (fenced or text), definition, html, label end
 // (so no brackets), list, setext, strikethrough (no `~`), math (no `$`), liquid (no `{`), wiki-link or
 // table syntax, and no URLs or emails: those constructs are not ported yet, so a fixture leaning on them
@@ -224,4 +226,9 @@ var attentionFixtures = []string{
 	"***\n*a*",
 	"*a*\n***",
 	"a\n\n_b_\n\nc",
+}
+
+func TestAttentionEvents(test *testing.T) {
+	test.Parallel()
+	compareEvents(test, attentionFixtures)
 }

@@ -1,0 +1,7 @@
+{
+  "source": "the Prettier fork's src/utilities/get-string-width.js at 54c8b90ae, run under node v24.14.1, recorded by record-string-widths.mjs (attached to #bahm7k3)",
+  "recorded": "2026-11-25",
+  "answers": [
+    {"name":"ZWJ family","text":"family 👨‍👩‍👧","width":9}
+  ]
+}

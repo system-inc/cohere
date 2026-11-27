@@ -1,15 +1,23 @@
 package doc
 
 import (
+	"encoding/json"
 	"fmt"
 	"math/rand"
+	"strings"
+	"testing"
+
+	"github.com/system-inc/cohere/internal/format/oracle_testing"
 )
 
 /*
- * Random docs for the tests that compare two walks of one doc.
+ * Random docs for the layout algorithm against upstream's printDocToString, and for the tests that compare
+ * two walks of one doc.
  *
  * One generator produces a random doc *spec*, and buildSpec builds it into a Go doc, as many times as a
- * test needs a fresh copy of the same tree.
+ * test needs a fresh copy of the same tree. TestPrintAgreesWithUpstream holds the printer to what upstream's
+ * own builders and printer made of the same spec, recorded: a Go doc and a JavaScript doc written separately
+ * could each be wrong in the same way, and the comparison would agree.
  *
  * The generator reaches the cases a printer port gets wrong quietly: groups that fit and break,
  * conditional groups, fills, IfBreak and IndentIfBreak on group ids printed before, after or never,
@@ -249,4 +257,125 @@ func buildSpecAs(root *spec, asSequences bool) Doc {
 		panic("unknown spec kind " + node.Kind)
 	}
 	return build(root)
+}
+
+// upstreamPrintOptions are the options upstream's printDocToString was given, spelled as upstream's are. With
+// the spec, as JSON, they are an answer's key, so their shape and names are fixed by the golden.
+type upstreamPrintOptions struct {
+	PrintWidth int  `json:"printWidth"`
+	TabWidth   int  `json:"tabWidth"`
+	UseTabs    bool `json:"useTabs"`
+}
+
+// boundaryCases are docs placed exactly at the print width, which random generation reaches too rarely.
+//
+// They exist because a mutation moving fits()'s pending space onto an empty string survived 5,000
+// random docs: the difference only shows when a line, an empty string and a break sit at exactly the
+// width. Each width is tried at the boundary and one either side.
+func boundaryCases() ([]*spec, []Options) {
+	var specs []*spec
+	var options []Options
+	text := func(value string) *spec { return &spec{Kind: "text", Text: value} }
+	for width := 3; width <= 8; width++ {
+		word := strings.Repeat("w", width)
+		shapes := []*spec{
+			{Kind: "concat", Children: []*spec{{
+				Kind:     "group",
+				Children: []*spec{{Kind: "concat", Children: []*spec{text(word), {Kind: "line"}, text("")}}},
+			}, {Kind: "hardline"}}},
+			{Kind: "concat", Children: []*spec{{
+				Kind:     "group",
+				Children: []*spec{{Kind: "concat", Children: []*spec{text(word), {Kind: "line"}, text(""), text("x")}}},
+			}, {Kind: "hardline"}}},
+			{Kind: "concat", Children: []*spec{{
+				Kind:     "group",
+				Children: []*spec{{Kind: "concat", Children: []*spec{text(word[:width-1]), {Kind: "line"}, text("")}}},
+			}, {Kind: "softline"}, text("y")}},
+			{Kind: "fill", Children: []*spec{text(word), {Kind: "line"}, text(""), {Kind: "line"}, text("z")}},
+		}
+		for _, shape := range shapes {
+			for _, printWidth := range []int{width - 1, width, width + 1} {
+				specs = append(specs, shape)
+				options = append(options, Options{PrintWidth: printWidth, TabWidth: 2})
+			}
+		}
+	}
+	return specs, options
+}
+
+// printRandomCount is how many generated docs TestPrintAgreesWithUpstream holds, the first of seed 20261001.
+// The live differential ran 5,000; this slice keeps the golden small, and the boundary cases ride beside it.
+const printRandomCount = 800
+
+// TestPrintAgreesWithUpstream is the differential, against upstream's answers recorded (see oracle_testing):
+// each spec built with the fork bundle's own prettier.doc.builders, mirroring buildSpec, and printed with its
+// prettier.doc.printer.printDocToString.
+func TestPrintAgreesWithUpstream(test *testing.T) {
+	test.Parallel()
+	random := rand.New(rand.NewSource(20261001))
+	var specs []*spec
+	var options []Options
+	for range printRandomCount {
+		generator := &specGenerator{random: random}
+		options = append(options, Options{
+			PrintWidth: 8 + random.Intn(40),
+			TabWidth:   []int{2, 4}[random.Intn(2)],
+			UseTabs:    random.Intn(4) == 0,
+		})
+		specs = append(specs, generator.node())
+	}
+	boundarySpecs, boundaryOptions := boundaryCases()
+	specs = append(specs, boundarySpecs...)
+	options = append(options, boundaryOptions...)
+
+	golden := oracle_testing.Open(test, test.Name())
+	mismatches, upstreamErrors, rewrites := 0, 0, 0
+	for index, each := range specs {
+		input, marshalError := json.Marshal(struct {
+			Spec    *spec                `json:"spec"`
+			Options upstreamPrintOptions `json:"options"`
+		}{each, upstreamPrintOptions{options[index].PrintWidth, options[index].TabWidth, options[index].UseTabs}})
+		if marshalError != nil {
+			test.Fatalf("encoding case %d: %v", index, marshalError)
+		}
+		expected, upstreamError := golden.Answer(oracle_testing.Key("printDocToString", string(input)))
+		if upstreamError != nil {
+			upstreamErrors++
+			if upstreamErrors <= 3 {
+				test.Logf("upstream refused case %d: %v", index, upstreamError)
+			}
+			continue
+		}
+		got := Print(buildSpec(each), options[index])
+		if strings.Contains(got, "\n") {
+			rewrites++
+		}
+		if got != expected {
+			mismatches++
+			if mismatches <= 5 {
+				test.Errorf("case %d (%+v)\nspec %s\nwant %q\ngot  %q", index, options[index], input, expected, got)
+			}
+		}
+	}
+	test.Logf(
+		"%d docs printed (%d random, %d at the width boundary), %d upstream refused, %d with line breaks, %d mismatches",
+		len(specs),
+		printRandomCount,
+		len(boundarySpecs),
+		upstreamErrors,
+		rewrites,
+		mismatches,
+	)
+	if upstreamErrors > printRandomCount/10 {
+		test.Errorf(
+			"upstream refused %d of %d generated docs; the generator is producing invalid docs and the comparison "+
+				"is thinner than it looks",
+			upstreamErrors,
+			printRandomCount,
+		)
+	}
+	// Many docs must break somewhere (about two in five do), or the comparison only ever saw flat layouts.
+	if rewrites < len(specs)/4 {
+		test.Errorf("only %d of %d docs printed a line break", rewrites, len(specs))
+	}
 }

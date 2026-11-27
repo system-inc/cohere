@@ -1,6 +1,9 @@
 package micromark
 
-import "strings"
+import (
+	"strings"
+	"testing"
+)
 
 // labelEndFixtures hold no attention, autolink, autolink literal (URLs, www, emails), code, definition,
 // html, list, block quote, setext, strikethrough, table, footnote (`[^`), math, liquid or wiki-link
@@ -146,4 +149,9 @@ var labelEndFixtures = []string{
 	"[a](b)\n\n[c](d)",
 	"***\n[a](b)",
 	"[a\n\nb](c)",
+}
+
+func TestLabelEndEvents(test *testing.T) {
+	test.Parallel()
+	compareEvents(test, labelEndFixtures)
 }

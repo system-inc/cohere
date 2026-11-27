@@ -1,6 +1,9 @@
 package micromark
 
-import "strings"
+import (
+	"strings"
+	"testing"
+)
 
 // characterReferenceFixtures hold no attention, autolink, code (fenced or text), definition, html,
 // label end, list, setext, strikethrough, math, liquid or wiki-link syntax, and no URLs or emails:
@@ -109,4 +112,9 @@ var characterReferenceFixtures = []string{
 	"    &amp;",
 	"***\n&amp;",
 	"&amp;\n\n&copy;",
+}
+
+func TestCharacterReferenceEvents(test *testing.T) {
+	test.Parallel()
+	compareEvents(test, characterReferenceFixtures)
 }
