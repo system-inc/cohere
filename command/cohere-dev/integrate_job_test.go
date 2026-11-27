@@ -17,6 +17,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/testing/executable_testing"
 	"github.com/system-inc/cohere/internal/testing/needs"
+	"github.com/system-inc/cohere/internal/testing/own_go_cache"
 )
 
 // integrateJobFixture is an integrate job ready to judge a merge in its history: a candidate, worktree a's head,
@@ -512,15 +513,13 @@ func TestAnIntegrateJobRefusesARedTestNamingIt(test *testing.T) {
 	}
 }
 
-// A merge that changes what only Swift's checks judge refuses in the preflight, before anything is laid, measured or
-// tested (#5wj23dd): cohere-swift can't be built in an integrate job's sandbox, so nothing there would check the
-// change, and the refusal says so as the skips and the account do (needs.SwiftUnlaid). The Swift package and the Swift
-// files of command/cohere and release's dispatch and packaging are each refused, named.
-func TestAnIntegrateJobRefusesAMergeChangingWhatOnlySwiftChecks(test *testing.T) {
+// A merge that changes Swift's own paths, the Swift package and the Swift files of command/cohere and release's
+// dispatch and packaging, passes the preflight to be laid like any other (#je1r32a, Kirk's one-time bridge): the tests
+// that build cohere-swift skip by name (needs.SwiftLaid), and its Swift is proven on a Mac beside it.
+func TestAnIntegrateJobLaysAMergeChangingSwiftsOwnPaths(test *testing.T) {
 	test.Parallel()
 	for _, changed := range []string{"swift_language/Package.swift", "command/cohere/swift_binary.go",
-		"internal/release/dispatch/swift.go", "internal/release/dispatch/swift_tree_state_test.go",
-		"internal/release/packaging/swift_package.go"} {
+		"internal/release/dispatch/swift.go", "internal/release/packaging/swift_package.go"} {
 		test.Run(changed, func(test *testing.T) {
 			test.Parallel()
 			fixture := newIntegrateJobFixture(test)
@@ -528,41 +527,10 @@ func TestAnIntegrateJobRefusesAMergeChangingWhatOnlySwiftChecks(test *testing.T)
 			writeFixtureFile(test, filepath.Join(worktree, filepath.FromSlash(changed)), "// a Swift change\n")
 			fixture.git(worktree, "add", ".")
 			fixture.git(worktree, "commit", "-q", "-m", fixtureSubject("a Swift change"))
-			ran := fixture.integrateJob(fixture.merged())
-			if ran.exit != 1 || ran.integrated != "" {
-				test.Fatalf("the integrate job exited %d, its last line %q, want 1 and no landing:\n%s", ran.exit,
-					ran.lastLine, ran.errors)
-			}
-			for _, want := range []string{needs.SwiftUnlaid + ", so the merge's change to " + changed,
-				"integrate-job step preflight refused in "} {
-				if !strings.Contains(ran.errors, want) {
-					test.Errorf("the integrate job doesn't say %q:\n%s", want, ran.errors)
-				}
-			}
-			if calls := readMaybeMissing(test, filepath.Join(fixture.replies, "calls")); len(calls) > 0 {
-				test.Errorf("a merge changing %s ran %q", changed, calls)
-			}
-		})
-	}
-}
-
-// A merge that changes a file beside the Swift ones, in a package whose Swift files the preflight refuses, isn't
-// refused: the guard names Swift's files, never their packages whole.
-func TestAnIntegrateJobPassesAMergeChangingWhatSwiftDoesNotJudge(test *testing.T) {
-	test.Parallel()
-	for _, changed := range []string{"command/cohere/discovery.go", "internal/release/dispatch/progress.go",
-		"internal/release/packaging/checksums.go", "internal/release/dispatch/swiftly.go"} {
-		test.Run(changed, func(test *testing.T) {
-			test.Parallel()
-			fixture := newIntegrateJobFixture(test)
-			worktree := fixture.worktree("a")
-			writeFixtureFile(test, filepath.Join(worktree, filepath.FromSlash(changed)), "// a change Go judges\n")
-			fixture.git(worktree, "add", ".")
-			fixture.git(worktree, "commit", "-q", "-m", fixtureSubject("a change Go judges"))
 			// The fixture scripts no measurement, so the job stops there: what matters is that it got past the
 			// preflight and laid the merge.
 			ran := fixture.integrateJob(fixture.merged())
-			if strings.Contains(ran.errors, "preflight refused") || strings.Contains(ran.errors, "can't be judged") ||
+			if strings.Contains(ran.errors, "preflight refused") ||
 				!strings.Contains(ran.errors, "integrate-job step lay ") {
 				test.Fatalf("a merge changing %s didn't pass the preflight to be laid:\n%s", changed, ran.errors)
 			}
@@ -870,7 +838,9 @@ func TestAnIntegrateJobRefusesAMergeOntoAnotherMain(test *testing.T) {
 // integrate job's, kept cache or none, so set, go mod download and go mod verify read the module set `GOMODCACHE` names
 // with `GOPROXY=off` and `GOSUMDB=off`, and unset, they read Go's default cache, the `GOMODCACHE` named never read.
 // Loom's runner sets no COHERE_INTEGRATE_CACHE, and an integrate job keyed on the kept cache alone went to a proxy it
-// can't reach.
+// can't reach. The runner's declared Go cache, its layer as `GOCACHE` and its `GOCACHEPROG` (#e94a6r4), is what an
+// integrate job with no kept cache tests on, with no -count=1 and its layer left in place, and anywhere else the two
+// are never read: a gate box's job runs on an empty cache of its own with no cache program.
 func TestTheIntegrateJobsCacheIsKeptAndDropsCountOne(test *testing.T) {
 	test.Parallel()
 	needs.Tool(test, "bash", "the gate is a bash script")
@@ -889,12 +859,14 @@ func TestTheIntegrateJobsCacheIsKeptAndDropsCountOne(test *testing.T) {
 	}
 	digest := toolchainDigest(test, goroot)
 	for _, row := range []struct {
-		name               string
-		kept, integrateJob bool
+		name                       string
+		kept, integrateJob, runner bool
 	}{
 		{name: "unset"},
 		{name: "set", kept: true, integrateJob: true},
 		{name: "an integrate job with no kept cache", integrateJob: true},
+		{name: "an integrate job on the runner's declared cache", integrateJob: true, runner: true},
+		{name: "a gate box whose account names a cache program", runner: true},
 	} {
 		kept := row.kept
 		test.Run(row.name, func(test *testing.T) {
@@ -916,9 +888,15 @@ func TestTheIntegrateJobsCacheIsKeptAndDropsCountOne(test *testing.T) {
 			gate := exec.Command("bash", "-c", script, "gate", goroot, digest, filepath.Join(tree, "no-node"),
 				strings.Repeat("0", 64), "", integrateCache, integrateJob, "./...")
 			laid := filepath.Join(test.TempDir(), "laid modules")
+			layer := test.TempDir()
 			gate.Dir = tree
-			gate.Env = append(os.Environ(), "GATE_LOG="+log, "TMPDIR="+temporary, "GOCACHE="+test.TempDir(),
+			// The test's own process may run under a runner's cache program, so every row starts from none, and the
+			// rows that are the runner's name a stand-in.
+			gate.Env = append(own_go_cache.Environment(os.Environ(), layer), "GATE_LOG="+log, "TMPDIR="+temporary,
 				"GOMODCACHE="+laid, "GOPROXY=https://proxy.example.com")
+			if row.runner {
+				gate.Env = append(gate.Env, "GOCACHEPROG=loom-job-runner gocacheprog shared layer")
+			}
 			output, gateError := gate.CombinedOutput()
 			if gateError != nil {
 				test.Fatalf("the gate failed: %v\n%s", gateError, output)
@@ -939,6 +917,20 @@ func TestTheIntegrateJobsCacheIsKeptAndDropsCountOne(test *testing.T) {
 				!strings.Contains(string(output), said) {
 				test.Errorf("the gate asked go mod for %q and %q, want each with %q, saying %q:\n%s", asked[0],
 					asked[1], modules, said, output)
+			}
+			if row.runner && row.integrateJob {
+				if strings.Contains(asked[2], "-count") || !strings.Contains(asked[2], "| cache "+layer+" empty yes "+
+					"| cache program loom-job-runner gocacheprog shared layer |") {
+					test.Errorf("the tests ran %q, want no -count on the runner's layer %s and its program", asked[2],
+						layer)
+				}
+				if information, statError := os.Stat(layer); statError != nil || !information.IsDir() {
+					test.Errorf("the gate removed the runner's layer %s: %v", layer, statError)
+				}
+				return
+			}
+			if strings.Contains(asked[2], "| cache program loom-job-runner") {
+				test.Errorf("outside an integrate job the tests ran %q, with the account's cache program", asked[2])
 			}
 			cache := filepath.Join(integrateCache, "gocache")
 			if !kept {

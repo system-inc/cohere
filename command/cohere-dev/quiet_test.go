@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/system-inc/cohere/internal/testing/build_inputs"
+	"github.com/system-inc/cohere/internal/testing/own_go_cache"
 )
 
 // A quiet window holds until it ends and not after, so a holder that never says off cannot switch the trim
@@ -136,8 +137,9 @@ func newQuietTrimCase(test *testing.T) quietTrimCase {
 			test.Fatal(changeTimesError)
 		}
 	}
-	environment := append(outsideThePool(os.Environ()), homeVariable+"="+home, "HOME="+scratchHome(test),
-		"GOCACHE="+cache, tokensVariable+"=2", cacheCapVariable+"="+strconv.FormatFloat(6*1024.0/(1<<30), 'g', -1, 64))
+	environment := append(own_go_cache.Environment(outsideThePool(os.Environ()), cache), homeVariable+"="+home,
+		"HOME="+scratchHome(test), tokensVariable+"=2",
+		cacheCapVariable+"="+strconv.FormatFloat(6*1024.0/(1<<30), 'g', -1, 64))
 	return quietTrimCase{wrapper: wrapper, slots: slots, cache: cache, environment: environment}
 }
 

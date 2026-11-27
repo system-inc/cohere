@@ -395,7 +395,7 @@ func TestTheGatesMacScriptCarriesTheMacsPinsAndItsScratch(test *testing.T) {
 	// The whole gate hands its box every package it lists, by import path, so the box shards go_language's tests.
 	if fixture.git(fixture.repository, "rev-parse", commit+"^{tree}") !=
 		fixture.git(fixture.repository, "rev-parse", "main^{tree}") || pin != "" ||
-		races != "./internal/go_language@"+goLanguage.run ||
+		races != "./internal/go_language@"+goLanguage.keptRun() ||
 		packages != "example.com/fixture/alpha example.com/fixture/internal/go_language" {
 		test.Errorf("the script was handed commit %s, pin %q, races %q and packages %q", commit, pin, races,
 			packages)

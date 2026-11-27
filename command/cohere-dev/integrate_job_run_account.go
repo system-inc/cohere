@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
@@ -72,11 +73,15 @@ type cacheReading struct {
 	unread    error
 }
 
-// readCache reads the kept Go cache, `gocache` under the integrate job's kept directory, as it is now. An empty cache,
-// the cache not yet made, reads as nothing in it.
+// readCache reads the Go cache the tests run on as it is now: the kept one, `gocache` under the integrate job's kept
+// directory, or with none kept the runner's declared layer, `GOCACHE` (runnerDeclaredCache). An empty cache, the
+// cache not yet made, reads as nothing in it.
 func (job *integrateJobRun) readCache() cacheReading {
 	started := time.Now()
 	cache := filepath.Join(job.cache, "gocache")
+	if job.cache == "" && runnerDeclaredCache() {
+		cache = strings.TrimSpace(os.Getenv("GOCACHE"))
+	}
 	entries := 0
 	walkError := filepath.WalkDir(cache, func(_ string, entry fs.DirEntry, pathError error) error {
 		if pathError != nil {

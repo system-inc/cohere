@@ -16,6 +16,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/testing/executable_testing"
 	"github.com/system-inc/cohere/internal/testing/needs"
+	"github.com/system-inc/cohere/internal/testing/own_go_cache"
 )
 
 // plantedGo stands in for a shared box's go: it answers go env, and records every go mod download, go mod verify and
@@ -36,7 +37,7 @@ mod)
   [ "$2" = verify ] && echo "all modules verified"; exit 0 ;;
 test)
   empty=no; [ -z "$(ls -A "$GOCACHE")" ] && empty=yes
-  echo "test $* | cache $GOCACHE empty $empty | toolchain $GOTOOLCHAIN | goenv $GOENV | goflags $GOFLAGS | path $PATH" >> "$GATE_LOG"
+  echo "test $* | cache $GOCACHE empty $empty | cache program ${GOCACHEPROG:-none} | toolchain $GOTOOLCHAIN | goenv $GOENV | goflags $GOFLAGS | path $PATH" >> "$GATE_LOG"
   if [ -n "$GATE_RACE_FAILS" ]; then case " $* " in *" -race"*" $GATE_RACE_FAILS "*)
     echo '{"Action":"fail","Package":"example.com/module"}'; exit 1 ;; esac; fi
   echo '{"Action":"pass","Package":"example.com/module"}' ;;
@@ -208,8 +209,8 @@ func TestASharedBoxGateTrustsNothingTheBoxKept(test *testing.T) {
 			temporary := test.TempDir()
 			// The account's own Go settings, which the gate must not read: a cache, flags, a toolchain switch and a
 			// proxy.
-			environment := append(withoutModuleCache(os.Environ()), "GATE_LOG="+log, "TMPDIR="+temporary,
-				"GOCACHE="+test.TempDir(), "GOFLAGS=-count=5", "GOTOOLCHAIN=auto",
+			environment := append(own_go_cache.Environment(withoutModuleCache(os.Environ()), test.TempDir()),
+				"GATE_LOG="+log, "TMPDIR="+temporary, "GOFLAGS=-count=5", "GOTOOLCHAIN=auto",
 				"GOENV="+filepath.Join(test.TempDir(), "env"), "GOPROXY=https://proxy.example.com")
 			if row.accountModules {
 				environment = append(environment, "GOMODCACHE="+filepath.Join(test.TempDir(), "account modules"))
@@ -390,8 +391,8 @@ func TestTheMacsGateRunsKeepTheTestCache(test *testing.T) {
 		}
 	}
 	if len(tests) != 3 || tests[1] != "test -race ./internal/edit" ||
-		tests[2] != "test -race -run "+goLanguage.run+" ./internal/go_language" {
+		tests[2] != "test -race -run "+goLanguage.keptRun()+" ./internal/go_language" {
 		test.Fatalf("Kirk's Mac ran go tests %q, want the module's, then its -race run of ./internal/edit, then "+
-			"./internal/go_language's with -run %s:\n%s", tests, goLanguage.run, recorded)
+			"./internal/go_language's with -run %s:\n%s", tests, goLanguage.keptRun(), recorded)
 	}
 }

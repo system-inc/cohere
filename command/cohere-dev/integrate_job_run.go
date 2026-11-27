@@ -8,11 +8,9 @@ import (
 	"io/fs"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
 	"regexp"
 	"runtime"
-	"slices"
 	"strings"
 	"time"
 	"unicode"
@@ -50,7 +48,8 @@ import (
 // pushed.
 
 // integrateJobCacheVariable is the integrate job's kept directory: its Go build and test cache, `gocache`, kept across
-// jobs, and its replay store, `steps`. Unset, the integrate job's tests run as a gate box's do, on an empty cache with
+// jobs, and its replay store, `steps`. Unset, the integrate job's tests run on the Go cache its runner declared, with
+// no -count=1 (runnerDeclaredCache, #e94a6r4), and with none declared as a gate box's do, on an empty cache with
 // -count=1.
 const integrateJobCacheVariable = "COHERE_INTEGRATE_CACHE"
 
@@ -294,8 +293,9 @@ func integrateJob(arguments []string) int {
 		}
 	}
 	// cohere-swift can't be built in an integrate job's sandbox (needs.SwiftUnlaid), so the tests that build it skip by
-	// name (needs.SwiftLaid), cohere on the tree checks every language but Swift (integrateJobCohereArguments), a merge
-	// that changes what only Swift checks is refused (integrateJobSwiftRefusal), and the landing's account says so.
+	// name (needs.SwiftLaid), cohere on the tree checks every language but Swift (integrateJobCohereArguments), and the
+	// landing's account says so. A merge that changes Swift's own paths is let through on that rule, its Swift proven
+	// on a Mac beside it, Kirk's one-time bridge (#je1r32a).
 	if setError := os.Setenv(needs.SwiftUnlaidVariable, needs.SwiftUnlaidSetting); setError != nil {
 		fmt.Fprintf(
 			streams.Errors,
@@ -556,15 +556,6 @@ func (job *integrateJobRun) preflight() (string, int) {
 		fmt.Fprintf(streams.Errors, "cohere-dev: %s\n", refusal)
 		return "", 1
 	}
-	swiftRefusal, swiftError := integrateJobSwiftRefusal(job.repository, job.merge)
-	if swiftError != nil {
-		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", swiftError)
-		return "", 1
-	}
-	if swiftRefusal != "" {
-		fmt.Fprintf(streams.Errors, "cohere-dev: %s\n", swiftRefusal)
-		return "", 1
-	}
 	job.commits, job.subject = commits, subject
 	return subject + ", " + shortCommit(job.candidate) + " merged onto main at " + shortCommit(job.running) + " as " +
 		shortCommit(job.merge), 0
@@ -574,8 +565,7 @@ func (job *integrateJobRun) preflight() (string, int) {
 // and of integrateJobPreflight's checks the one that reads only the tree, its submodules recorded as gitlinks
 // (checkGitlinks). The rest judge a candidate, and a fill has none,
 // main's tip being already landed: the merge's two parents, main holding the candidate (heldByMain), the commits'
-// subjects and their task, the landing's subject and --message, and the Swift guard, which reads what a merge changes
-// against main (integrateJobSwiftRefusal).
+// subjects and their task, and the landing's subject and --message.
 func (job *integrateJobRun) fillPreflight() (string, int) {
 	if code := job.reachMerge(); code != 0 {
 		return "", code
@@ -771,44 +761,6 @@ func pullRequestTitle(message string, task string) (string, string) {
 			"characters", number, subjectLimit)
 	}
 	return title, ""
-}
-
-// integrateJobSwiftDirectories are the packages whose Swift files integrateJobSwiftRefusal refuses: command/cohere runs
-// cohere-swift, and release's dispatch and packaging build it.
-var integrateJobSwiftDirectories = []string{
-	"command/cohere/",
-	"internal/release/dispatch/",
-	"internal/release/packaging/",
-}
-
-// integrateJobSwiftRefusal is why the integrate job refuses merge, read from repository, for what it changes against
-// its first parent that only Swift's checks judge, empty when it changes none of it: any path under swift_language/,
-// the Swift package, and the Swift files of the packages that run cohere-swift or build it, swift.go and swift_*.go in
-// integrateJobSwiftDirectories, whose tests that build it skip in an integrate job (needs.SwiftLaid). Until Machines
-// lays Swift on Shackler (#je1r32a) no integrate job checks them, so a change to them is never integrated unchecked.
-// Renames are read as a removal and an addition, so a file moved out of the package is still the package's change.
-func integrateJobSwiftRefusal(repository string, merge string) (string, error) {
-	changed, diffError := gitOutput(repository, "diff", "--name-only", "--no-renames", merge+"^1", merge)
-	if diffError != nil {
-		return "", fmt.Errorf("reading what the merge %s changes: %w", shortCommit(merge), diffError)
-	}
-	swift := []string{}
-	for _, changedPath := range strings.Split(changed, "\n") {
-		directory, name := path.Split(changedPath)
-		swiftFile := (name == "swift.go" || strings.HasPrefix(name, "swift_")) && strings.HasSuffix(name, ".go")
-		if strings.HasPrefix(changedPath, "swift_language/") ||
-			(swiftFile && slices.Contains(integrateJobSwiftDirectories, directory)) {
-			swift = append(swift, changedPath)
-		}
-	}
-	if len(swift) == 0 {
-		return "", nil
-	}
-	return fmt.Sprintf(
-		"%s, so the merge's change to %s can't be judged here, and nothing integrates",
-		needs.SwiftUnlaid,
-		strings.Join(swift, ", "),
-	), nil
 }
 
 // lay checks the merge's tree out under the integrate job's scratch, a worktree of its own cohere.git, borrowing the
@@ -1097,12 +1049,21 @@ func (job *integrateJobRun) tests(share func(string) []string) (string, int) {
 	return tested, 0
 }
 
+// runnerDeclaredCache reports whether the job's runner declared a Go cache, its layer and its program, which
+// sharedBoxCacheBlock then runs the tests on when no kept cache is named (#e94a6r4).
+func runnerDeclaredCache() bool {
+	return strings.TrimSpace(os.Getenv("GOCACHEPROG")) != "" && strings.TrimSpace(os.Getenv("GOCACHE")) != ""
+}
+
 // cacheSaid is how the integrate job's lines name the Go cache its tests ran on.
 func (job *integrateJobRun) cacheSaid() string {
-	if job.cache == "" {
-		return "an empty Go cache with -count=1"
+	switch {
+	case job.cache != "":
+		return "the integrate job's kept Go cache"
+	case runnerDeclaredCache():
+		return "the runner's declared Go cache"
 	}
-	return "the integrate job's kept Go cache"
+	return "an empty Go cache with -count=1"
 }
 
 // landingLines are the integrate job's last lines, all Loom's finisher needs to make the landing on Kirk's Mac, in
