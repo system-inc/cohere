@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/system-inc/cohere/internal/lint/testing"
@@ -29,10 +30,27 @@ const implicitGlobalsScriptTsConfiguration = `{
 	"include": ["**/*.ts", "**/*.js"]
 }`
 
+// implicitGlobalsSloppyScriptTsConfiguration is the same project with `strict` off, which tsgo ignores
+// in deciding strictness, so a TypeScript script there is still strict (#8skx4es).
+var implicitGlobalsSloppyScriptTsConfiguration = strings.Replace(
+	implicitGlobalsScriptTsConfiguration, `"strict": true`, `"strict": false`, 1)
+
 // runImplicitGlobalsAsAScript builds a typed program in which the fixture is a script: sloppy for a
-// .js file, and strict under alwaysStrict for a .ts one.
+// .js file, and strict for a .ts one whatever its tsconfig says.
 func runImplicitGlobalsAsAScript(
 	test *testing.T,
+	fileName string,
+	sourceText string,
+	options NoImplicitGlobalsSettings,
+) rule_testing.Result {
+	test.Helper()
+	return runImplicitGlobalsAsAScriptUnder(test, implicitGlobalsScriptTsConfiguration, fileName, sourceText, options)
+}
+
+// runImplicitGlobalsAsAScriptUnder is runImplicitGlobalsAsAScript with the project's tsconfig given.
+func runImplicitGlobalsAsAScriptUnder(
+	test *testing.T,
+	configuration string,
 	fileName string,
 	sourceText string,
 	options NoImplicitGlobalsSettings,
@@ -43,7 +61,7 @@ func runImplicitGlobalsAsAScript(
 			path := filepath.Join(directory, "tsconfig.json")
 			if writeError := os.WriteFile(
 				path,
-				[]byte(implicitGlobalsScriptTsConfiguration),
+				[]byte(configuration),
 				0o644,
 			); writeError != nil {
 				test.Fatalf("writing the script tsconfig: %v", writeError)
@@ -74,7 +92,7 @@ func implicitGlobalsOptions(test *testing.T, lexicalBindings bool) NoImplicitGlo
 //	the untyped harness               a script, with no checker, so only the declaration halves
 //	the typed harness                 a module (it forces module detection), strict throughout
 //	runImplicitGlobalsAsAScript       a typed script: a .js one sloppy, so both halves fire, and a
-//	                                  .ts one strict under alwaysStrict, so only declarations do
+//	                                  .ts one strict whatever its tsconfig, so only declarations do
 //
 // Measured with controls in TestNoImplicitGlobalsReadsWhatTheFileIs below.
 
@@ -359,8 +377,9 @@ func TestNoImplicitGlobalsDeclinesReadonlyGlobals(test *testing.T) {
 // What the file is decides each half, measured with controls in each kind of file.
 //
 // A module has no global scope and is strict, so neither half fires. A TypeScript script is strict
-// under alwaysStrict, which every TypeScript file is, so its top-level var is still a global and
-// reports while its assignment to an undeclared name throws and leaks nothing (#hks3djf, #jjfa7qb).
+// whatever its tsconfig says, `strict: false` included, so its top-level var is still a global and
+// reports while its assignment to an undeclared name throws and leaks nothing (#hks3djf, #jjfa7qb,
+// #8skx4es).
 // A sloppy JavaScript script reports both. The untyped harness has no checker, so it shows only the
 // declaration half.
 func TestNoImplicitGlobalsReadsWhatTheFileIs(test *testing.T) {
@@ -385,9 +404,23 @@ func TestNoImplicitGlobalsReadsWhatTheFileIs(test *testing.T) {
 				implicitGlobalsOptions(test, true),
 			)
 		},
-		"a TypeScript script under alwaysStrict": func(test *testing.T, sourceText string) rule_testing.Result {
+		"a TypeScript script": func(test *testing.T, sourceText string) rule_testing.Result {
 			return runImplicitGlobalsAsAScript(
 				test,
+				implicitGlobalsFile,
+				sourceText,
+				implicitGlobalsOptions(test, true),
+			)
+		},
+		"a TypeScript script under strict false": func(test *testing.T, sourceText string) rule_testing.Result {
+			// Without the replacement the row reads the strict project and proves nothing.
+			if !strings.Contains(implicitGlobalsSloppyScriptTsConfiguration, `"strict": false`) {
+				test.Fatalf("the sloppy tsconfig doesn't turn strict off: %s",
+					implicitGlobalsSloppyScriptTsConfiguration)
+			}
+			return runImplicitGlobalsAsAScriptUnder(
+				test,
+				implicitGlobalsSloppyScriptTsConfiguration,
 				implicitGlobalsFile,
 				sourceText,
 				implicitGlobalsOptions(test, true),
@@ -411,9 +444,12 @@ func TestNoImplicitGlobalsReadsWhatTheFileIs(test *testing.T) {
 		{"the untyped harness", "foo = 1", nil},
 		{"a module", "var foo = 1;", nil},
 		{"a module", "foo = 1", nil},
-		{"a TypeScript script under alwaysStrict", "var foo = 1;", []string{"globalNonLexicalBinding"}},
-		{"a TypeScript script under alwaysStrict", "foo = 1", nil},
-		{"a TypeScript script under alwaysStrict", "foo = 1; var bar;", []string{"globalNonLexicalBinding"}},
+		{"a TypeScript script", "var foo = 1;", []string{"globalNonLexicalBinding"}},
+		{"a TypeScript script", "foo = 1", nil},
+		{"a TypeScript script", "foo = 1; var bar;", []string{"globalNonLexicalBinding"}},
+		// The row that discriminates: a rule reading `strict` reports a leak here, as this one did.
+		{"a TypeScript script under strict false", "foo = 1", nil},
+		{"a TypeScript script under strict false", "foo = 1; var bar;", []string{"globalNonLexicalBinding"}},
 		{"a sloppy JavaScript script", "var foo = 1;", []string{"globalNonLexicalBinding"}},
 		{"a sloppy JavaScript script", "foo = 1", []string{"globalVariableLeak"}},
 		{"a sloppy JavaScript script", "foo = 1; var bar;", []string{"globalNonLexicalBinding", "globalVariableLeak"}},
