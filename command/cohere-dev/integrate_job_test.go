@@ -928,9 +928,10 @@ func TestTheIntegrateJobsCacheIsKeptAndDropsCountOne(test *testing.T) {
 }
 
 // The tests' temporary directory on a gate Mac, macBoxTemporaryBlock run for real with bash: a new one each run under
-// the account's `TMPDIR`, while with integrateCache set it is one path each run inside the kept cache, emptied first,
-// so go test's cache, which keys a test on the `TMPDIR` it read, replays across integrate jobs. Neither is ever under
-// /tmp, which an integrate job in Shackler's sandbox may not write (J-7dhfcty).
+// the account's `TMPDIR`, while in an integrate job it is one path each run, emptied first, inside the kept cache when
+// one is kept and under the script's base when the runner's cache serves the job, so go test's cache, which keys a
+// test on the `TMPDIR` it read, replays across integrate jobs (J-5j0jbp5 replayed 73 of 438 with a new one each job).
+// None is ever under /tmp, which an integrate job in Shackler's sandbox may not write (J-7dhfcty).
 func TestTheIntegrateJobsTemporaryDirectoryIsOnePath(test *testing.T) {
 	test.Parallel()
 	needs.Tool(test, "bash", "the gate's script is a bash script")
@@ -938,12 +939,17 @@ func TestTheIntegrateJobsTemporaryDirectoryIsOnePath(test *testing.T) {
 		test.Errorf("the block names a fixed path under /tmp:\n%s", macBoxTemporaryBlock)
 	}
 	temporary, kept := test.TempDir(), filepath.Join(test.TempDir(), "integrate cache")
-	run := func(integrateCache string) string {
+	base := filepath.Join(test.TempDir(), "scratch base")
+	run := func(integrateCache string, integrateJob string) string {
 		test.Helper()
 		bash := exec.Command("bash", "-s")
 		bash.Env = append(os.Environ(), "TMPDIR="+temporary)
 		bash.Stdin = strings.NewReader("set -euo pipefail\nrefuse() { echo \"refused $*\"; exit 1; }\nintegrateCache=" +
 			shellQuoted(integrateCache) +
+			"\nintegrateJob=" +
+			integrateJob +
+			"\nbase=" +
+			shellQuoted(base) +
 			"\n" +
 			macBoxTemporaryBlock +
 			"touch \"$gatetemp/left\"\necho \"$gatetemp\"\n")
@@ -953,7 +959,7 @@ func TestTheIntegrateJobsTemporaryDirectoryIsOnePath(test *testing.T) {
 		}
 		return strings.TrimSpace(string(output))
 	}
-	first, second := run(kept), run(kept)
+	first, second := run(kept, "1"), run(kept, "1")
 	if first != second || first != filepath.Join(kept, "temporary") {
 		test.Errorf("with a kept cache the runs' temporary directories are %s and %s, want %s", first, second,
 			filepath.Join(kept, "temporary"))
@@ -961,7 +967,14 @@ func TestTheIntegrateJobsTemporaryDirectoryIsOnePath(test *testing.T) {
 	if entries := listMaybeMissing(test, second); len(entries) != 1 {
 		test.Errorf("the second run found %d entries in its temporary directory, want only its own", len(entries))
 	}
-	if cold, again := run(""), run(""); cold == again || !strings.HasPrefix(cold, temporary+"/cohere-gate.") {
+	if runner, again := run("", "1"), run("", "1"); runner != again || runner != filepath.Join(base, "temporary") {
+		test.Errorf("on the runner's cache the integrate jobs' temporary directories are %s and %s, want %s", runner,
+			again, filepath.Join(base, "temporary"))
+	} else if entries := listMaybeMissing(test, again); len(entries) != 1 {
+		test.Errorf("on the runner's cache the second job found %d entries in its temporary directory, want only its"+
+			" own", len(entries))
+	}
+	if cold, again := run("", ""), run("", ""); cold == again || !strings.HasPrefix(cold, temporary+"/cohere-gate.") {
 		test.Errorf("without a kept cache the runs' temporary directories are %s and %s, want a new one each under %s",
 			cold, again, temporary)
 	}
