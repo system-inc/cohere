@@ -23,9 +23,10 @@ import (
 // namespace that has no ignored siblings, which is most of them.
 //
 // The corpus has two halves and needs both. The repository half is the exit criterion for this
-// component: a repository's theme diffed key by key against what Tailwind built from the same files.
-// It was two real repositories on the same Tailwind, whose themes differ, and is now the public theme,
-// since cohere's tests no longer read other repositories (#5wj23dd). The synthetic half reaches the branches a real
+// component: two design systems on the same Tailwind, whose themes differ, each diffed key by key against
+// what Tailwind built from the same files. They were two real repositories and are now two themes written
+// in cohere, testdata/public_theme and testdata/planted_repository/styles, since cohere's tests no longer
+// read other repositories (#5wj23dd, #pg78xtp). The synthetic half reaches the branches a real
 // theme never does, `initial` deletion, namespace clearing, `@theme default` losing to a
 // non-default value, prefixes, and the dot-to-underscore retry, which is roughly half of `theme.ts`
 // and all of the half where a port fails silently.
@@ -108,13 +109,20 @@ type themeOptionFixture struct {
 // tailwindPackageRoots maps a repository case's name to the tailwindcss install its theme resolves
 // `@import "tailwindcss"` against.
 //
-// The public theme's copy of the fixture (#f598zk0) carries one repository case, testdata/public_theme, on
-// the vendored snapshot of 4.3.3, so it loads on any machine (#sycrdr6).
+// Both are 4.3.3, which is the point: the two design systems differ by their own `@theme` content on
+// an identical framework, so a table generated from either one is wrong for the other. That is the
+// defect this whole component exists to fix, and the corpus is what proves it is real rather than
+// theorized. Both are the vendored snapshot of 4.3.3, which is that identical framework, on any machine
+// (#sycrdr6).
+//
+// theme_fixtures.json carries two repository cases, "public" (testdata/public_theme) and "planted"
+// (testdata/planted_repository/styles), and the public theme's copy (#f598zk0) carries the first alone.
 func tailwindPackageRoots(test *testing.T) map[string]string {
 	test.Helper()
 	snapshot := vendored.TailwindPackageRootForTest(test)
 	return map[string]string{
-		"public": snapshot,
+		"public":  snapshot,
+		"planted": snapshot,
 	}
 }
 
@@ -181,6 +189,32 @@ func loadRepositoryTheme(test *testing.T, aCase themeCase) (*Theme, []SkippedDir
 	return theme, skipped
 }
 
+// coveredRepositoryCases is how many repository cases the fixture's list holds, which is how many a run
+// must check. Each records its stylesheet as a path inside this repository, so none is ever skipped for a
+// missing checkout. The count is read from the list and held against the header the generator wrote, so
+// a fixture whose list lost a case fails here rather than lowering the bar the coverage check holds.
+func coveredRepositoryCases(test *testing.T, fixture themeCorpus) int {
+	test.Helper()
+	covered := 0
+	for _, aCase := range fixture.Cases {
+		if aCase.Source != "repository" {
+			continue
+		}
+		if aCase.EntryPath == "" || filepath.IsAbs(aCase.EntryPath) {
+			test.Fatalf(
+				"repository case %q records the entry path %q, and it must be a path inside this repository",
+				aCase.Name,
+				aCase.EntryPath,
+			)
+		}
+		covered++
+	}
+	if covered != fixture.RepositoryCaseCount {
+		test.Fatalf("the fixture lists %d repository cases and its header says %d", covered, fixture.RepositoryCaseCount)
+	}
+	return covered
+}
+
 // TestThemeMatchesTailwind is the differential: every answer the port gives, against the answer
 // Tailwind gave for the same question.
 //
@@ -189,12 +223,17 @@ func loadRepositoryTheme(test *testing.T, aCase themeCase) (*Theme, []SkippedDir
 // and this component's whole claim is about scale: it is checked against a design system Tailwind built,
 // not against a reading.
 //
-// Run on the public theme's copy of the fixture (#f598zk0): its repository case is testdata/public_theme,
-// so the repository half runs on every machine.
+// Run on the public theme's copy of the fixture (#f598zk0), whose repository case is testdata/public_theme,
+// and on theme_fixtures.json, which adds the planted repository's theme beside it (#pg78xtp). Both themes
+// are written in cohere, so the repository half runs on every machine.
 func TestThemeMatchesTailwind(test *testing.T) {
 	test.Parallel()
 	forEachOracleCopy(test, "theme_fixtures.json", func(test *testing.T, fixtureName string) {
 		expectThemeMatchesTailwind(test, loadThemeCorpus(test, fixtureName))
+	})
+	test.Run("two_themes", func(test *testing.T) {
+		test.Parallel()
+		expectThemeMatchesTailwind(test, loadThemeCorpus(test, "theme_fixtures.json"))
 	})
 }
 
@@ -393,11 +432,11 @@ func expectThemeMatchesTailwind(test *testing.T, fixture themeCorpus) {
 	// Coverage. A count that has never been shown to be large is not a large count, and a suite
 	// that lost its repository half would otherwise report the same green line as one that ran it.
 	// Every repository case the fixture records must have run.
-	if repositoriesChecked != fixture.RepositoryCaseCount {
+	if covered := coveredRepositoryCases(test, fixture); repositoriesChecked != covered {
 		test.Errorf(
-			"ran %d of %d repository cases: the exit criterion for this component is a comparison against a real design system",
+			"ran %d of %d repository cases: the exit criterion for this component is a comparison against two design systems",
 			repositoriesChecked,
-			fixture.RepositoryCaseCount,
+			covered,
 		)
 	}
 	if syntheticChecked != fixture.SyntheticCaseCount {
@@ -415,6 +454,79 @@ func expectThemeMatchesTailwind(test *testing.T, fixture themeCorpus) {
 		totalEntries, totalNamespaces, totalNamespaceEntries, totalKeysInNamespace,
 		totalResolutions, totalResolveWith, totalNested, totalOptionQueries,
 		totalComparisons,
+	)
+}
+
+// TestThemeRepositoriesDiffer is the measurement the whole port argues from.
+//
+// cohere shipped generated tables built from one repository and linted three with them. That is
+// only a defect if two repositories on the same Tailwind actually resolve different themes, so this
+// asserts it directly rather than leaving it as the premise of a design document. The two themes in
+// theme_fixtures.json differ on purpose, the way two repositories do: the public theme declares keys the
+// planted one never names (`--pane-*`, `--percentage-*`, `--color-x--2`), and the planted theme declares
+// breakpoints of its own (`--breakpoint-tablet`, `--breakpoint-desk`), a numbered scale with a negative key
+// (`--color-wash--1`), and an animation, radius and shadow set the public one lacks. If this test ever
+// passes trivially because the two themes became identical, the assertion below fails rather than
+// quietly succeeding.
+func TestThemeRepositoriesDiffer(test *testing.T) {
+	test.Parallel()
+	fixture := loadThemeCorpus(test, "theme_fixtures.json")
+
+	type resolved struct {
+		name string
+		keys map[string]string
+		size int
+	}
+	var themes []resolved
+
+	for _, aCase := range fixture.Cases {
+		if aCase.Source != "repository" {
+			continue
+		}
+		theme, _ := loadRepositoryTheme(test, aCase)
+		keys := make(map[string]string, theme.Size())
+		for _, entry := range theme.Entries() {
+			keys[entry.Key] = entry.Value
+		}
+		themes = append(themes, resolved{name: aCase.Name, keys: keys, size: theme.Size()})
+	}
+
+	if len(themes) < 2 {
+		test.Fatalf("need two repositories to compare, have %d", len(themes))
+	}
+
+	first, second := themes[0], themes[1]
+
+	var onlyInFirst int
+	var onlyInSecond int
+	var differingValues int
+	for key, value := range first.keys {
+		otherValue, present := second.keys[key]
+		switch {
+		case !present:
+			onlyInFirst++
+		case otherValue != value:
+			differingValues++
+		}
+	}
+	for key := range second.keys {
+		if _, present := first.keys[key]; !present {
+			onlyInSecond++
+		}
+	}
+
+	if onlyInFirst == 0 && onlyInSecond == 0 && differingValues == 0 {
+		test.Errorf(
+			"%s and %s resolved identical themes; the argument for this port is that they do not, "+
+				"so either the corpus regressed to one repository or the loader is not reading the repository in front of it",
+			first.name, second.name,
+		)
+	}
+
+	test.Logf(
+		"%s resolved %d entries, %s resolved %d: %d keys only in %s, %d only in %s, %d shared keys with different values",
+		first.name, first.size, second.name, second.size,
+		onlyInFirst, first.name, onlyInSecond, second.name, differingValues,
 	)
 }
 
