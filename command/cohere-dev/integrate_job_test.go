@@ -1334,6 +1334,27 @@ func TestAFillRunsNoMeasurement(test *testing.T) {
 	}
 }
 
+// A fill judges main's own tip, which changes nothing of its own, so it isolates no rule's fixtures, and its account
+// says so once, even with the isolation test in its tree and its history shallow at the tip, as Loom's runner lays a
+// fill's: there the tip has no first parent, and reading one refused every fill's checks (J-kexdjp4, #e94a6r4).
+func TestAFillOnAShallowHistoryIsolatesNothingAndSaysSo(test *testing.T) {
+	test.Parallel()
+	fixture := newIntegrateJobFixture(test)
+	// The isolation test's package sits in go_language, a race token's package, which the gate's listing must find.
+	fixture.commitOn(fixture.worktree("a"), map[string]string{unitIsolationFile: "package check\n",
+		"internal/go_language/go_language.go": "package go_language\n"}, "check: the isolation test")
+	tip := fixture.landedMain()
+	writeFixtureFile(test, filepath.Join(fixture.historyRepository(), "shallow"), tip+"\n")
+	ran := fixture.fill()
+	if ran.exit != 0 {
+		test.Fatalf("the fill exited %d, its last line %q:\n%s", ran.exit, ran.lastLine, ran.errors)
+	}
+	want := integrateJobMarker + "isolation skipped: " + fillIsolatesNothing + "\n"
+	if strings.Count(ran.errors, want) != 1 {
+		test.Errorf("the account doesn't say %q once:\n%s", want, ran.errors)
+	}
+}
+
 // A fill's account says the steps an integration's does at the same tree, in the same order, but the measurement
 // (#fnrchck), so the two compare step by step: the lay, the tests and their box's steps, and each check.
 func TestAFillSaysTheStepsAnIntegrationDoes(test *testing.T) {

@@ -1173,6 +1173,14 @@ func (job *integrateJobRun) landingLines() (string, error) {
 	return lines.String(), nil
 }
 
+// fillIsolatesNothing is why a fill skips the unit isolation, which isolates the rules a merge changes against main,
+// its first parent: a fill judges main's tip itself and changes nothing of its own, and the tip it runs at was
+// isolated when it landed. Loom's runner lays a fill's history shallow at the tip, so the tip has no first parent there
+// to read, and reading one refused every fill's checks (J-kexdjp4, #e94a6r4). A candidate's merge always has its first
+// parent, main, in its history, since the preflight refuses a merge whose first parent isn't the commit the job runs
+// at.
+const fillIsolatesNothing = "a fill judges main's own tip, which changes nothing of its own"
+
 // checks runs the gate's other checks here, each through the gate's own function and in its environment: go vet, the
 // rule CPU budget, the unit isolation of the rules the landing changes, the docs data, replayed when its inputs match a
 // pass the store recorded (integrateJobReplay), and cohere on the tree. share is the pool token's environment for a
@@ -1205,6 +1213,10 @@ func (job *integrateJobRun) checks(share func(string) []string) (string, int) {
 			return code, map[bool]string{true: "the rule CPU budget"}[ran]
 		}},
 		{"isolation", func() (int, string) {
+			if job.options.Fill {
+				job.say("isolation skipped: %s", fillIsolatesNothing)
+				return 0, ""
+			}
 			code, ran, said := checkUnitIsolation(job.tree, job.merge,
 				func() []string { return gateEnvironment(share("the unit isolation")) })
 			return code, map[bool]string{true: said}[ran]
