@@ -1199,6 +1199,96 @@ func TestTheIntegrateJobsMirrorsHoldTheMergeAndItsPin(test *testing.T) {
 	}
 }
 
+// An integrate job's tests run in the tree the job laid and stamped by content (#ntrewm3), macBoxScript run for real
+// with bash: handed that tree, it checks the tree's commit and its TypeScript's against the commit and the pin it was
+// given and goes on in it to the toolchain check, which here finds no go, and never makes a checkout of its own under
+// its scratch, whose files would carry the moment it wrote them. A laid tree at another commit, or whose TypeScript
+// is at another pin, is refused in words, the scratch tree still never made. J-hy1ttx3 stamped its laid tree and
+// tested a checkout of its own, 328 packages run and 110 replayed.
+func TestAnIntegrateJobsTestsRunInTheTreeItLaid(test *testing.T) {
+	test.Parallel()
+	needs.Tool(test, "bash", "the gate's script is a bash script")
+	directory := test.TempDir()
+	environment := append(append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null",
+		"GIT_AUTHOR_NAME=test", "GIT_AUTHOR_EMAIL=test@example.com", "GIT_COMMITTER_NAME=test",
+		"GIT_COMMITTER_EMAIL=test@example.com"), gitWithoutMaintenance...)
+	git := func(where string, arguments ...string) string {
+		test.Helper()
+		command := exec.Command("git", arguments...)
+		command.Dir, command.Env = where, environment
+		output, gitError := command.CombinedOutput()
+		if gitError != nil {
+			test.Fatalf("git %v in %s: %v\n%s", arguments, where, gitError, output)
+		}
+		return strings.TrimSpace(string(output))
+	}
+	laid := filepath.Join(directory, "laid")
+	writeFixtureFile(test, filepath.Join(laid, "go.mod"), "module example.com/module\n\ngo 1.27\n")
+	git(directory, "init", "-q", "-b", "main", laid)
+	git(laid, "add", ".")
+	git(laid, "commit", "-q", "-m", "main")
+	commit := git(laid, "rev-parse", "HEAD")
+	typeScript := filepath.Join(laid, "TypeScript")
+	writeFixtureFile(test, filepath.Join(typeScript, "README.md"), "TypeScript\n")
+	git(laid, "init", "-q", "-b", "main", typeScript)
+	git(typeScript, "add", ".")
+	git(typeScript, "commit", "-q", "-m", "TypeScript")
+	pin := git(typeScript, "rev-parse", "HEAD")
+	noGo := filepath.Join(directory, "no-go")
+	for _, row := range []struct {
+		name, commit, pin, want string
+	}{
+		{"at the commit and the pin", commit, pin, "there is no go at " + noGo},
+		{"at another commit", strings.Repeat("a", 40), pin, "the laid tree " + laid + " holds " + commit + ", not " +
+			strings.Repeat("a", 40)},
+		{"its TypeScript at another pin", commit, strings.Repeat("b", 40), "the laid tree's TypeScript holds " + pin +
+			", not " + strings.Repeat("b", 40)},
+	} {
+		test.Run(row.name, func(test *testing.T) {
+			test.Parallel()
+			script, scriptError := withIntegrateJobMirrors(macBoxScript, filepath.Join(directory, "no-mirrors"))
+			if scriptError == nil {
+				script, scriptError = replacedOnce(script, macBoxLaidTreeLine, "laidTree="+shellQuoted(laid))
+			}
+			if scriptError == nil {
+				script, scriptError = replacedOnce(script, integrateJobLine, integrateJobSetting)
+			}
+			if scriptError != nil {
+				test.Fatal(scriptError)
+			}
+			script = strings.Replace(script, `goroot="`+macBoxGoroot+`"`, `goroot="`+noGo+`"`, 1)
+			home := test.TempDir()
+			bash := exec.Command("bash", "-s", "--", row.commit, row.pin, "", "./...")
+			bash.Dir, bash.Stdin = test.TempDir(), strings.NewReader(script)
+			bash.Env = append(environment, "HOME="+home)
+			output, bashError := bash.CombinedOutput()
+			if bashError == nil || !strings.Contains(string(output), sharedBoxRefusedMarker+row.want) {
+				test.Errorf("the script didn't say %q (%v):\n%s", row.want, bashError, output)
+			}
+			scratchTree := filepath.Join(home, strings.TrimPrefix(macBoxScratch, "~/"), "tree")
+			if _, statError := os.Stat(scratchTree); !errors.Is(statError, os.ErrNotExist) {
+				test.Errorf("the script made a checkout of its own at %s: %v", scratchTree, statError)
+			}
+		})
+	}
+}
+
+// The integrate job hands its tests' script the tree it laid (macBoxLaidTreeLine), the one its lay stamped.
+func TestAnIntegrateJobHandsItsTestsTheTreeItLaid(test *testing.T) {
+	test.Parallel()
+	fixture := newIntegrateJobFixture(test)
+	fixture.reply("measure.run", shacklerSays([]int64{9900, 9700, 9800}))
+	ran := fixture.integrateJob(fixture.merged())
+	if ran.exit != 0 {
+		test.Fatalf("the integrate job exited %d:\n%s", ran.exit, ran.errors)
+	}
+	script := string(readMaybeMissing(test, filepath.Join(fixture.replies, "tests.script")))
+	want := "\nlaidTree=" + shellQuoted(filepath.Join(fixture.home, integrateJobScratch, "tree")) + "\n"
+	if !strings.Contains(script, want) || strings.Contains(script, "\n"+macBoxLaidTreeLine+"\n") {
+		test.Errorf("the tests' script doesn't name the laid tree %q:\n%s", want, script)
+	}
+}
+
 // The account the Square rows (#ged8ew1), parsed from a fixture run's log: every step's seconds and the job's total,
 // the kept cache before and after with the entries it gained, read from the entry count and said so, the packages that
 // ran and replayed `(cached)` for the plain run and the -race run, and the free space and integrate path size before

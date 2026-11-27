@@ -73,6 +73,14 @@ const (
 	integrateJobSetting = `integrateJob=1`
 )
 
+// macBoxLaidTreeLine is macBoxScript's line naming the tree it tests when another laid it: empty on a gate box, which
+// checks the commit out itself under its scratch, and in an integrate job the tree the job laid and stamped by content
+// (stampTreeTimes), which the job alone replaces it with (integrate_job_run.go). Tested in its own checkout, an
+// integrate job's tests read files the checkout had just written, each at the moment it was written, and go test's
+// cache, which keys a test on the times of the files it opens, missed nearly every package: J-hy1ttx3 stamped its laid
+// tree and tested another, 328 packages run and 110 replayed (#ntrewm3).
+const macBoxLaidTreeLine = `laidTree=""`
+
 // macBoxTemporaryBlock makes gatetemp, the tests' temporary directory: a new one each run on a gate box, under the
 // account's `TMPDIR`, and in an integrate job one path every job, made empty first: inside the kept cache when one is
 // kept, else under the script's base, which the integrate kind's fixed home holds at one path (#e94a6r4). go test's
@@ -128,15 +136,29 @@ held() {
 // and runs sharedBoxGate against the Mac's pinned toolchain and node. It reads the mirrors through macBoxMirrorReads,
 // and removes the configuration file naming them safe before any test runs. On a gate box it keeps no Go cache
 // (macBoxIntegrateCacheLine) and is no integrate job (integrateJobLine); the integrate job runs it on Shackler with its
-// mirrors, its cache when one is kept, and its own setting.
+// mirrors, its cache when one is kept, its own setting, and the tree it laid (macBoxLaidTreeLine), which the script
+// tests where it lies once its `HEAD` is the commit and its TypeScript the pin, fetching and checking out nothing.
 const macBoxScript = `set -euo pipefail
 commit="$1"; pin="$2"; races="$3"; shift 3
 ` + macBoxMirrorLine + `
 ` + macBoxIntegrateCacheLine + `
 ` + integrateJobLine + `
+` + macBoxLaidTreeLine + `
 base=` + macBoxScratch + `
 mkdir -p "$base"; cd "$base"
 refuse() { echo "` + sharedBoxRefusedMarker + `$*"; exit 1; }
+if [ -n "$laidTree" ]; then
+  # The tree the integrate job laid and stamped by content (macBoxLaidTreeLine), tested where it lies, never checked out
+  # again: a checkout gives every file it writes the moment it wrote it, and go test's cache keys on those times.
+  laidAt=$(git -C "$laidTree" rev-parse HEAD) || refuse "the laid tree $laidTree has no commit checked out"
+  [ "$laidAt" = "$commit" ] || refuse "the laid tree $laidTree holds $laidAt, not $commit"
+  if [ -n "$pin" ]; then
+    pinnedAt=$(git -C "$laidTree/TypeScript" rev-parse HEAD) ||
+      refuse "the laid tree's TypeScript at $laidTree/TypeScript has no commit checked out"
+    [ "$pinnedAt" = "$pin" ] || refuse "the laid tree's TypeScript holds $pinnedAt, not $pin"
+  fi
+  testTree="$laidTree"
+else
 ` + macBoxMirrorReads + `held cohere.git "$commit" || refuse "` + macBoxMirrorLacks + `$commit"
 [ -d cohere.git ] || git init -q --bare cohere.git
 GIT_CONFIG_GLOBAL="$safe" git -C cohere.git fetch -q "$mirrors/cohere.git" "$commit"
@@ -154,11 +176,13 @@ if [ -n "$pin" ]; then
   git -C tree/TypeScript checkout -q --detach --force "$pin"
 fi
 rm -f "$safe"; trap - EXIT
+testTree="$base/tree"
+fi
 # The tests' temporary directory, made anew under the account's TMPDIR, or one path every integrate job, and never
 # under a fixed /tmp, which an integrate job in Shackler's sandbox may not write (J-7dhfcty).
 ` + macBoxTemporaryBlock + `trap 'chmod -R u+w "$gatetemp" 2>/dev/null; rm -rf "$gatetemp"' EXIT
 export TMPDIR="$gatetemp"
-cd tree
+cd "$testTree"
 goroot="` + macBoxGoroot + `"; digest="` + macBoxToolchainDigest + `"
 node="` + macBoxNode + `"; nodeDigest="` + macBoxNodeDigest + `"
 ` + sharedBoxGate
