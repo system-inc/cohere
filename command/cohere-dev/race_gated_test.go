@@ -551,7 +551,7 @@ func skippingTests(directory string) ([]string, error) {
 }
 
 // testsReaching is every top-level test of directory's test files whose body holds a node matches is true of, or
-// calls a function of the package's test files that does, followed to a fixed point, by its bare name.
+// calls a function or method of the package's test files that does, followed to a fixed point, by its bare name.
 func testsReaching(directory string, matches func(ast.Node) bool) ([]string, error) {
 	entries, readError := os.ReadDir(directory)
 	if readError != nil {
@@ -572,11 +572,14 @@ func testsReaching(directory string, matches func(ast.Node) bool) ([]string, err
 		}
 		for _, declaration := range parsed.Decls {
 			function, isFunction := declaration.(*ast.FuncDecl)
-			if !isFunction || function.Recv != nil || function.Body == nil {
+			if !isFunction || function.Body == nil {
 				continue
 			}
+			// A method is keyed by its bare name, as a call reaches it through a selector (calleeName), so a method
+			// helper of the test files that starts goroutines marks every test that calls a method of that name, which
+			// fails toward keeping more.
 			caller := function.Name.Name
-			if strings.HasPrefix(caller, "Test") && caller != "TestMain" {
+			if function.Recv == nil && strings.HasPrefix(caller, "Test") && caller != "TestMain" {
 				tests = append(tests, caller)
 			}
 			ast.Inspect(function.Body, func(node ast.Node) bool {
@@ -806,7 +809,7 @@ func TestConcurrencySitesAndBodyConcurrentTestsAreReadFromTheCode(test *testing.
 	if bodyError != nil {
 		test.Fatal(bodyError)
 	}
-	if want := []string{"TestDirect", "TestThroughHelpers"}; !slices.Equal(byBody, want) {
+	if want := []string{"TestDirect", "TestThroughHelpers", "TestThroughAMethod"}; !slices.Equal(byBody, want) {
 		test.Errorf("the fixture's tests that start goroutines themselves read %v, want %v", byBody, want)
 	}
 }
@@ -853,6 +856,7 @@ func TestANarrowedRaceRunIsRefusedForEachWayItFailsItsPackage(test *testing.T) {
 			concurrent: []raceKeptTest{
 				{test: "TestDirect", reason: "starts a goroutine"},
 				{test: "TestThroughHelpers", reason: "starts one through helpers"},
+				{test: "TestThroughAMethod", reason: "starts one through a method of the test files"},
 			},
 			sites: []raceSite{
 				{site: "sites.go:fanOut#1", claims: []raceClaim{{test: "TestFansOut", width: 2},
