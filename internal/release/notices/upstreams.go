@@ -86,6 +86,16 @@ var Upstreams = []Upstream{
 		Reach:   Compiled, LicenseFile: "prettier.txt",
 	},
 	{
+		Name: "Prettier's format test fixtures", Url: "https://github.com/prettier/prettier", License: "MIT",
+		Carries: "Prettier's own CSS, SCSS and YAML format fixtures, vendored in internal/format/css/testdata/prettier and internal/format/yaml/testdata/prettier_tests, which the formatter's tests read.",
+		Reach:   RepositoryOnly, LicenseFile: "prettier.txt",
+	},
+	{
+		Name: "yaml-test-suite", Url: "https://github.com/yaml/yaml-test-suite", License: "MIT",
+		Carries: "The YAML test suite's cases, vendored in internal/format/yaml/testdata/yaml_test_suite, which the YAML parser's and printer's tests read.",
+		Reach:   RepositoryOnly, LicenseFile: "yaml-test-suite.txt",
+	},
+	{
 		Name: "yaml", Url: "https://github.com/eemeli/yaml", License: "ISC", Version: "2",
 		Carries: "The YAML parser in internal/format/yaml, ported.",
 		Reach:   Compiled, LicenseFile: "yaml.txt",

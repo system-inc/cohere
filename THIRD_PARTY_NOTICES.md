@@ -4174,6 +4174,87 @@ Used by tests and tools, or kept for them. None of these ship in any package.
    limitations under the License.
 ```
 
+### Prettier's format test fixtures
+
+- Source: https://github.com/prettier/prettier
+- License: `MIT`
+- In cohere: Prettier's own CSS, SCSS and YAML format fixtures, vendored in internal/format/css/testdata/prettier and internal/format/yaml/testdata/prettier_tests, which the formatter's tests read.
+
+```text
+Copyright © James Long and contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+```
+
+### yaml-test-suite
+
+- Source: https://github.com/yaml/yaml-test-suite
+- License: `MIT`
+- In cohere: The YAML test suite's cases, vendored in internal/format/yaml/testdata/yaml_test_suite, which the YAML parser's and printer's tests read.
+
+```text
+The cases in this directory are the yaml-test-suite's, recorded from yaml-test-suite 0.1.0, fisker
+Cheung's JavaScript packaging (https://github.com/fisker/yaml-test-suite) of the YAML test suite data by
+Ingy döt Net and contributors (https://github.com/yaml/yaml-test-suite). Both are MIT licensed; their
+notices follow.
+
+-------------------------------------------------------------------------------
+yaml-test-suite (the npm package), https://github.com/fisker/yaml-test-suite
+-------------------------------------------------------------------------------
+
+MIT License
+
+Copyright (c) fisker Cheung <lionkay@gmail.com> (https://www.fiskercheung.com/)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+-------------------------------------------------------------------------------
+yaml-test-suite (the data), https://github.com/yaml/yaml-test-suite
+-------------------------------------------------------------------------------
+
+MIT License
+
+Copyright (c) 2016-2020 Ingy döt Net
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
 ### staticcheck's check fixtures
 
 - Source: https://pkg.go.dev/honnef.co/go/tools@v0.8.1
