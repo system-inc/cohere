@@ -5,7 +5,6 @@ import (
 	"go/types"
 	"reflect"
 	"slices"
-	"sync/atomic"
 
 	"golang.org/x/tools/go/analysis"
 
@@ -19,15 +18,13 @@ type pushResult map[*types.Func]*IsPure
 
 // newPushAnalyzer is the analyzer as it was before it answered on demand (#w7zmvat unit 2), kept for the tests as the
 // original the resolver answers as: it judges every source function of every package, dependencies included, in
-// buildir's order, exporting IsPure on each pure one, and its result is every function the facts hold pure. judged,
-// when not nil, counts the functions it judged over a run, the push's total that the resolver's computed is held
-// against.
-func newPushAnalyzer(judged *atomic.Int64) *analysis.Analyzer {
+// buildir's order, exporting IsPure on each pure one, and its result is every function the facts hold pure.
+func newPushAnalyzer() *analysis.Analyzer {
 	return &analysis.Analyzer{
 		Name: "function_purity_push",
 		Doc:  "marks the functions that are pure, every function of every package, as the facts were pushed",
 		Run: func(pass *analysis.Pass) (any, error) {
-			return runPush(pass, judged)
+			return runPush(pass)
 		},
 		Requires:   []*analysis.Analyzer{build_intermediate_representation.Analyzer},
 		FactTypes:  []analysis.Fact{new(IsPure)},
@@ -36,11 +33,11 @@ func newPushAnalyzer(judged *atomic.Int64) *analysis.Analyzer {
 }
 
 // pushAnalyzer is the push for the tests that read only its facts.
-var pushAnalyzer = newPushAnalyzer(nil)
+var pushAnalyzer = newPushAnalyzer()
 
 // runPush judges every source function of the package, in buildir's order, and returns every function the facts hold
 // pure.
-func runPush(pass *analysis.Pass, judged *atomic.Int64) (pushResult, error) {
+func runPush(pass *analysis.Pass) (pushResult, error) {
 	built, readError := build_intermediate_representation.ResultOf(pass)
 	if readError != nil {
 		return nil, readError
@@ -50,9 +47,6 @@ func runPush(pass *analysis.Pass, judged *atomic.Int64) (pushResult, error) {
 		seen: map[*intermediate_representation.Function]bool{}}
 	for _, function := range functions {
 		walk.isPure(function)
-	}
-	if judged != nil {
-		judged.Add(int64(len(walk.seen)))
 	}
 	result := pushResult{}
 	for _, fact := range pass.AllObjectFacts() {

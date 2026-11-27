@@ -7,7 +7,6 @@ import (
 	"os"
 	"runtime"
 	"slices"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -15,18 +14,6 @@ import (
 
 	release "github.com/system-inc/cohere/internal/release/packaging"
 )
-
-// methodSetNamesCorpusVariable names a directory whose packages, `./...` there and every package they import, the
-// differential compares in place of std. The Mac compares std; a box compares cohere's and adamic's closures, which
-// never load on the Mac (#5xzb4q2):
-//
-//	COHERE_METHOD_SET_NAMES_CORPUS=<tree> go run ./command/cohere-dev test ./internal/go_language/check/ \
-//	    -run 'TestMethodSetNamesMatchNewMethodSet$' -count=1 -v
-const methodSetNamesCorpusVariable = "COHERE_METHOD_SET_NAMES_CORPUS"
-
-// methodSetNamesCorpusMinimumVariable names the fewest sets a corpus must give, a whole number of at least one, one
-// when it is unset, so a corpus whose `./...` matches nothing fails rather than passing on no comparison (#jy0v2ef).
-const methodSetNamesCorpusMinimumVariable = "COHERE_METHOD_SET_NAMES_CORPUS_MINIMUM"
 
 // methodSetNamesStandardMinimum is fewer sets than std's type names give on any platform the differential loads,
 // values and pointers, so it cannot pass on a load that found little: go1.27's std gives 7,919 sets of 4,126 type
@@ -37,10 +24,10 @@ const methodSetNamesStandardMinimum = 6000
 // methodSetNamesReported is how many differing sets the differential names before it stops listing them.
 const methodSetNamesReported = 20
 
-// TestMethodSetNamesMatchNewMethodSet holds the namer to NewMethodSet on every type name of std's packages, or of the
-// closure methodSetNamesCorpusVariable names: the set of each, and of a pointer to each that is not an interface, both
-// as sorted names, since the namer's order is its map's and the method index reads none, while NewMethodSet's is by
-// unique name. A name twice, two packages' unexported methods of one spelling, is twice in both.
+// TestMethodSetNamesMatchNewMethodSet holds the namer to NewMethodSet on every type name of std's packages: the set of
+// each, and of a pointer to each that is not an interface, both as sorted names, since the namer's order is its map's
+// and the method index reads none, while NewMethodSet's is by unique name. A name twice, two packages' unexported
+// methods of one spelling, is twice in both.
 //
 // std is compared for the host and for every platform a release ships besides the host's (release.Targets), each with
 // cgo off as a release builds it, so the types only one platform declares, Windows' syscall and
@@ -52,13 +39,9 @@ const methodSetNamesReported = 20
 // the host's load alone; the package ran in 34.8 s, against 32.4 s without the five.
 func TestMethodSetNamesMatchNewMethodSet(test *testing.T) {
 	test.Parallel()
-	if corpus := os.Getenv(methodSetNamesCorpusVariable); corpus != "" {
-		methodSetNamesCompare(test, methodSetNamesLoad(test, corpus, nil, "./..."), methodSetNamesCorpusMinimum(test))
-		return
-	}
 	test.Run("host", func(test *testing.T) {
 		test.Parallel()
-		loaded := methodSetNamesLoad(test, "", nil, "std")
+		loaded := methodSetNamesLoad(test, nil, "std")
 		methodSetNamesHoldPlatform(test, loaded, runtime.GOOS, runtime.GOARCH)
 		methodSetNamesCompare(test, loaded, methodSetNamesStandardMinimum)
 	})
@@ -74,7 +57,7 @@ func TestMethodSetNamesMatchNewMethodSet(test *testing.T) {
 			test.Run(target.GoOperatingSystem+"_"+target.GoArchitecture, func(test *testing.T) {
 				environment := append(os.Environ(), "GOOS="+target.GoOperatingSystem,
 					"GOARCH="+target.GoArchitecture, "CGO_ENABLED=0")
-				loaded := methodSetNamesLoad(test, "", environment, "std")
+				loaded := methodSetNamesLoad(test, environment, "std")
 				methodSetNamesHoldPlatform(test, loaded, target.GoOperatingSystem, target.GoArchitecture)
 				methodSetNamesCompare(test, loaded, methodSetNamesStandardMinimum)
 			})
@@ -152,29 +135,13 @@ func methodSetNamesCompare(test *testing.T, loaded []*types.Package, minimum int
 	}
 }
 
-// methodSetNamesCorpusMinimum is the fewest sets a corpus must give, methodSetNamesCorpusMinimumVariable's whole
-// number, or one when it is unset.
-func methodSetNamesCorpusMinimum(test *testing.T) int {
-	test.Helper()
-	spelled := os.Getenv(methodSetNamesCorpusMinimumVariable)
-	if spelled == "" {
-		return 1
-	}
-	minimum, parseError := strconv.Atoi(spelled)
-	if parseError != nil || minimum < 1 {
-		test.Fatalf("%s is %q, want a whole number of at least 1", methodSetNamesCorpusMinimumVariable, spelled)
-	}
-	return minimum
-}
-
-// methodSetNamesLoad are the types of the packages patterns name from directory, and of every package they import,
-// each once, for the platform environment names (the host's when it is nil). Each is type-checked from source,
+// methodSetNamesLoad are the types of the packages patterns name, and of every package they import, each once, for
+// the platform environment names (the host's when it is nil). Each is type-checked from source,
 // function bodies included, since NeedDeps without NeedExportFile reads no export data, so every package-scope type
 // name is there, unexported ones too, and every type name's method set reads in full.
-func methodSetNamesLoad(test testing.TB, directory string, environment []string, patterns ...string) []*types.Package {
+func methodSetNamesLoad(test testing.TB, environment []string, patterns ...string) []*types.Package {
 	test.Helper()
 	configuration := &packages.Config{
-		Dir:  directory,
 		Env:  environment,
 		Mode: packages.NeedName | packages.NeedTypes | packages.NeedImports | packages.NeedDeps,
 	}
@@ -201,7 +168,7 @@ func methodSetNamesLoad(test testing.TB, directory string, environment []string,
 // not an interface, both by NewMethodSet and by the namer, one namer a package as indexPackage makes it, so the two
 // report their allocations side by side (#5xzb4q2).
 func BenchmarkMethodSetNames(benchmark *testing.B) {
-	loaded := methodSetNamesLoad(benchmark, "", nil, "net/http")
+	loaded := methodSetNamesLoad(benchmark, nil, "net/http")
 	var sets []types.Type
 	for _, each := range loaded {
 		if each.Path() != "net/http" {

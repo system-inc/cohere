@@ -408,7 +408,9 @@ func TestPropertyLookupUsesTheLongestRoot(test *testing.T) {
 //
 // Asserted against a stylesheet that declares its own utility, so the compiled answer cannot be
 // coming from a table: `synthetic-static` sets `display` and `opacity`, and no generated table in
-// this repository contains the name.
+// this repository contains the name. The repository half, a functional `@utility` answered by
+// compiling its block and not compiled on a system that lacks it, is
+// TestRepositoryUtilitiesAreCompiledOnThePublicTheme.
 func TestRepositoryUtilitiesAreCompiledRatherThanLookedUp(test *testing.T) {
 	test.Parallel()
 	packageRoot := unknownFixturePackageRoot(test)
@@ -420,52 +422,6 @@ func TestRepositoryUtilitiesAreCompiledRatherThanLookedUp(test *testing.T) {
 	result := runConflictFixture(test, "Component.tsx",
 		`const element = <div className="flex block" />;`)
 	rule_testing.ExpectFindings(test, result, "conflictingClasses", "conflictingClasses")
-
-	// And the repository half, against a class the corpus repository declares and no framework
-	// contains. `background--0` is a functional `@utility` block in ahra's own stylesheet, compiled
-	// here rather than looked up.
-	ahra := loadedDesignSystemResult(unknownFixtureLiveSystem(test), "")
-	facts, canResolve := resolveClassFactsIn("background--0", ahra)
-	if !canResolve {
-		test.Fatal("background--0 did not resolve, so the repository half is not being compiled")
-	}
-	if len(facts.Properties) != 1 || facts.Properties[0] != "background-color" {
-		test.Errorf("background--0 resolved to %v, want [background-color] from compiling its @utility "+
-			"block", facts.Properties)
-	}
-
-	// The population, so this is not one lucky class. Every corpus class the repository half answers
-	// is one whose properties come from compiling a block rather than from any table.
-	compiled := 0
-	for _, className := range []string{
-		"background--0", "background--1", "background--2", "background--3",
-		"content--0", "content--1", "content--placeholder", "content--positive",
-		"border--0", "border--focus", "hover:background--1", "dark:content--2",
-	} {
-		if _, wasCompiled := repositoryClassFacts(className, "", ahra); wasCompiled {
-			compiled++
-		}
-	}
-	if compiled < 10 {
-		test.Errorf("only %d of 12 repository utilities were answered by compiling their @utility "+
-			"block; the repository half is not carrying the population it should", compiled)
-	}
-
-	// The complement, and it asserts the source rather than the answer. `background--0` still
-	// resolves against a design system that does not declare it, because `RootDeclaredProperties`
-	// carries the root `background-`, the same generated-table leak
-	// TestRepositoryNamesInTheFrameworkTablesAreStillVouchedFor pins for `KnownStatics`. What must
-	// differ is which half answered: the repository's compiled block on ahra, the framework table
-	// elsewhere.
-	independent := loadedDesignSystemResult(independentLiveSystem(test), "")
-	if _, compiledHere := repositoryClassFacts("background--0", "", ahra); !compiledHere {
-		test.Error("background--0 was not answered by compiling ahra's own @utility block, so the " +
-			"repository half is not being consulted")
-	}
-	if _, compiledElsewhere := repositoryClassFacts("background--0", "", independent); compiledElsewhere {
-		test.Error("background--0 was answered by compiling a block on a design system that declares " +
-			"none, so the repository half is not reading the repository in front of the rule")
-	}
 }
 
 // TestStaticRepositoryUtilitiesStillReadFromTheFrameworkTables pins a gap this task did not close.

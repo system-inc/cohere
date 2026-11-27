@@ -34,8 +34,8 @@ import (
  * Upstream's syntax checks (check-syntax-errors.js) are ported for one case, an update of something
  * that cannot be assigned (`1++`, Converter.checkSyntaxError), which the tsc corpus found the formatter
  * printing where Prettier refuses. The rest are not. They reject programs TypeScript parsed but ESTree
- * cannot represent, the oracle fails on those files, and a file the oracle fails on leaves the
- * differential's denominator. Parse errors themselves are refused before conversion.
+ * cannot represent, which Prettier refuses to format at all, so there is no output of its to match.
+ * Parse errors themselves are refused before conversion.
  */
 
 // ConvertForBabel is Convert for a file Prettier would parse with babel (see ParseJavaScript). The

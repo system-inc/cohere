@@ -9,7 +9,6 @@ import (
 
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
-	"github.com/system-inc/cohere/internal/testing/corpus"
 )
 
 // noDeprecatedFinding is one expected report: which message, on what name, with what reason.
@@ -44,14 +43,11 @@ type noDeprecatedCase struct {
 	// rather than on the rule. Skipped with its reason named, never silently dropped.
 	environmentDependent bool
 
-	// withInstalledTypes links a real node_modules beside the fixture so an import resolves.
-	//
-	// Some cases take their deprecation from a @types package rather than from their own text, and
-	// without the link they report nothing, which is indistinguishable from the rule declining them.
-	// The link is enough for a named import whose types the fixture reaches directly; it admits no
-	// ambient declarations, since the harness's tsconfig says `"types": []`. A case that needs those
-	// pins them in its own program instead, withNodeTypes or withReactTypes.
-	withInstalledTypes bool
+	// withReactModuleTypes adds noDeprecatedReactModuleTypes beside the subject, so `import * as
+	// React from 'react'` resolves to the pinned `React.FC` the case's component is typed with. Without
+	// it the import resolves to nothing, the props read as any, and the case reports nothing, which is
+	// indistinguishable from the rule declining it.
+	withReactModuleTypes bool
 
 	// withReactTypes adds noDeprecatedReactTypes beside the subject, the @types/react declarations
 	// an intrinsic element's attributes come from, pinned.
@@ -188,6 +184,26 @@ const noDeprecatedReactTypes = "" +
 	"  }\n" +
 	"}\n"
 
+// noDeprecatedReactModuleTypes is the part of @types/react that upstream's invalid:145 reads, pinned.
+//
+// The case imports React as a module and types a component `React.FC<Props>`, so its deprecated
+// prop is found through the call signature of an interface the module declares, the way the real
+// package delivers it. A declaration file is a script even under `"moduleDetection": "force"`, so the
+// module and the JSX namespace here are both ambient, as @types/react's are.
+const noDeprecatedReactModuleTypes = "" +
+	"declare module 'react' {\n" +
+	"  interface FunctionComponent<P = {}> {\n" +
+	"    (props: P): JSX.Element | null;\n" +
+	"  }\n" +
+	"  type FC<P = {}> = FunctionComponent<P>;\n" +
+	"}\n" +
+	"declare namespace JSX {\n" +
+	"  interface Element {}\n" +
+	"  interface IntrinsicElements {\n" +
+	"    div: {};\n" +
+	"  }\n" +
+	"}\n"
+
 // runNoDeprecatedCases runs a block of rows.
 func runNoDeprecatedCases(test *testing.T, cases []noDeprecatedCase) {
 	test.Helper()
@@ -213,6 +229,9 @@ func runNoDeprecatedCases(test *testing.T, cases []noDeprecatedCase) {
 			if testCase.withReactTypes {
 				files["/repository/types/react.d.ts"] = noDeprecatedReactTypes
 			}
+			if testCase.withReactModuleTypes {
+				files["/repository/types/react-module.d.ts"] = noDeprecatedReactModuleTypes
+			}
 
 			var decoded rule.Given[NoDeprecatedOptions]
 			if testCase.options != "" {
@@ -224,9 +243,6 @@ func runNoDeprecatedCases(test *testing.T, cases []noDeprecatedCase) {
 			}
 
 			var setups []func(directory string)
-			if testCase.withInstalledTypes {
-				setups = append(setups, linkInstalledTypesForNoDeprecated(test))
-			}
 			if testCase.asScript {
 				setups = append(setups, writeNoDeprecatedScriptConfiguration(test))
 			}
@@ -264,31 +280,6 @@ func runNoDeprecatedCases(test *testing.T, cases []noDeprecatedCase) {
 				}
 			}
 		})
-	}
-}
-
-// linkInstalledTypesForNoDeprecated links a real node_modules into the fixture directory.
-//
-// The three cases that need it take their deprecation from `@types/react` or `@types/node` rather
-// than from their own text. Without the link the types do not resolve, the rule finds nothing, and
-// the case reports zero findings, which is indistinguishable from the rule declining them. That is
-// the failure mode this whole file is arranged against, so the link is what makes those three
-// assertions mean anything.
-//
-// The packages are ahra's installed ones, so the case skips where the ahra corpus is not set, and the gate
-// names it as not covered (#sycrdr6). Where it is set, a missing @types/react fails: the corpus is there and
-// the case would otherwise read nothing.
-func linkInstalledTypesForNoDeprecated(test *testing.T) func(string) {
-	test.Helper()
-	return func(directory string) {
-		source := corpus.Ahra.Path(test, "node_modules")
-		if _, statError := os.Stat(filepath.Join(source, "@types", "react")); statError != nil {
-			test.Fatalf("this case reads its deprecation from @types/react, which the ahra corpus at %s does "+
-				"not have installed: %v", source, statError)
-		}
-		if symlinkError := os.Symlink(source, filepath.Join(directory, "node_modules")); symlinkError != nil {
-			test.Fatalf("linking node_modules into the fixture: %v", symlinkError)
-		}
 	}
 }
 

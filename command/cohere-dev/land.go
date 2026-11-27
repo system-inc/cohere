@@ -564,13 +564,7 @@ func gate(worktree string, commit string, task string) (int, string) {
 		if checked {
 			ran = append(ran, "the rule CPU budget")
 		}
-		// The same environment cohere-dev test gives the module's tests, corpora included (corpora.go).
-		testing, uncovered, testEnvironmentError := testEnvironment(gateEnvironment(step("the test run")))
-		if testEnvironmentError != nil {
-			fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", testEnvironmentError)
-			return 2
-		}
-		defer printUncovered(streams.Errors, uncovered)
+		testing := gateEnvironment(step("the test run"))
 		// On a gate box, a house Mac (box_verdict.go, mac_box_gate.go), or as a land-gate job (land_gate_job.go),
 		// either one's no verdict refusing the landing, or on Kirk's Mac alone when the gate says off.
 		testCode, where := runModuleTests(worktree, commit, task, covered, testing)
@@ -595,6 +589,7 @@ func gate(worktree string, commit string, task string) (int, string) {
 		}
 		code, checked = checkCohere(
 			worktree,
+			gateCohereArguments,
 			func() []string { return gateEnvironment(step("building cohere")) },
 			func() []string { return gateEnvironment(step("cohere on the tree")) },
 		)
@@ -621,7 +616,7 @@ func testedNamed(covered project.Workspace) string {
 }
 
 // goVet runs go vet of patterns in the worktree, in environment, writing to the terminal, and returns its exit code:
-// the gate's first step, and one of the land job's checks (land_job_run.go).
+// the gate's first step, and one of the integrate job's checks (integrate_job_run.go).
 func goVet(worktree string, patterns []string, environment []string) int {
 	vet := exec.Command("go", append([]string{"vet"}, patterns...)...)
 	vet.Dir, vet.Env = worktree, environment
