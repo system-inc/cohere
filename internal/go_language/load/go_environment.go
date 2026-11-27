@@ -112,13 +112,7 @@ func ReadGoEnvironmentTelling(
 	if contextError != nil {
 		return nil, contextError
 	}
-	reported.goFlags = append(reported.goFlags, "-pgo=off")
-	// A user's -mod=mod lets go list write a requirement go.mod lacks, and sums go.sum lacks, so a check would edit
-	// tracked files without a word (#ycf4240). go keeps the last -mod, so the load's own go commands run at
-	// -mod=readonly, go's default, under which go reports what is missing as the load's diagnostics and writes nothing.
-	if goFlagsRewriteModules(strings.Join(reported.goFlags, " ")) {
-		reported.goFlags = append(reported.goFlags, "-mod=readonly")
-	}
+	reported.goFlags = withModulesReadOnly(append(reported.goFlags, "-pgo=off"))
 	fullEnvironment := withGoFlags(given, reported.goFlags)
 	return &GoEnvironment{
 		workspace:       workspace,
@@ -202,9 +196,21 @@ func runGoEnvironment(
 	return answer, nil
 }
 
+// withModulesReadOnly is goFlags, the flags a go command of a load runs with, with -mod=readonly last when their last
+// -mod is mod. A user's -mod=mod lets go list write a requirement go.mod lacks, and sums go.sum lacks, so a check
+// would edit tracked files without a word (#ycf4240). go keeps the last -mod, so the command runs at -mod=readonly,
+// go's default, under which go reports what is missing as the load's diagnostics and writes nothing. Every place a
+// load makes a go command's flags, or predicts them, makes them through here, so none of them can miss it.
+func withModulesReadOnly(goFlags []string) []string {
+	if goFlagsRewriteModules(strings.Join(goFlags, " ")) {
+		return append(goFlags, "-mod=readonly")
+	}
+	return goFlags
+}
+
 // goFlagsRewriteModules reports whether go commands under goFlags, `GOFLAGS` as go env reports it, run with -mod=mod,
 // under which go list may rewrite go.mod and go.sum, so the load's own go commands run at -mod=readonly instead
-// (ReadGoEnvironmentTelling). go reads `GOFLAGS` as fields, each `-name=value`, one dash or two, and the last -mod is
+// (withModulesReadOnly). go reads `GOFLAGS` as fields, each `-name=value`, one dash or two, and the last -mod is
 // the one it keeps.
 func goFlagsRewriteModules(goFlags string) bool {
 	mode := ""

@@ -146,7 +146,7 @@ func predictedContextKey(host *GoEnvironment, environment []string) ([sha256.Siz
 	if value := variables["CGO_ENABLED"]; value == "0" || value == "1" {
 		cgoEnabled = value
 	}
-	return contextKey(given, append(goFlags, "-pgo=off"), cgoEnabled, host.answer)
+	return contextKey(given, withModulesReadOnly(append(goFlags, "-pgo=off")), cgoEnabled, host.answer)
 }
 
 // givenVariables is the environment a go command under environment is given, the caller's entries over the process's

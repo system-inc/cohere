@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/go_language/cgo_testing"
 )
 
 // missingRequirementFiles is a module root that imports a module its go.mod replaces with a directory beside it but
@@ -24,6 +26,18 @@ var missingSumFiles = map[string]string{
 	"go.mod": "module example.com/a\n\ngo 1.21\n\nrequire example.com/dep v1.0.0\n",
 	"go.sum": "",
 	"a.go":   "package a\n\nimport \"example.com/dep\"\n\n// Value is dep's.\nconst Value = dep.Value\n",
+}
+
+// missingSumCgoFiles is missingSumFiles' module with its package translated by the cgo tool, a cgo file of its own
+// that imports the proxy's dep, so a load runs go list -compiled there (translatedEnvironment), which under -mod=mod
+// writes the sums too.
+var missingSumCgoFiles = map[string]string{
+	"go.mod": "module example.com/a\n\ngo 1.21\n\nrequire example.com/dep v1.0.0\n",
+	"go.sum": "",
+	"a.go": "package a\n\nimport \"example.com/dep\"\n\n" +
+		"// int twice(int value) { return value * 2; }\nimport \"C\"\n\n" +
+		"// Twice is value doubled, by C, and dep's added.\n" +
+		"func Twice(value int) int { return int(C.twice(C.int(value))) + dep.Value }\n",
 }
 
 // readModuleFiles is the bytes of a module root's go.mod and go.sum, a missing go.sum read as none.
@@ -56,19 +70,31 @@ func listedAsTheUserWould(test *testing.T, root string, environment []string) []
 // A load of a module root whose `GOFLAGS` say -mod=mod leaves its go.mod and go.sum byte for byte as they were
 // (#ycf4240): under -mod=mod go list writes a requirement the go.mod lacks, and the sums the go.sum lacks, so a
 // `--no-fix` check would edit tracked files. The load runs its go commands at -mod=readonly instead, so go reports the
-// missing requirement or sums as the load's diagnostics rather than writing them. Each fixture rewrites its file when
-// go list runs under the user's flags alone, so the fixtures can fail.
+// missing requirement or sums as the load's diagnostics rather than writing them, the cgo tool's go list -compiled
+// included. Each fixture rewrites its file when go list runs under the user's flags alone, so the fixtures can fail.
 func TestALoadUnderModModLeavesAModuleRootsFilesAsTheyWere(test *testing.T) {
 	test.Parallel()
-	for name, files := range map[string]map[string]string{
-		"a requirement go.mod lacks": missingRequirementFiles,
-		"sums go.sum lacks":          missingSumFiles,
+	for _, each := range []struct {
+		name  string
+		files map[string]string
+		cgo   bool
+	}{
+		{name: "a requirement go.mod lacks", files: missingRequirementFiles},
+		{name: "sums go.sum lacks", files: missingSumFiles},
+		{name: "sums go.sum lacks, read by the cgo tool's translation", files: missingSumCgoFiles, cgo: true},
 	} {
-		test.Run(name, func(test *testing.T) {
+		files := each.files
+		test.Run(each.name, func(test *testing.T) {
 			test.Parallel()
+			if each.cgo {
+				cgo_testing.RequireTranslation(test)
+			}
 			workspace, environment := writeStaleWorkspace(test, files)
 			// The fixture's own -modcacherw kept, so the test's cleanup can remove the module cache go writes.
 			environment = append(environment, "GOWORK=off", "GOFLAGS=-modcacherw -mod=mod")
+			if each.cgo {
+				environment = append(environment, "CGO_ENABLED=1")
+			}
 			before := readModuleFiles(test, workspace)
 
 			// Under the user's flags alone, go list rewrites the module's files, so the fixture is one go writes.
