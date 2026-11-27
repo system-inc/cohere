@@ -18,9 +18,9 @@ import (
 //
 // Member ranges are therefore RE-derived from the widened ranges rather than inherited from
 // `ReactiveScopes.MemberRanges()`, which still reports the pre-alignment hull. A consumer reading
-// member ranges after this pass must take them from here. `TestAlignReDerivesMemberRanges` measures
-// the two tables against each other and asserts they differ, because a re-derivation that changed
-// nothing would mean this pass had not widened anything.
+// member ranges after this pass must take them from here. Measured over real code, the two tables
+// differ, as they must: a re-derivation that changed nothing would mean this pass had not widened
+// anything.
 //
 // The zero value is an empty result and is ready to read.
 type AlignedScopes struct {

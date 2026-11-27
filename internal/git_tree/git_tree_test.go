@@ -15,7 +15,8 @@ import (
 	"github.com/system-inc/cohere/internal/git_tree"
 )
 
-// Every answer here is checked against git itself, in a repository of each object format. Each mutant
+// Every answer here is checked against git's own, recorded once in a repository of each object format
+// under testdata, whose README.md holds the script that recorded them. No test runs git. Each mutant
 // below must make a test fail:
 //
 //	the executable bit read as `&0o111`: TestModeOfIsWhatGitAddRecords
@@ -50,49 +51,51 @@ func permissionFile(permissions os.FileMode) string {
 // between it and where it would sort as a directory.
 const gitlinkPath = "sub"
 
-// fixture is a repository of format holding every shape a tree's arithmetic must get right: an empty
-// file, a 1 MiB file, a name with a tab and a newline, links (one dangling), siblings that sort on
-// either side of a directory by git's rule, a gitlink with no checkout beside sub-x/ and sub.y, a
-// checked-out submodule, and a file at each of permissionModes. It is added to the index, not
-// committed.
-func fixture(test *testing.T, format git_tree.ObjectFormat) *testRepository {
+// gitmodules is the .gitmodules `git submodule add` wrote for the fixture's submodule, its url then set
+// to a relative one, so the tree git's answers were recorded over names no temporary path.
+const gitmodules = "[submodule \"module\"]\n\tpath = module\n\turl = ./module-source\n"
+
+// fixture lays every shape a tree's arithmetic must get right: an empty file, a 1 MiB file, a name
+// with a tab and a newline, links (one dangling), siblings that sort on either side of a directory by
+// git's rule, a gitlink with no checkout beside sub-x/ and sub.y, a checked-out submodule, and a file at
+// each of permissionModes. It is byte for byte the tree git's answers under testdata/sha1 and
+// testdata/sha256 were recorded over, whose index (stage) holds all of it, the two gitlinks included.
+func fixture(test *testing.T) *workTree {
 	test.Helper()
-	repository := newTestRepository(test, format)
-	repository.write("empty", "", 0o644)
-	repository.write("hello", "hello\n", 0o644)
-	repository.write("large", strings.Repeat("0123456789abcdef", 1<<16), 0o644)
-	repository.write("tab\tand\nnewline", "an odd name\n", 0o644)
-	repository.link("link", "hello")
-	repository.link("dangling", "nowhere/at/all")
+	onDisk := newWorkTree(test)
+	onDisk.write("empty", "", 0o644)
+	onDisk.write("hello", "hello\n", 0o644)
+	onDisk.write("large", strings.Repeat("0123456789abcdef", 1<<16), 0o644)
+	onDisk.write("tab\tand\nnewline", "an odd name\n", 0o644)
+	onDisk.link("link", "hello")
+	onDisk.link("dangling", "nowhere/at/all")
 	// In a tree a directory sorts as if it ended in "/": after a-b and a.b, before a0 and a_b. Sorted
 	// by its bare name it would come first.
-	repository.write("a/inner", "inside a\n", 0o644)
-	repository.write("a/deeper/most", "deepest\n", 0o644)
+	onDisk.write("a/inner", "inside a\n", 0o644)
+	onDisk.write("a/deeper/most", "deepest\n", 0o644)
 	for _, sibling := range []string{"a-b", "a.b", "a0", "a_b"} {
-		repository.write(sibling, sibling+"\n", 0o644)
+		onDisk.write(sibling, sibling+"\n", 0o644)
 	}
 	// A gitlink sorts as a file: before sub-x/ and sub.y. As a directory it would come after both.
-	repository.write("sub-x/file", "beside the gitlink\n", 0o644)
-	repository.write("sub.y", "beside the gitlink\n", 0o644)
+	onDisk.write("sub-x/file", "beside the gitlink\n", 0o644)
+	onDisk.write("sub.y", "beside the gitlink\n", 0o644)
 	for permissions := range permissionModes {
-		repository.write(permissionFile(permissions), "permission "+permissions.String()+"\n", permissions)
+		onDisk.write(permissionFile(permissions), "permission "+permissions.String()+"\n", permissions)
 	}
-	module := newTestRepository(test, format)
-	module.write("module.txt", "a submodule's file\n", 0o644)
-	module.commit("module")
-	repository.git("submodule", "add", "-q", module.directory, "module")
-	repository.git("add", "-A")
+	// The checked-out submodule as `git submodule add` left it: its file, and the .git file pointing
+	// into its parent's .git. The index records it as a gitlink, so none of it is hashed.
+	onDisk.write(".gitmodules", gitmodules, 0o644)
+	onDisk.write("module/module.txt", "a submodule's file\n", 0o644)
+	onDisk.write("module/.git", "gitdir: ../.git/modules/module\n", 0o644)
 	// The gitlink with no checkout sits on disk as git leaves an uninitialized submodule: an empty
-	// directory.
-	if mkdirError := os.Mkdir(repository.path(gitlinkPath), 0o755); mkdirError != nil {
+	// directory. Its pin in the index is a commit of fives no repository holds.
+	if mkdirError := os.Mkdir(onDisk.path(gitlinkPath), 0o755); mkdirError != nil {
 		test.Fatal(mkdirError)
 	}
-	pin := strings.Repeat("5", len(module.line("rev-parse", "HEAD")))
-	repository.git("update-index", "--add", "--cacheinfo", "160000,"+pin+","+gitlinkPath)
-	return repository
+	return onDisk
 }
 
-// formats runs check against a repository of each object format, in parallel.
+// formats runs check against git's answers in each object format, in parallel.
 func formats(test *testing.T, check func(test *testing.T, format git_tree.ObjectFormat)) {
 	test.Helper()
 	for _, format := range []git_tree.ObjectFormat{git_tree.Sha1, git_tree.Sha256} {
@@ -103,25 +106,25 @@ func formats(test *testing.T, check func(test *testing.T, format git_tree.Object
 	}
 }
 
-// stage is the repository's index, as ParseStageListing reads git's own listing of it.
-func stage(test *testing.T, repository *testRepository) []git_tree.Entry {
+// stage is the fixture's index in format, as ParseStageListing reads git's own listing of it.
+func stage(test *testing.T, format git_tree.ObjectFormat) []git_tree.Entry {
 	test.Helper()
-	entries, parseError := git_tree.ParseStageListing(repository.git("ls-files", "--stage", "-z"))
+	entries, parseError := git_tree.ParseStageListing(recorded(test, string(format)+"/ls-files-stage.z"))
 	if parseError != nil {
 		test.Fatal(parseError)
 	}
 	return entries
 }
 
-// committed is the repository's `HEAD`, as ParseTreeListing reads git's own listing of it, with -t
-// when directories is set.
-func committed(test *testing.T, repository *testRepository, directories bool) []git_tree.Entry {
+// committed is the fixture's commit in format, as ParseTreeListing reads git's own listing of it, with
+// -t when directories is set.
+func committed(test *testing.T, format git_tree.ObjectFormat, directories bool) []git_tree.Entry {
 	test.Helper()
-	arguments := []string{"ls-tree", "-r", "-z", "--full-tree", "HEAD"}
+	answer := string(format) + "/ls-tree-r-z-full-tree-head"
 	if directories {
-		arguments = []string{"ls-tree", "-r", "-t", "-z", "--full-tree", "HEAD"}
+		answer = string(format) + "/ls-tree-r-t-z-full-tree-head"
 	}
-	entries, parseError := git_tree.ParseTreeListing(repository.git(arguments...))
+	entries, parseError := git_tree.ParseTreeListing(recorded(test, answer))
 	if parseError != nil {
 		test.Fatal(parseError)
 	}
@@ -132,14 +135,14 @@ func committed(test *testing.T, repository *testRepository, directories bool) []
 func TestModeOfIsWhatGitAddRecords(test *testing.T) {
 	test.Parallel()
 	formats(test, func(test *testing.T, format git_tree.ObjectFormat) {
-		repository := fixture(test, format)
-		recorded := map[string]git_tree.Mode{}
-		for _, entry := range stage(test, repository) {
-			recorded[entry.Path] = entry.Mode
+		onDisk := fixture(test)
+		modes := map[string]git_tree.Mode{}
+		for _, entry := range stage(test, format) {
+			modes[entry.Path] = entry.Mode
 			if entry.Mode == git_tree.ModeGitlink {
 				continue
 			}
-			information, lstatError := os.Lstat(repository.path(entry.Path))
+			information, lstatError := os.Lstat(onDisk.path(entry.Path))
 			if lstatError != nil {
 				test.Fatal(lstatError)
 			}
@@ -149,15 +152,15 @@ func TestModeOfIsWhatGitAddRecords(test *testing.T) {
 			}
 		}
 		for permissions, want := range permissionModes {
-			if recorded[permissionFile(permissions)] != want {
+			if modes[permissionFile(permissions)] != want {
 				test.Errorf("git recorded %s for a file at %04o, and the fixture expects %s",
-					recorded[permissionFile(permissions)], uint32(permissions), want)
+					modes[permissionFile(permissions)], uint32(permissions), want)
 			}
 		}
-		if recorded["link"] != git_tree.ModeSymbolicLink || recorded["dangling"] != git_tree.ModeSymbolicLink {
-			test.Errorf("the links were recorded as %s and %s", recorded["link"], recorded["dangling"])
+		if modes["link"] != git_tree.ModeSymbolicLink || modes["dangling"] != git_tree.ModeSymbolicLink {
+			test.Errorf("the links were recorded as %s and %s", modes["link"], modes["dangling"])
 		}
-		information, lstatError := os.Lstat(repository.path("a"))
+		information, lstatError := os.Lstat(onDisk.path("a"))
 		if lstatError != nil {
 			test.Fatal(lstatError)
 		}
@@ -167,17 +170,34 @@ func TestModeOfIsWhatGitAddRecords(test *testing.T) {
 	})
 }
 
+// hashedByGit is `git hash-object --no-filters`'s id in format for each of the fixture's files, by
+// path, from its recorded records of id, tab, path and a zero byte.
+func hashedByGit(test *testing.T, format git_tree.ObjectFormat) map[string]string {
+	test.Helper()
+	hashed := map[string]string{}
+	answer := recorded(test, string(format)+"/hash-object-no-filters.z")
+	for record := range strings.SplitSeq(strings.TrimSuffix(string(answer), "\x00"), "\x00") {
+		object, path, found := strings.Cut(record, "\t")
+		if !found {
+			test.Fatalf("the recorded hash-object record %q has no tab", record)
+		}
+		hashed[path] = object
+	}
+	return hashed
+}
+
 // HashFile is `git hash-object --no-filters` for every file, and for every link the blob the index
 // records, a dangling one included.
 func TestHashFileIsWhatGitHashObjectHashes(test *testing.T) {
 	test.Parallel()
 	formats(test, func(test *testing.T, format git_tree.ObjectFormat) {
-		repository := fixture(test, format)
-		for _, entry := range stage(test, repository) {
+		onDisk := fixture(test)
+		hashed := hashedByGit(test, format)
+		for _, entry := range stage(test, format) {
 			if entry.Mode == git_tree.ModeGitlink {
 				continue
 			}
-			mode, object, hashError := git_tree.HashFile(format, repository.path(entry.Path))
+			mode, object, hashError := git_tree.HashFile(format, onDisk.path(entry.Path))
 			if hashError != nil || mode != entry.Mode || object != entry.Object {
 				test.Errorf("%q: HashFile is %s %s (%v), and the index records %s %s",
 					entry.Path, mode, object, hashError, entry.Mode, entry.Object)
@@ -185,16 +205,21 @@ func TestHashFileIsWhatGitHashObjectHashes(test *testing.T) {
 			if entry.Mode == git_tree.ModeSymbolicLink {
 				continue
 			}
-			if hashed := repository.line("hash-object", "--no-filters", "--", entry.Path); hashed != object {
-				test.Errorf("%q: HashFile is %s, and git hash-object %s", entry.Path, object, hashed)
+			if hashed[entry.Path] != object {
+				test.Errorf("%q: HashFile is %s, and git hash-object %q", entry.Path, object, hashed[entry.Path])
 			}
 		}
 	})
 }
 
-// walk is the repository's work tree hashed file by file with HashFile, as a listing, beside the
+// walk is the tree on disk hashed file by file with HashFile in format, as a listing, beside the
 // gitlinks of entries: what `git add -A` would record, read without git.
-func walk(test *testing.T, repository *testRepository, entries []git_tree.Entry) []git_tree.Entry {
+func walk(
+	test *testing.T,
+	onDisk *workTree,
+	format git_tree.ObjectFormat,
+	entries []git_tree.Entry,
+) []git_tree.Entry {
 	test.Helper()
 	var walked []git_tree.Entry
 	gitlinks := map[string]bool{}
@@ -208,24 +233,24 @@ func walk(test *testing.T, repository *testRepository, entries []git_tree.Entry)
 		if walkError != nil {
 			return walkError
 		}
-		relative, relativeError := filepath.Rel(repository.directory, name)
+		relative, relativeError := filepath.Rel(onDisk.directory, name)
 		if relativeError != nil {
 			return relativeError
 		}
 		if walkEntry.IsDir() {
-			if filepath.ToSlash(relative) == ".git" || gitlinks[filepath.ToSlash(relative)] {
+			if gitlinks[filepath.ToSlash(relative)] {
 				return filepath.SkipDir
 			}
 			return nil
 		}
-		mode, object, hashError := git_tree.HashFile(repository.format, name)
+		mode, object, hashError := git_tree.HashFile(format, name)
 		if hashError != nil {
 			return hashError
 		}
 		walked = append(walked, git_tree.Entry{Mode: mode, Object: object, Path: filepath.ToSlash(relative)})
 		return nil
 	}
-	if walkError := filepath.WalkDir(repository.directory, visit); walkError != nil {
+	if walkError := filepath.WalkDir(onDisk.directory, visit); walkError != nil {
 		test.Fatal(walkError)
 	}
 	return walked
@@ -237,9 +262,9 @@ func walk(test *testing.T, repository *testRepository, entries []git_tree.Entry)
 func TestTreeIdIsWhatGitWriteTreeWrites(test *testing.T) {
 	test.Parallel()
 	formats(test, func(test *testing.T, format git_tree.ObjectFormat) {
-		repository := fixture(test, format)
-		written := repository.line("write-tree")
-		entries := stage(test, repository)
+		onDisk := fixture(test)
+		written := recordedLine(test, string(format)+"/write-tree")
+		entries := stage(test, format)
 		if tree, treeError := git_tree.TreeId(format, entries); treeError != nil || tree != written {
 			test.Errorf(
 				"the index's listing rebuilds tree %s (%v), and git write-tree wrote %s",
@@ -250,20 +275,19 @@ func TestTreeIdIsWhatGitWriteTreeWrites(test *testing.T) {
 		}
 		if tree, treeError := git_tree.TreeId(
 			format,
-			walk(test, repository, entries),
+			walk(test, onDisk, format, entries),
 		); treeError != nil || tree != written {
 			test.Errorf("the files on disk rebuild tree %s (%v), and git write-tree wrote %s", tree, treeError, written)
 		}
-		repository.git("commit", "-q", "-m", "fixture")
-		headTree := repository.line("rev-parse", "HEAD^{tree}")
+		headTree := recordedLine(test, string(format)+"/rev-parse-head-tree")
 		for _, directories := range []bool{false, true} {
-			tree, treeError := git_tree.TreeId(format, committed(test, repository, directories))
+			tree, treeError := git_tree.TreeId(format, committed(test, format, directories))
 			if treeError != nil || tree != headTree {
 				test.Errorf("ls-tree (-t: %t) rebuilds tree %s (%v), and `HEAD^{tree}` is %s",
 					directories, tree, treeError, headTree)
 			}
 		}
-		empty := repository.line("hash-object", "-t", "tree", "--stdin")
+		empty := recordedLine(test, string(format)+"/empty-tree")
 		if tree, treeError := git_tree.TreeId(format, nil); treeError != nil || tree != empty {
 			test.Errorf("no entries rebuild tree %s (%v), and git's empty tree is %s", tree, treeError, empty)
 		}
@@ -275,9 +299,8 @@ func TestTreeIdIsWhatGitWriteTreeWrites(test *testing.T) {
 func TestCommitHashesAsGitHashesIt(test *testing.T) {
 	test.Parallel()
 	formats(test, func(test *testing.T, format git_tree.ObjectFormat) {
-		repository := fixture(test, format)
-		head := repository.commit("fixture")
-		commit := repository.git("cat-file", "commit", "HEAD")
+		head := recordedLine(test, string(format)+"/rev-parse-head")
+		commit := recorded(test, string(format)+"/cat-file-commit-head")
 		if object, hashError := git_tree.HashBytes(
 			format,
 			git_tree.Commit,
@@ -288,7 +311,7 @@ func TestCommitHashesAsGitHashesIt(test *testing.T) {
 		if found, formatError := git_tree.FormatOf(head); formatError != nil || found != format {
 			test.Errorf("`HEAD` %s reads as format %s (%v)", head, found, formatError)
 		}
-		entries := committed(test, repository, false)
+		entries := committed(test, format, false)
 		if checkError := git_tree.CheckCommit(head, commit, entries); checkError != nil {
 			test.Errorf("the head's own commit and listing: %v", checkError)
 		}
@@ -308,12 +331,10 @@ func TestCommitHashesAsGitHashesIt(test *testing.T) {
 func TestCheckCommitRefusesAnotherCommitsListing(test *testing.T) {
 	test.Parallel()
 	formats(test, func(test *testing.T, format git_tree.ObjectFormat) {
-		repository := fixture(test, format)
-		repository.commit("fixture")
-		older := committed(test, repository, false)
-		repository.write("hello", "hello again\n", 0o644)
-		head := repository.commit("later")
-		checkError := git_tree.CheckCommit(head, repository.git("cat-file", "commit", "HEAD"), older)
+		older := committed(test, format, false)
+		// The later commit is the fixture's with hello rewritten "hello again\n", its parent the fixture's.
+		head := recordedLine(test, string(format)+"/later/rev-parse-head")
+		checkError := git_tree.CheckCommit(head, recorded(test, string(format)+"/later/cat-file-commit-head"), older)
 		if !errors.Is(checkError, git_tree.ErrTreeNotListed) {
 			test.Errorf("the earlier commit's listing beside the head's commit: %v", checkError)
 		}
@@ -327,9 +348,8 @@ func TestCheckCommitRefusesAnotherCommitsListing(test *testing.T) {
 func TestDiffersFindsWhatGitDiffFilesFinds(test *testing.T) {
 	test.Parallel()
 	formats(test, func(test *testing.T, format git_tree.ObjectFormat) {
-		repository := fixture(test, format)
-		repository.commit("fixture")
-		entries := stage(test, repository)
+		onDisk := fixture(test)
+		entries := stage(test, format)
 		want := map[string]git_tree.Difference{}
 		// Each permission file moves to another permission. The four whose owner bit moves differ; the
 		// rest don't. 0o100, which the owner can't read, is given to a 100644 file, which git and Differs
@@ -339,29 +359,29 @@ func TestDiffersFindsWhatGitDiffFilesFinds(test *testing.T) {
 			0o700: 0o611, 0o611: 0o411, 0o411: 0o100, 0o755: 0o644,
 		}
 		for from, to := range moves {
-			repository.chmod(permissionFile(from), to)
+			onDisk.chmod(permissionFile(from), to)
 			if (permissionModes[from] == git_tree.ModeExecutable) != (to&0o100 != 0) {
 				want[permissionFile(from)] = git_tree.AnotherExecutableBit
 			}
 		}
-		repository.write("hello", "jello\n", 0o644)
+		onDisk.write("hello", "jello\n", 0o644)
 		want["hello"] = git_tree.AnotherContent
-		repository.remove("link")
-		repository.write("link", "hello", 0o644)
+		onDisk.remove("link")
+		onDisk.write("link", "hello", 0o644)
 		want["link"] = git_tree.AnotherKind
-		repository.remove("empty")
+		onDisk.remove("empty")
 		want["empty"] = git_tree.Missing
-		repository.remove("a/deeper/most")
-		repository.remove("a/deeper")
-		repository.write("a/deeper", "a file now\n", 0o644)
+		onDisk.remove("a/deeper/most")
+		onDisk.remove("a/deeper")
+		onDisk.write("a/deeper", "a file now\n", 0o644)
 		want["a/deeper/most"] = git_tree.Missing
 
-		// diff-files reads the index's stat data, which a chmod alone makes stale; a refresh rehashes
-		// those, so what diff-files names is what changed.
-		repository.git("update-index", "-q", "--refresh")
+		// git made the same changes over the fixture committed, and named these. diff-files reads the
+		// index's stat data, which a chmod alone makes stale, so they were recorded after
+		// `git update-index -q --refresh`, which rehashes those: what diff-files named is what changed.
 		named := map[string]bool{}
 		for name := range strings.SplitSeq(
-			strings.TrimSuffix(string(repository.git("diff-files", "--name-only", "-z")), "\x00"),
+			strings.TrimSuffix(string(recorded(test, string(format)+"/diff-files-name-only.z")), "\x00"),
 			"\x00",
 		) {
 			named[name] = true
@@ -371,7 +391,7 @@ func TestDiffersFindsWhatGitDiffFilesFinds(test *testing.T) {
 			if entry.Mode == git_tree.ModeGitlink {
 				continue
 			}
-			difference, differsError := git_tree.Differs(repository.path(entry.Path), entry)
+			difference, differsError := git_tree.Differs(onDisk.path(entry.Path), entry)
 			if differsError != nil {
 				test.Fatalf("%q: %v", entry.Path, differsError)
 			}

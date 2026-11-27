@@ -154,10 +154,21 @@ func trimCache() int {
 		recordCacheLook(directory, quietLine)
 	}
 
-	cache, goCacheDirectoryError := goCacheDirectory()
+	cache, program, goCacheDirectoryError := goCacheDirectory()
 	if goCacheDirectoryError != nil {
 		recordCacheLook(directory, goCacheDirectoryError.Error())
 		return 1
+	}
+	// A cache a program serves is the program's to keep: Loom's runner names its own in an integrate job, a layer
+	// it promotes or drops when the job ends, and Kirk's rule is no cleanup inside a job (#e94a6r4). So the trim
+	// measures and removes nothing there, and says so.
+	if program != "" {
+		recordCacheLook(directory, fmt.Sprintf(
+			"not trimmed: the Go cache at %s is served by a cache program, %s, so its life is the program's",
+			cache,
+			program,
+		))
+		return 0
 	}
 	if poolGuardsError := poolGuards(cache); poolGuardsError != nil {
 		recordCacheLook(directory, poolGuardsError.Error())
@@ -263,18 +274,19 @@ func poolGuards(cache string) error {
 	)
 }
 
-// goCacheDirectory is the cache a plain go command here uses: `GOCACHE` when it is set, Go's default
-// otherwise.
-func goCacheDirectory() (string, error) {
-	output, outputError := exec.Command("go", "env", "GOCACHE").Output()
+// goCacheDirectory is the cache a plain go command here uses, `GOCACHE` when it is set and Go's default otherwise,
+// and the cache program that serves it, `GOCACHEPROG`, empty when none does.
+func goCacheDirectory() (string, string, error) {
+	output, outputError := exec.Command("go", "env", "GOCACHE", "GOCACHEPROG").Output()
 	if outputError != nil {
-		return "", fmt.Errorf("asking go for its build cache: %w", outputError)
+		return "", "", fmt.Errorf("asking go for its build cache: %w", outputError)
 	}
-	directory := strings.TrimSpace(string(output))
+	directory, program, _ := strings.Cut(strings.TrimRight(string(output), "\n"), "\n")
+	directory, program = strings.TrimSpace(directory), strings.TrimSpace(program)
 	if directory == "" || directory == "off" {
-		return "", fmt.Errorf("go has no build cache here (GOCACHE=%q)", directory)
+		return "", "", fmt.Errorf("go has no build cache here (GOCACHE=%q)", directory)
 	}
-	return directory, nil
+	return directory, program, nil
 }
 
 // recordCacheLook keeps the last look at the cache, for cohere-dev status, and appends it to the trim log.

@@ -302,14 +302,14 @@ func TestLiftingIsTheDefault(test *testing.T) {
 	}
 }
 
-// TestPlacedViewIsComplete builds the ordinary corpus lifted, the every-form fixture among it, and holds each
+// TestPlacedViewIsComplete builds the differentials' corpus lifted, the every-form fixture among it, and holds each
 // round's placed view, the instructions the core sees, to the Go IR's own rule for which instructions have a place,
 // decided over every instruction of every block (liftingPlacedProblems): each one with a place is in its block's
 // view, in order, and nothing else is.
 func TestPlacedViewIsComplete(test *testing.T) {
 	test.Parallel()
 	rounds, places, everyFormPlaces := 0, 0, 0
-	for _, unit := range differentialCorpusUnits(test, "") {
+	for _, unit := range differentialCorpusUnits(test) {
 		problems, unitRounds, unitPlaces := placedViewBuild(test, unit, false)
 		for _, problem := range problems {
 			test.Errorf("%s: %s", unit.path, problem)

@@ -14,8 +14,8 @@ import (
 // a/b.txt, z.txt, a link to top.txt, and a submodule sub holding sub.txt and x/y.txt), committed as
 // Loom's gitTree commits, by t <t@example.invalid> with message "tree", at a pinned date so its ids
 // are the same everywhere. The gitlink is recorded by update-index rather than `submodule add`, whose
-// .gitmodules would hold the fixture's temporary path. TestTheGoldenRecordIsGitsOwnOutput makes the
-// fixture again and requires git print these bytes.
+// .gitmodules would hold the fixture's temporary path. TestTheGoldenRecordIsGitsOwnOutput requires
+// these be the bytes git printed for it, recorded under testdata/golden.
 const (
 	goldenHead   = "c99b49ffc53e7c8d793a92c07ca5b4dd65cc5f69"
 	goldenCommit = "tree 509663580863ee780d4c1d704ac0d1a1523c520c\n" +
@@ -92,34 +92,21 @@ func TestTheGoldenRecordReadsAndWritesByteForByte(test *testing.T) {
 	}
 }
 
-// The golden record is git's own output: the fixture made again prints these bytes for rev-parse,
-// cat-file commit and ls-tree -r -z --full-tree.
+// The golden record is git's own output: the bytes git printed for rev-parse, cat-file commit and
+// ls-tree -r -z --full-tree in the fixture's two repositories, recorded once under testdata/golden.
 func TestTheGoldenRecordIsGitsOwnOutput(test *testing.T) {
 	test.Parallel()
-	submodule := newTestRepository(test, git_tree.Sha1)
-	submodule.write("sub.txt", "sub\n", 0o644)
-	submodule.write("x/y.txt", "y\n", 0o644)
-	submodule.commit("tree")
-	top := newTestRepository(test, git_tree.Sha1)
-	top.write("top.txt", "top\n", 0o644)
-	top.write("a/b.txt", "b\n", 0o644)
-	top.write("z.txt", "z\n", 0o644)
-	top.link("link", "top.txt")
-	top.git("add", "-A")
-	top.git("update-index", "--add", "--cacheinfo", "160000,"+submodule.line("rev-parse", "HEAD")+",sub")
-	top.git("commit", "-q", "-m", "tree")
-	for index, repository := range []*testRepository{top, submodule} {
+	for index, repository := range []string{"top", "sub"} {
 		for _, answer := range []struct {
-			arguments []string
-			want      string
+			command, name, want string
 		}{
-			{[]string{"rev-parse", "HEAD"}, goldenRecords[index].head + "\n"},
-			{[]string{"cat-file", "commit", "HEAD"}, goldenRecords[index].commit},
-			{[]string{"ls-tree", "-r", "-z", "--full-tree", "HEAD"}, goldenRecords[index].files},
+			{"rev-parse HEAD", "rev-parse-head", goldenRecords[index].head + "\n"},
+			{"cat-file commit HEAD", "cat-file-commit-head", goldenRecords[index].commit},
+			{"ls-tree -r -z --full-tree HEAD", "ls-tree-r-z-full-tree-head", goldenRecords[index].files},
 		} {
-			if got := string(repository.git(answer.arguments...)); got != answer.want {
-				test.Errorf("git %s prints %q, and the golden record holds %q",
-					strings.Join(answer.arguments, " "), got, answer.want)
+			if got := string(recorded(test, "golden/"+repository+"/"+answer.name)); got != answer.want {
+				test.Errorf("git %s in %s printed %q, and the golden record holds %q",
+					answer.command, repository, got, answer.want)
 			}
 		}
 	}

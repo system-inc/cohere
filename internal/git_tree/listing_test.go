@@ -100,14 +100,15 @@ func TestTreeIdRefusesEntriesNoTreeHolds(test *testing.T) {
 	}
 }
 
-// listedStages is the repository's index as git prints it without -z, one "<mode> <object> <stage>",
-// tab, path line per entry, each path git quoted read back by Go's unquoting: git quotes a path in C's
-// spelling (\t, \n, \" and octal), which strconv.Unquote reads. It is the oracle ParseIndexListing's
-// entries are compared against, a reading of another listing than the one it parses.
-func listedStages(test *testing.T, repository *testRepository) []string {
+// listedStages is an index as git printed it without -z in the recorded answer at name, one
+// "<mode> <object> <stage>", tab, path line per entry, each path git quoted read back by Go's unquoting:
+// git quotes a path in C's spelling (\t, \n, \" and octal), which strconv.Unquote reads. It is the
+// oracle ParseIndexListing's entries are compared against, a reading of another listing than the one it
+// parses.
+func listedStages(test *testing.T, name string) []string {
 	test.Helper()
 	var lines []string
-	for line := range strings.SplitSeq(strings.TrimSuffix(string(repository.git("ls-files", "--stage")), "\n"), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSuffix(string(recorded(test, name)), "\n"), "\n") {
 		header, path, found := strings.Cut(line, "\t")
 		if !found {
 			test.Fatalf("git ls-files --stage printed %q, with no tab", line)
@@ -133,10 +134,10 @@ func indexLines(entries []git_tree.IndexEntry) []string {
 	return lines
 }
 
-// index is the repository's index, as ParseIndexListing reads git's own listing of it.
-func index(test *testing.T, repository *testRepository) []git_tree.IndexEntry {
+// index is an index as ParseIndexListing reads git's own -z listing of it, the recorded answer at name.
+func index(test *testing.T, name string) []git_tree.IndexEntry {
 	test.Helper()
-	entries, parseError := git_tree.ParseIndexListing(repository.git("ls-files", "--stage", "-z"))
+	entries, parseError := git_tree.ParseIndexListing(recorded(test, name))
 	if parseError != nil {
 		test.Fatal(parseError)
 	}
@@ -148,12 +149,14 @@ func index(test *testing.T, repository *testRepository) []git_tree.IndexEntry {
 func TestParseIndexListingReadsACleanIndexAsGitListsIt(test *testing.T) {
 	test.Parallel()
 	formats(test, func(test *testing.T, format git_tree.ObjectFormat) {
-		repository := fixture(test, format)
-		entries := index(test, repository)
-		if got, want := indexLines(entries), listedStages(test, repository); !slices.Equal(got, want) {
+		entries := index(test, string(format)+"/ls-files-stage.z")
+		if got, want := indexLines(entries), listedStages(
+			test,
+			string(format)+"/ls-files-stage",
+		); !slices.Equal(got, want) {
 			test.Errorf("ParseIndexListing read\n%q\nand git ls-files --stage lists\n%q", got, want)
 		}
-		staged := stage(test, repository)
+		staged := stage(test, format)
 		if len(entries) != len(staged) {
 			test.Fatalf("ParseIndexListing read %d entries, and ParseStageListing %d", len(entries), len(staged))
 		}
@@ -168,41 +171,21 @@ func TestParseIndexListingReadsACleanIndexAsGitListsIt(test *testing.T) {
 // A merge left in conflict reads, each conflicted path once per stage git holds it at, as git lists it:
 // a file both sides changed (stages 1, 2 and 3), a submodule both sides moved (a gitlink at 1, 2 and
 // 3), and a submodule ours removed and theirs moved (1 and 3), beside a merged file at stage 0.
-// ParseStageListing, which reads only a merged index, refuses the same listing.
+// ParseStageListing, which reads only a merged index, refuses the same listing. git's listings of the
+// merge were recorded once, with the script testdata/README.md holds.
 func TestParseIndexListingReadsAMergeLeftInConflict(test *testing.T) {
 	test.Parallel()
 	formats(test, func(test *testing.T, format git_tree.ObjectFormat) {
-		repository := newTestRepository(test, format)
-		repository.write("merged", "merged\n", 0o644)
-		repository.write("conflicted", "base\n", 0o644)
-		repository.git("add", "-A")
-		repository.git("commit", "-q", "-m", "files")
 		// Each pin is a commit no repository holds, as the fixture's gitlink is: git merges a gitlink by
-		// its id alone, and one it can't look into is a conflict.
-		digits := len(repository.line("rev-parse", "HEAD"))
+		// its id alone, and one it can't look into is a conflict. Pin "1" was the base's, "2" ours and
+		// "3" theirs, each its digit repeated as long as the merge's first commit's id.
+		digits := len(recordedLine(test, string(format)+"/merge/rev-parse-head"))
 		pin := func(digit string) string { return strings.Repeat(digit, digits) }
-		gitlink := func(digit string, path string) {
-			repository.git("update-index", "--add", "--cacheinfo", "160000,"+pin(digit)+","+path)
-		}
-		gitlink("1", "module")
-		gitlink("1", "removed")
-		repository.git("commit", "-q", "-m", "base")
-		repository.git("checkout", "-q", "-b", "theirs")
-		repository.write("conflicted", "theirs\n", 0o644)
-		repository.git("add", "conflicted")
-		gitlink("3", "module")
-		gitlink("3", "removed")
-		repository.git("commit", "-q", "-m", "theirs")
-		repository.git("checkout", "-q", "main")
-		repository.write("conflicted", "ours\n", 0o644)
-		repository.git("add", "conflicted")
-		gitlink("2", "module")
-		repository.git("update-index", "--force-remove", "removed")
-		repository.git("commit", "-q", "-m", "ours")
-		repository.gitFails("merge", "-q", "theirs")
-
-		entries := index(test, repository)
-		if got, want := indexLines(entries), listedStages(test, repository); !slices.Equal(got, want) {
+		entries := index(test, string(format)+"/merge/ls-files-stage.z")
+		if got, want := indexLines(entries), listedStages(
+			test,
+			string(format)+"/merge/ls-files-stage",
+		); !slices.Equal(got, want) {
 			test.Errorf("ParseIndexListing read\n%q\nand git ls-files --stage lists\n%q", got, want)
 		}
 		stages := map[string][]int{}
@@ -224,7 +207,7 @@ func TestParseIndexListingReadsAMergeLeftInConflict(test *testing.T) {
 			test.Errorf("the index reads as paths %v, and the merge left %v", stages, want)
 		}
 		if staged, parseError := git_tree.ParseStageListing(
-			repository.git("ls-files", "--stage", "-z"),
+			recorded(test, string(format)+"/merge/ls-files-stage.z"),
 		); parseError == nil {
 			test.Errorf("ParseStageListing read an index in conflict as %+v", staged)
 		}

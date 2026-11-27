@@ -8,6 +8,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -18,6 +19,7 @@ import (
 	"time"
 
 	"github.com/system-inc/cohere/internal/testing/executable_testing"
+	"github.com/system-inc/cohere/internal/testing/process_reading"
 )
 
 // fakeSwiftBinary writes a shell script standing in for cohere-swift, so the process boundary can be driven
@@ -242,7 +244,8 @@ const standInChild = "sleep 100000"
 // before it, or hangs until go test's -timeout, would leave the sleep on the machine for a day.
 //
 // It kills by id, never by name, and only a process still running standInChild, since an id is reused once its
-// process ends and a cleanup that killed whatever holds it now could end someone else's work.
+// process ends and a cleanup that killed whatever holds it now could end someone else's work. A command line that
+// can't be read fails the test, since the child it couldn't look at is still running.
 func killChildAtCleanup(test *testing.T, path string) {
 	test.Helper()
 	test.Cleanup(func() {
@@ -255,9 +258,20 @@ func killChildAtCleanup(test *testing.T, path string) {
 		if parseError != nil {
 			return
 		}
-		command, psError := exec.Command("ps", "-o", "command=", "-p", strconv.Itoa(child)).Output()
-		if psError != nil || strings.TrimSpace(string(command)) != standInChild {
-			// ps fails on an id no process holds, and a different command means the id was reused.
+		// Read in this process, never through ps, which is setuid on macOS and refused in a land job's sandbox.
+		command, commandError := process_reading.Command(child)
+		if errors.Is(commandError, process_reading.ErrNoProcess) {
+			// No process holds the id, so the child has ended and there is nothing to end.
+			return
+		}
+		if commandError != nil {
+			// A command line that can't be read says nothing of the child, which is left running, so the test says
+			// why.
+			test.Errorf("the command of the child %d couldn't be read, so it was left running: %v", child, commandError)
+			return
+		}
+		if strings.Join(command, " ") != standInChild {
+			// A different command means the id was reused.
 			return
 		}
 		// Ignored: the child ending on its own between the look and the kill is the outcome the kill asks for.
@@ -286,10 +300,18 @@ func TestAStandInBinarysChildIsKilledWhenItsTestEnds(test *testing.T) {
 	// The subtest stands for a stand-in cohere-swift test that leaves its child running; its cleanups run as it ends.
 	// Not parallel: the wait below needs its cleanup to have killed the child, and a parallel subtest would not
 	// start until this test returned
-	test.Run("a test that leaves its child running", func(test *testing.T) {
+	cleaned := test.Run("a test that leaves its child running", func(test *testing.T) {
 		killChildAtCleanup(test, childFile)
 	})
-	// No deadline: a cleanup that did not kill the child leaves this waiting on a sleep that outlasts any run, a
-	// hang go test's -timeout fails.
+	if !cleaned {
+		// The cleanup said why it left the child running, so this test ends its own sleep, which no other process
+		// can hold the id of while this one hasn't waited on it, rather than wait on it for go test's -timeout.
+		// Ignored: the sleep ending on its own first is what the kill asks for.
+		_ = sleeper.Process.Kill()
+		<-ended
+		test.FailNow()
+	}
+	// No deadline: a cleanup that said nothing and did not kill the child leaves this waiting on a sleep that outlasts
+	// any run, a hang go test's -timeout fails.
 	<-ended
 }

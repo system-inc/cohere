@@ -8,7 +8,8 @@
 //	go run ./command/cohere-dev test --bounded <pkg>  under a process limit and a deadline, for a mutant (bound.go)
 //	go run ./command/cohere-dev land                  one merge commit onto main, gated, one landing at a time
 //	go run ./command/cohere-dev land --train <heads>  two to four accepted units landed under one gate
-//	go run ./command/cohere-dev land-job --merge <sha>  Loom's land job on Shackler: a merge measured and gated
+//	go run ./command/cohere-dev integrate-job --merge <sha>  Loom's job on Shackler: a merge measured and gated
+//	go run ./command/cohere-dev integrate-job --fill  Loom's cold fill: main's tip gated as laid, measuring nothing
 //	go run ./command/cohere-dev status                the pool: its tokens, their holders, the line, the cache
 //	go run ./command/cohere-dev quiet on|off|wait     a quiet window: no job starts but the one it is for (quiet.go)
 //	go run ./command/cohere-dev worktree <name>       a hand's worktree, made or moved to main by git (worktree.go)
@@ -73,9 +74,9 @@ func runCommandLine() int {
 		return namedWorktree(os.Args[2:])
 	case "measure":
 		return measure(os.Args[2:])
-	case "land-job":
+	case "integrate-job":
 		// At the priority it was started with, never niced: its measurement is Shackler's numbers of record.
-		return landJob(os.Args[2:])
+		return integrateJob(os.Args[2:])
 	case "test", "build", "vet", "exec", "land":
 		return run(os.Args[1], os.Args[2:])
 	}
@@ -92,7 +93,9 @@ func usage() int {
 		"       cohere-dev land [--task <id>] [--message <what landed>]\n"+
 		"       cohere-dev land --train <head> <head> [<head> [<head>]] --task <id> [--message <what landed>]\n"+
 		"       cohere-dev measure [<commit>]   the landing's measurement on Shackler alone, landing nothing\n"+
-		"       cohere-dev land-job --merge <sha> --task <id> [--message <what landed>]\n"+
+		"       cohere-dev integrate-job --merge <sha> --task <id> [--message <what it integrates>]\n"+
+		"       cohere-dev integrate-job --fill --task <id>   main's tip judged as laid, filling the cache, measuring "+
+		"nothing\n"+
 		"       cohere-dev status\n"+
 		"       cohere-dev quiet [on [--for <duration>] [--through <name>] [why] | off | wait]\n"+
 		"         every job but status, quiet and worktree takes --through <name>, for the run a window lets through\n"+
@@ -401,13 +404,7 @@ func countsOnce(arguments []string) bool {
 
 // goTest runs go test with the caller's terminal, under the bound when there is one, and returns its exit code.
 func goTest(base []string, arguments []string, limit *bound) int {
-	environment, uncovered, testEnvironmentError := testEnvironment(base)
-	if testEnvironmentError != nil {
-		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", testEnvironmentError)
-		return 2
-	}
-	defer printUncovered(streams.Errors, uncovered)
-	return runAttached(limit, "", environment, "go", append([]string{"test"}, arguments...))
+	return runAttached(limit, "", base, "go", append([]string{"test"}, arguments...))
 }
 
 // holderLine describes the run holding a token: who, where, since when and what it runs.

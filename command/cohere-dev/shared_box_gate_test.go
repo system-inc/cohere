@@ -9,24 +9,27 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
 
 	"github.com/system-inc/cohere/internal/testing/executable_testing"
 	"github.com/system-inc/cohere/internal/testing/needs"
+	"github.com/system-inc/cohere/internal/testing/own_go_cache"
 )
 
 // plantedGo stands in for a shared box's go: it answers go env, and records every go mod download, go mod verify and
-// go test it is asked for in GATE_LOG, with the Go settings it ran under and whether its Go cache was empty, so a test
-// can read what the gate asked of it. GATE_VERIFY_FAILS makes go mod verify fail as a tampered module cache would,
-// GATE_DOWNLOAD_FAILS makes go mod download fail as a box cut off from the module proxy would, and GATE_RACE_FAILS
-// makes the -race run of the package it names fail as one that found a race would.
+// go test it is asked for in GATE_LOG, with the Go settings it ran under (a go mod's its module cache and proxy) and
+// whether its Go cache was empty, so a test can read what the gate asked of it. GATE_VERIFY_FAILS makes go mod verify
+// fail as a tampered module cache would, GATE_DOWNLOAD_FAILS makes go mod download fail as a box cut off from the
+// module proxy would, and GATE_RACE_FAILS makes the -race run of the package it names fail as one that found a race
+// would.
 const plantedGo = `#!/bin/sh
 case "$1" in
 env) [ "$2" = GOOS ] && echo linux; [ "$2" = GOARCH ] && echo amd64; exit 0 ;;
 mod)
-  echo "$2" >> "$GATE_LOG"
+  echo "$2 | modcache ${GOMODCACHE:-} | proxy ${GOPROXY:-} | sum database ${GOSUMDB:-}" >> "$GATE_LOG"
   if [ "$2" = download ] && [ -n "$GATE_DOWNLOAD_FAILS" ]; then
     echo "example.com/module@v1.0.0: no route to the proxy"; exit 1; fi
   if [ "$2" = verify ] && [ -n "$GATE_VERIFY_FAILS" ]; then echo "example.com/module v1.0.0: dir has been modified"
@@ -34,7 +37,7 @@ mod)
   [ "$2" = verify ] && echo "all modules verified"; exit 0 ;;
 test)
   empty=no; [ -z "$(ls -A "$GOCACHE")" ] && empty=yes
-  echo "test $* | cache $GOCACHE empty $empty | toolchain $GOTOOLCHAIN | goenv $GOENV | goflags $GOFLAGS | path $PATH" >> "$GATE_LOG"
+  echo "test $* | cache $GOCACHE empty $empty | cache program ${GOCACHEPROG:-none} | toolchain $GOTOOLCHAIN | goenv $GOENV | goflags $GOFLAGS | path $PATH" >> "$GATE_LOG"
   if [ -n "$GATE_RACE_FAILS" ]; then case " $* " in *" -race"*" $GATE_RACE_FAILS "*)
     echo '{"Action":"fail","Package":"example.com/module"}'; exit 1 ;; esac; fi
   echo '{"Action":"pass","Package":"example.com/module"}' ;;
@@ -78,10 +81,20 @@ func toolchainDigest(test *testing.T, root string) string {
 	return hex.EncodeToString(sum[:])
 }
 
+// withoutModuleCache is environment without `GOMODCACHE`, so a script run in a test's environment reads no module set
+// laid for it unless the test lays one, whatever the machine running the test names.
+func withoutModuleCache(environment []string) []string {
+	return slices.DeleteFunc(environment, func(variable string) bool {
+		return strings.HasPrefix(variable, "GOMODCACHE=")
+	})
+}
+
 // A shared box's gate trusts nothing the box kept (#adbkt5t). Its toolchain must digest to the pinned one before any
 // of it runs, its module cache must pass go mod verify before any test, and every test runs with -count=1 on a Go
-// cache made empty for the job, with the account's Go settings left unread, and the cache is gone after. Shown by
-// running the gate's own script with bash against a planted toolchain whose go records what it is asked.
+// cache made empty for the job, with the account's Go settings left unread, an account's `GOMODCACHE` among them, so go
+// mod download and go mod verify read Go's default cache with the proxy as Go sets it, and the cache is gone after.
+// Shown by running the gate's own script with bash against a planted toolchain whose go records what it is asked. The
+// integrate job's module set, the one `GOMODCACHE` it reads, is TestTheIntegrateJobsCacheIsKeptAndDropsCountOne's.
 func TestASharedBoxGateTrustsNothingTheBoxKept(test *testing.T) {
 	test.Parallel()
 	needs.Tool(test, "bash", "the gate is a bash script")
@@ -96,8 +109,16 @@ func TestASharedBoxGateTrustsNothingTheBoxKept(test *testing.T) {
 		node string
 		// raceFails is whether the gate fails for its -race runs alone, every one of them asked first.
 		raceFails bool
+		// accountModules is whether the account names a module cache in `GOMODCACHE`, which outside the integrate job
+		// is never read.
+		accountModules bool
 	}{
 		{name: "a toolchain as pinned runs the tests", node: "pinned"},
+		{
+			name:           "an account's module cache is never read outside the integrate job",
+			node:           "pinned",
+			accountModules: true,
+		},
 		{
 			name: "the plain tokens' -race run failing fails the gate, after the token with a run has run",
 			node: "pinned",
@@ -186,9 +207,14 @@ func TestASharedBoxGateTrustsNothingTheBoxKept(test *testing.T) {
 			writeFixtureFile(test, filepath.Join(tree, "AtOnce|SideBy.planted"), "")
 			log := filepath.Join(test.TempDir(), "asked")
 			temporary := test.TempDir()
-			// The account's own Go settings, which the gate must not read: a cache, flags and a toolchain switch.
-			environment := append(os.Environ(), "GATE_LOG="+log, "TMPDIR="+temporary, "GOCACHE="+test.TempDir(),
-				"GOFLAGS=-count=5", "GOTOOLCHAIN=auto", "GOENV="+filepath.Join(test.TempDir(), "env"))
+			// The account's own Go settings, which the gate must not read: a cache, flags, a toolchain switch and a
+			// proxy.
+			environment := append(own_go_cache.Environment(withoutModuleCache(os.Environ()), test.TempDir()),
+				"GATE_LOG="+log, "TMPDIR="+temporary, "GOFLAGS=-count=5", "GOTOOLCHAIN=auto",
+				"GOENV="+filepath.Join(test.TempDir(), "env"), "GOPROXY=https://proxy.example.com")
+			if row.accountModules {
+				environment = append(environment, "GOMODCACHE="+filepath.Join(test.TempDir(), "account modules"))
+			}
 			if row.plant != nil {
 				environment = row.plant(test, goroot, environment)
 			}
@@ -230,9 +256,15 @@ func TestASharedBoxGateTrustsNothingTheBoxKept(test *testing.T) {
 				test.Fatalf("the gate failed: %v, want it failed %t\n%s", gateError, row.raceFails, output)
 			}
 			lines := strings.Split(strings.TrimSpace(string(asked)), "\n")
-			if len(lines) != 5 || lines[0] != "download" || lines[1] != "verify" {
-				test.Fatalf("the gate asked for %q, want go mod download, go mod verify, then the module's tests and "+
-					"the -race run's two go tests", lines)
+			// go mod reads Go's default cache with the proxy Go sets, the account's never read.
+			modules, said := " | modcache  | proxy  | sum database ", boxModulesMarker+
+				"Go's default cache, from the proxy\n"
+			if len(lines) != 5 || lines[0] != "download"+modules || lines[1] != "verify"+modules {
+				test.Fatalf("the gate asked for %q, want go mod download and go mod verify with %q, then the "+
+					"module's tests and the -race run's two go tests", lines, modules)
+			}
+			if !strings.Contains(string(output), said) {
+				test.Errorf("the gate didn't say %q:\n%s", said, output)
 			}
 			// Past the download, the log reads as the checks below index it: verify, the tests, the -race runs.
 			lines = lines[1:]
@@ -274,6 +306,42 @@ func TestASharedBoxGateTrustsNothingTheBoxKept(test *testing.T) {
 				test.Errorf("the gate left its Go cache behind: %v", left)
 			}
 		})
+	}
+}
+
+// A shared box's gate handed a path that holds nothing but the toolchain's own directory, as an integrate job's sandbox
+// hands it one without /sbin, still digests the toolchain and runs the tests: the system's directories go last on the
+// path before the first check (sharedBoxSystemPathAfter), so sha256sum, find and sort are found, and set -e never ends
+// the script before it says a word (#5wj23dd).
+func TestASharedBoxGateDigestsOnAPathWithoutTheSystemsDirectories(test *testing.T) {
+	test.Parallel()
+	bash := needs.Tool(test, "bash", "the gate is a bash script")
+	needs.Tool(test, "sha256sum", "the gate digests the toolchain with it, as the boxes do")
+	goroot := filepath.Join(test.TempDir(), "go")
+	writeFixtureFile(test, filepath.Join(goroot, "src", "fmt", "print.go"), "package fmt\n")
+	if makeError := os.MkdirAll(filepath.Join(goroot, "bin"), 0o755); makeError != nil {
+		test.Fatal(makeError)
+	}
+	if writeError := executable_testing.WriteFile(filepath.Join(goroot, "bin", "go"), []byte(plantedGo),
+		0o755); writeError != nil {
+		test.Fatal(writeError)
+	}
+	tree := test.TempDir()
+	writeFixtureFile(test, filepath.Join(tree, "go.mod"), "module example.com/module\n\ngo 1.27\n")
+	log := filepath.Join(test.TempDir(), "asked")
+	script := "set -euo pipefail\n" + `goroot="$1"; digest="$2"; node="$3"; nodeDigest="$4"; races="$5"; shift 5` +
+		"\n" + sharedBoxGate
+	gate := exec.Command(bash, "-c", script, "gate", goroot, toolchainDigest(test, goroot),
+		filepath.Join(tree, "no-node"), strings.Repeat("0", 64), "", "./...")
+	gate.Dir = tree
+	gate.Env = append(withoutModuleCache(os.Environ()), "PATH="+filepath.Join(goroot, "bin"), "GATE_LOG="+log,
+		"TMPDIR="+test.TempDir())
+	output, gateError := gate.CombinedOutput()
+	if gateError != nil || !strings.Contains(string(output), boxStepMarker+"toolchain ") {
+		test.Fatalf("on a path of the toolchain alone the gate didn't digest it (%v):\n%s", gateError, output)
+	}
+	if asked := string(readMaybeMissing(test, log)); !strings.Contains(asked, "test test -count=1 ") {
+		test.Errorf("on a path of the toolchain alone the gate ran no tests:\n%s", asked)
 	}
 }
 
@@ -323,8 +391,8 @@ func TestTheMacsGateRunsKeepTheTestCache(test *testing.T) {
 		}
 	}
 	if len(tests) != 3 || tests[1] != "test -race ./internal/edit" ||
-		tests[2] != "test -race -run "+goLanguage.run+" ./internal/go_language" {
+		tests[2] != "test -race -run "+goLanguage.keptRun()+" ./internal/go_language" {
 		test.Fatalf("Kirk's Mac ran go tests %q, want the module's, then its -race run of ./internal/edit, then "+
-			"./internal/go_language's with -run %s:\n%s", tests, goLanguage.run, recorded)
+			"./internal/go_language's with -run %s:\n%s", tests, goLanguage.keptRun(), recorded)
 	}
 }

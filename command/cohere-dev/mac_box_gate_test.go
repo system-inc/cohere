@@ -31,10 +31,8 @@ type macBoxFixture struct {
 	// `<box>.shards`, `<import path> <count> <test>...`, runs that package in that many shards as sharedBoxShards
 	// prints them, its middle shard the slowest, every test passing but the one `<box>.shardomit` names, which no
 	// shard ends; and `<box>.steps`, `<plain seconds> <race seconds>`, says a tests step after the passing run's plain
-	// tests and a race step after its -race run, as sharedBoxGate says its steps. `<box>.unlaid` is what her gap prints
-	// in place of `<box>.run` until a gap carrying corpora has laid them, which copies its carry to `<box>.carry` and
-	// its remote to `<box>.lay`, or prints `<box>.lay.fails` and exits 1 when that is there. The stand-in writes each
-	// call it took to `calls`, one line each, and each box's remote command whole to `<box>.remote`.
+	// tests and a race step after its -race run, as sharedBoxGate says its steps. The stand-in writes each call it took
+	// to `calls`, one line each, and each box's remote command whole to `<box>.remote`.
 	replies string
 	// goCalls is every go command Kirk's Mac ran, one line each.
 	goCalls string
@@ -57,14 +55,7 @@ gap)
     if [ -e "$replies/$box.held" ]; then echo "gap $box closed · $box is held by system_loom until 18:00Z"; exit 1; fi
     echo "gap $box open"; exit 0
   fi
-  if [ "$7" = --carry ]; then
-    cp "$8" "$replies/$box.carry"
-    printf '%s' "${14}" > "$replies/$box.lay"
-    if [ -e "$replies/$box.lay.fails" ]; then cat "$replies/$box.lay.fails"; exit 1; fi
-    touch "$replies/$box.laid"; echo "cohere-dev-gate: laid ahra at COMMIT in 1s, 1.8G"; exit 0
-  fi
   printf '%s' "${10}" > "$replies/$box.remote"
-  if [ -e "$replies/$box.unlaid" ] && [ ! -e "$replies/$box.laid" ]; then cat "$replies/$box.unlaid"; exit 0; fi
   if [ -e "$replies/$box.passes" ]; then
     read -r plain race < "$replies/$box.passes"
     omit=$(cat "$replies/$box.omit" 2>/dev/null || true); fails=$(cat "$replies/$box.fails" 2>/dev/null || true)
@@ -76,7 +67,7 @@ gap)
     set -f
     set -- $(printf '%s' "${10}" | sed "s/^.* bash -s -- //; s/''/-/g" | tr -d "'")
     echo "` + boxMarker + `$1 on darwin/arm64"
-    races="$3"; shift 4
+    races="$3"; shift 3
     failed=0
     for package in "$@"; do
       [ "$package" != "$omit" ] || continue
@@ -368,7 +359,7 @@ func TestALandingTestsOnTheGatesMacsAndNeverOnKirksMac(test *testing.T) {
 var macBoxRemote = regexp.MustCompile(
 	// A box with a core budget (macBoxCoreBudgets), Marin, has it set before bash.
 	`^echo ([A-Za-z0-9+/=]+) \| base64 -d \| (?:` + boxCoreBudgetVariable + `=[0-9]+ )?bash -s -- ([0-9a-f]{40}) ` +
-		`'([0-9a-f]*)' '([^']*)' '([^']*)' (.*)$`,
+		`'([0-9a-f]*)' '([^']*)' (.*)$`,
 )
 
 // The push puts the commit being landed in Loom's feed for cohere, the gap runs on Sun2 within its bound over ssh to
@@ -400,15 +391,14 @@ func TestTheGatesMacScriptCarriesTheMacsPinsAndItsScratch(test *testing.T) {
 	if found == nil {
 		test.Fatalf("the gap's remote is not the encoded script and its arguments:\n%s", remote)
 	}
-	commit, pin, races, corpora, packages := string(found[2]), string(found[3]), string(found[4]), string(found[5]),
-		string(found[6])
+	commit, pin, races, packages := string(found[2]), string(found[3]), string(found[4]), string(found[5])
 	// The whole gate hands its box every package it lists, by import path, so the box shards go_language's tests.
 	if fixture.git(fixture.repository, "rev-parse", commit+"^{tree}") !=
 		fixture.git(fixture.repository, "rev-parse", "main^{tree}") || pin != "" ||
-		races != "./internal/go_language@"+goLanguage.run || corpora != "-" ||
+		races != "./internal/go_language@"+goLanguage.keptRun() ||
 		packages != "example.com/fixture/alpha example.com/fixture/internal/go_language" {
-		test.Errorf("the script was handed commit %s, pin %q, races %q, corpora %q and packages %q", commit, pin,
-			races, corpora, packages)
+		test.Errorf("the script was handed commit %s, pin %q, races %q and packages %q", commit, pin, races,
+			packages)
 	}
 	for _, want := range []string{
 		"loom push --feed " + commit + " --repository cohere",
@@ -446,7 +436,8 @@ func TestTheGatesMacScriptCarriesTheMacsPinsAndItsScratch(test *testing.T) {
 // The box's script, run with bash against mirrors of its own: a mirror that lacks the commit is asked again and then
 // refused in the marker's words, a mirror that can't be read is refused at once in git's, and a mirror holding the
 // commit has it fetched and checked out under ~/scratch/system_cohere_tools, reaching sharedBoxGate, which here finds
-// no toolchain. Each leaves no configuration file of its own behind.
+// no toolchain, with the tests' temporary directory made under /tmp and gone with the run. Each leaves no
+// configuration file of its own behind.
 func TestTheGatesMacScriptWaitsForItsMirrorAndWorksInItsScratch(test *testing.T) {
 	test.Parallel()
 	needs.Tool(test, "bash", "the box's script is a bash script")
@@ -485,16 +476,19 @@ func TestTheGatesMacScriptWaitsForItsMirrorAndWorksInItsScratch(test *testing.T)
 	} {
 		test.Run(row.name, func(test *testing.T) {
 			test.Parallel()
-			home := test.TempDir()
+			home, temporaryRoot := test.TempDir(), test.TempDir()
 			script := strings.Replace(macBoxScript, macBoxMirrorLine, "mirrors="+row.mirrors+"; tries=2; pause=0", 1)
 			script = strings.Replace(script, `goroot="`+macBoxGoroot+`"`, `goroot="`+noGo+`"`, 1)
+			// The toolchain's refusal names the temporary directory, so the test sees what the script set before it.
+			script = strings.Replace(script, `refuse "there is no go at $goroot"`,
+				`refuse "there is no go at $goroot, temporary at $TMPDIR"`, 1)
 			if script == macBoxScript {
 				test.Fatal("the script's mirror line or goroot was not found to replace")
 			}
-			bash := exec.Command("bash", "-s", "--", row.commit, "", "", "-", "./...")
+			bash := exec.Command("bash", "-s", "--", row.commit, "", "", "./...")
 			bash.Dir = test.TempDir()
 			bash.Stdin = strings.NewReader(script)
-			bash.Env = append(os.Environ(), "HOME="+home, "GIT_CONFIG_NOSYSTEM=1")
+			bash.Env = append(os.Environ(), "HOME="+home, "TMPDIR="+temporaryRoot, "GIT_CONFIG_NOSYSTEM=1")
 			output, bashError := bash.CombinedOutput()
 			if bashError == nil || !strings.Contains(string(output), row.said) {
 				test.Fatalf("the script did not refuse, saying %q (%v):\n%s", row.said, bashError, output)
@@ -509,6 +503,15 @@ func TestTheGatesMacScriptWaitsForItsMirrorAndWorksInItsScratch(test *testing.T)
 			if checkedOut := run(filepath.Join(scratch, "tree"), "rev-parse", "HEAD"); checkedOut != commit {
 				test.Errorf("the scratch tree is at %s, want %s", checkedOut, commit)
 			}
+			// The tests' temporary directory is under the account's `TMPDIR`, never a fixed /tmp, and it goes with the
+			// run.
+			_, temporary, found := strings.Cut(strings.TrimSpace(string(output)), "temporary at ")
+			if !found || !strings.HasPrefix(temporary, temporaryRoot+"/cohere-gate.") {
+				test.Fatalf("the tests' temporary directory wasn't made under %s:\n%s", temporaryRoot, output)
+			}
+			if _, statError := os.Stat(temporary); !os.IsNotExist(statError) {
+				test.Errorf("the tests' temporary directory %s outlived the run: %v", temporary, statError)
+			}
 		})
 	}
 }
@@ -519,7 +522,7 @@ func TestTheGatesScriptsParseAndSayTheirSteps(test *testing.T) {
 	test.Parallel()
 	needs.Tool(test, "bash", "the gate's scripts are bash scripts")
 	for name, script := range map[string]string{"macBoxScript": macBoxScript, "landGateScript": landGateScript,
-		"corpusLayScript": corpusLayScript, "performanceScript": performanceScript} {
+		"performanceScript": performanceScript} {
 		bash := exec.Command("bash", "-n")
 		bash.Stdin = strings.NewReader(script)
 		if output, bashError := bash.CombinedOutput(); bashError != nil {
@@ -549,8 +552,8 @@ func TestAGateMacKeepsToHerCoreBudget(test *testing.T) {
 	needs.Tool(test, "go", "go itself reads the flags the budget sets")
 	// The go command runs outside the module, where nothing of ours is read, so Go's test cache needs no record of it.
 	outside := build_inputs.OutsideModule(test, test.TempDir())
-	marin := macBoxRemoteCommand("Marin", "0123", "", nil, nil, []string{"./..."})
-	sun2 := macBoxRemoteCommand("Sun2", "0123", "", nil, nil, []string{"./..."})
+	marin := macBoxRemoteCommand("Marin", "0123", "", nil, []string{"./..."})
+	sun2 := macBoxRemoteCommand("Sun2", "0123", "", nil, []string{"./..."})
 	if !strings.Contains(marin, " | "+boxCoreBudgetVariable+"=10 bash -s -- ") ||
 		strings.Contains(sun2, boxCoreBudgetVariable) {
 		test.Errorf("Marin's command or Sun2's carries the wrong budget:\n%.300s\n%.300s", marin[len(marin)-120:],
