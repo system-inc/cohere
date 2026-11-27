@@ -43,8 +43,7 @@ import * as NodePath from 'node:path';
 import { locate } from '../corpus.mjs';
 import { loadDesignSystem } from '../generate_descriptors/loader.mjs';
 
-const usage =
-    'usage: generate.mjs <theme.css> <cross-check theme.css> <source dir>... [--resolve-root <dir>]\n';
+const usage = 'usage: generate.mjs <theme.css> <cross-check theme.css> <source dir>... [--resolve-root <dir>]\n';
 const positionalArguments = [];
 let resolveRootArgument;
 for(let index = 2; index < process.argv.length; index++) {
@@ -212,7 +211,9 @@ for(const className of Array.from(candidates).sort()) {
 const missingEdgeCases = edgeCases.filter((className) => unshared.includes(className));
 if(missingEdgeCases.length > 0) {
     // The edge cases are chosen to read alike on any theme, so one that does not is a reading that changed.
-    process.stderr.write(`generate.mjs: edge cases read differently on the two themes: ${missingEdgeCases.join(' ')}\n`);
+    process.stderr.write(
+        `generate.mjs: edge cases read differently on the two themes: ${missingEdgeCases.join(' ')}\n`,
+    );
     process.exit(4);
 }
 

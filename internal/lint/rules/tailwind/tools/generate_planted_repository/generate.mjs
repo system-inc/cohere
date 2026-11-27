@@ -492,8 +492,26 @@ while(lists.length < listCount) {
  * The files: invented component names, forty lists each, in the order drawn.
  */
 const adjectives = [
-    'Amber', 'Brisk', 'Cobalt', 'Dusky', 'Ember', 'Fable', 'Gilded', 'Hollow', 'Ivory', 'Jade',
-    'Kindled', 'Lunar', 'Misty', 'Nimble', 'Opal', 'Pebble', 'Quiet', 'Russet', 'Sable', 'Tidal',
+    'Amber',
+    'Brisk',
+    'Cobalt',
+    'Dusky',
+    'Ember',
+    'Fable',
+    'Gilded',
+    'Hollow',
+    'Ivory',
+    'Jade',
+    'Kindled',
+    'Lunar',
+    'Misty',
+    'Nimble',
+    'Opal',
+    'Pebble',
+    'Quiet',
+    'Russet',
+    'Sable',
+    'Tidal',
 ];
 const nouns = ['Lantern', 'Ledger', 'Meadow', 'Orchard', 'Quiver', 'Spindle', 'Thicket', 'Wicket'];
 const files = new Map();
