@@ -6,29 +6,49 @@
 //	    -entry-point <theme.css> [-output <file.go>] [-check] \
 //	    [-resolve-root <dir>] [-verify-invariance-against <theme.css>[:<resolve-root>]]
 //
+// # Which design system the committed tables come from
+//
+// The independent theme in tools/generate_descriptor_base/testdata, the generators' own design
+// system, written in this repository to share no `@theme` with any consumer. The public theme under
+// collapse/testdata says of itself that it is never an input to a generated table, so it is the
+// second system the families are checked against rather than the first. Neither directory holds a
+// `node_modules`, so `-resolve-root` names an installed tailwindcss for both:
+//
+//	go run ./internal/lint/rules/tailwind/tools/generate_collapse \
+//	    -entry-point internal/lint/rules/tailwind/tools/generate_descriptor_base/testdata/independent_theme.css \
+//	    -resolve-root <directory holding node_modules/tailwindcss> \
+//	    -verify-invariance-against internal/lint/rules/tailwind/collapse/testdata/public_theme/theme.css:<the same directory> \
+//	    [-check]
+//
+// The theme matters to more than the header. A consumer's theme puts its custom variants into
+// VariantOrder: the committed table was once generated from one and held `group-dark:` and
+// `peer-dark:`, which only a theme redeclaring `dark` registers, so `-check` failed on every machine
+// that did not have that consumer's checkout.
+//
 // # The one invariance claim in this file, and how to re-measure it
 //
-// `CollapseFamilies` ships as a fact about Tailwind. Everything else this generator writes is a
-// per-repository extraction, and `KnownStatics` proves it by carrying `markdown-content`, one of
-// ahra's own `@utility` blocks.
+// `CollapseFamilies` ships as a fact about Tailwind. VariantOrder beside it is a per-repository
+// extraction, since a theme's custom variants take positions in it.
 //
-// That claim was first verified by generating against ~/Projects/ahra and
-// ~/Projects/connected/www-connected-app and diffing to zero. The instrument could not support the
-// conclusion: both vendor the Structure submodule and import its `global.css`, so they share its
+// That claim was first verified by generating against two consumer repositories and diffing to zero. The
+// instrument could not support the conclusion: both import one shared stylesheet, so they share its
 // `@theme` and `@utility` blocks and are one observation wearing two names. Re-measured against a
-// system sharing nothing, the claim does hold: the same 44 families, identical down to the value
+// system sharing nothing, the claim held: the same 44 families then, identical down to the value
 // each was discovered at, across a registry differing by 25 functional roots and 7,850 probed
 // pairs. `-verify-invariance-against` is that measurement made repeatable, and it refuses a second
 // system whose registry matches the first, since two systems that cannot differ cannot detect a
 // table that varies.
 //
-//	go run ./internal/lint/rules/tailwind/tools/generate_collapse \
-//	    -entry-point ~/Projects/ahra/app/_theme/styles/theme.css \
-//	    -verify-invariance-against internal/lint/rules/tailwind/tools/generate_descriptor_base/testdata/independent_theme.css:tools/tailwind/generate_descriptor_base/testdata
+// It holds across the independent and public themes and not across every theme. The planted
+// repository's theme (collapse/testdata/planted_repository/styles) reports the same 45 families and
+// twelve more, all `rounded-*` ones such as `rounded-b + rounded-bl => rounded-b`, because its
+// `--radius-chip` is 0.375rem, the value of Tailwind's own `--radius-md`. Moved to 0.4rem it reports
+// the 45 alone. A theme key that repeats a default's value changes what the canonicalizer collapses,
+// which is why this check fails rather than warns.
 //
-// `-resolve-root` is what makes that second path work at all. Bare specifiers such as `tailwindcss`
+// `-resolve-root` is what makes those paths work at all. Bare specifiers such as `tailwindcss`
 // used to resolve from the entry point's own directory, which is correct for every repository and
-// impossible for a design system checked in under `tools/` with no `node_modules` above it. The two
+// impossible for a design system checked in under testdata with no `node_modules` above it. The two
 // are separate inputs now, defaulting to the old behaviour.
 //
 // The table it writes is what lets `enforce-canonical-classes` run in Go without a JavaScript runtime
@@ -152,12 +172,11 @@ func parseDesignSystemInput(value string) designSystemInput {
 
 // familySignature is the comparable form of the invariant table.
 //
-// Only the families, and deliberately not the rest of the enumeration. `collapse_table.go` also
-// carries KnownStatics, KnownRoots and ColorNames, which are repository facts by construction:
-// KnownStatics holds `markdown-content`, one of ahra's own `@utility` blocks, in a file whose
-// header says "Source: Tailwind 4.3.3". Comparing whole files across two design systems would
-// therefore always fail and would say nothing about the families. What is claimed invariant is what
-// gets checked.
+// Only the families, and deliberately not the rest of the enumeration. The header names the entry
+// point and its registry's size, and `property_order_table.go`'s VariantOrder holds the theme's own
+// custom variants, both repository facts by construction. Comparing whole files across two design
+// systems would therefore always fail and would say nothing about the families. What is claimed
+// invariant is what gets checked.
 func familySignature(families []family) string {
 	lines := make([]string, 0, len(families))
 	for _, entry := range families {
@@ -191,25 +210,6 @@ func invarianceProvenance(verifiedAgainst []string) string {
 		"//\n// Identical families, down to the value each was discovered at and whether it needs logicalToPhysical.\n",
 	)
 	return buffer.String()
-}
-
-// portablePath rewrites a home-relative path so the generated file does not name one machine.
-//
-// The paths reach here as the operator typed them, and an absolute one checked into a generated
-// header is a diff every other machine produces on regeneration, which makes `-check` fail for a
-// reason that has nothing to do with Tailwind.
-func portablePath(path string) string {
-	home, homeDirectoryError := os.UserHomeDir()
-	if homeDirectoryError != nil || home == "" {
-		return path
-	}
-	if relative, relativePathError := filepath.Rel(
-		home,
-		path,
-	); relativePathError == nil && !strings.HasPrefix(relative, "..") {
-		return filepath.Join("~", relative)
-	}
-	return path
 }
 
 // differingFamilies names what the two systems disagree about, in both directions.
@@ -272,7 +272,7 @@ func main() {
 		// Ignored: the rest of the same message, and the same exit code says it either way.
 		fmt.Fprintln(
 			os.Stderr,
-			"  example: go run ./internal/lint/rules/tailwind/tools/generate_collapse -entry-point ~/Projects/ahra/app/_theme/styles/theme.css",
+			"  example: go run ./internal/lint/rules/tailwind/tools/generate_collapse -entry-point internal/lint/rules/tailwind/tools/generate_descriptor_base/testdata/independent_theme.css -resolve-root <directory holding node_modules/tailwindcss>",
 		)
 		os.Exit(2)
 	}
@@ -329,15 +329,14 @@ func main() {
 	// CollapseFamilies is shipped as a framework fact, so the claim is re-measured here rather than
 	// at review time.
 	//
-	// The claim was once verified by generating against ~/Projects/ahra and
-	// ~/Projects/connected/www-connected-app and diffing to zero. Both vendor the Structure
-	// submodule and both import its global.css, so they share its `@theme` and its `@utility`
-	// blocks: that diff measured a shared dependency, and two repositories that cannot differ
-	// cannot detect a table that varies. Re-measured against
+	// The claim was once verified by generating against two consumer repositories and diffing to
+	// zero. Both import one shared stylesheet, so they share its `@theme` and its `@utility` blocks:
+	// that diff measured a shared dependency, and two repositories that cannot differ cannot detect a
+	// table that varies. Re-measured against
 	// internal/lint/rules/tailwind/tools/generate_descriptor_base/testdata/independent_theme.css, which shares nothing,
-	// the families do hold: the same 44, identical down to the value each was discovered at, across a
-	// registry that differs by 25 functional roots and 7,850 probed pairs. The claim is true. The
-	// instrument that had been asserting it was not measuring it.
+	// the families did hold: the same 44 then, identical down to the value each was discovered at,
+	// across a registry that differs by 25 functional roots and 7,850 probed pairs. The instrument
+	// that had been asserting it was not measuring it.
 	//
 	// It is opt-in rather than required, which is where this differs from generate_descriptor_base.
 	// That generator's entire job is to separate framework from repository, so one system leaves it
@@ -388,12 +387,12 @@ func main() {
 			// Ignored: the rest of the same message, and the same exit code says it either way.
 			fmt.Fprintln(
 				os.Stderr,
-				"  Every repository here vendors the Structure submodule and imports its global.css, so any two of them share a @theme.",
+				"  Two repositories importing one shared stylesheet share its @theme, so they cannot tell a framework fact from theirs.",
 			)
 			// Ignored: the rest of the same message, and the same exit code says it either way.
 			fmt.Fprintln(
 				os.Stderr,
-				"  Use internal/lint/rules/tailwind/tools/generate_descriptor_base/testdata/independent_theme.css, which shares nothing.",
+				"  Use a theme written in this repository: the independent one in tools/generate_descriptor_base/testdata or the public one in collapse/testdata.",
 			)
 			os.Exit(1)
 		}
@@ -417,7 +416,7 @@ func main() {
 		}
 		verifiedAgainst = append(verifiedAgainst, fmt.Sprintf(
 			"%s (%d roots, %d pairs)",
-			portablePath(other.entryPoint),
+			otherResult.EntryPoint,
 			otherResult.FunctionalRoots,
 			otherResult.PairsProbed,
 		))
@@ -560,10 +559,11 @@ func enumerate(entryPoint string, resolveRoot string) (*enumeration, error) {
 		return nil, fmt.Errorf("entry point %s is not readable: %w", absoluteEntryPoint, statError)
 	}
 
-	scriptPath, scriptBesideThisToolError := scriptBesideThisTool()
-	if scriptBesideThisToolError != nil {
-		return nil, scriptBesideThisToolError
+	directory, toolDirectoryError := toolDirectory()
+	if toolDirectoryError != nil {
+		return nil, toolDirectoryError
 	}
+	scriptPath := filepath.Join(directory, "enumerate.mjs")
 
 	// The resolve root defaults to the entry point's directory, which is what every repository
 	// invocation gets and what the script did unconditionally before. It is named explicitly only
@@ -600,19 +600,6 @@ func enumerate(entryPoint string, resolveRoot string) (*enumeration, error) {
 	return &result, nil
 }
 
-// scriptBesideThisTool finds enumerate.mjs relative to the repository rather than the caller.
-//
-// The tool is run with `go run ./internal/lint/rules/tailwind/tools/generate_collapse` from the repository root, so the
-// script sits at a known path from there. Locating it by walking up from the working directory
-// would silently pick up a different checkout when run from a subdirectory.
-func scriptBesideThisTool() (string, error) {
-	candidate := filepath.Join("tools", "generate_collapse", "enumerate.mjs")
-	if _, statError := os.Stat(candidate); statError == nil {
-		return candidate, nil
-	}
-	return "", fmt.Errorf("cannot find %s; run this from the repository root", candidate)
-}
-
 // render writes the Go source for the table.
 //
 // Gofmt is applied here rather than left to the caller so that `-check` compares bytes that a
@@ -636,10 +623,9 @@ func render(result *enumeration) ([]byte, error) {
 // usage, because a table built from observed classes is silently missing every family nobody has
 // written yet.
 //
-// Only CollapseFamilies is claimed invariant. The other tables in this file are per-repository by
-// construction, and KnownStatics is the proof: it carries markdown-content, one of ahra's own
-// @utility blocks, under a header naming only a Tailwind version. Read this file as one framework
-// fact sitting beside several repository extractions, not as framework data throughout.
+// Only CollapseFamilies is claimed invariant. The entry point and the registry size above are this
+// design system's, and a theme that repeats a default's value under a key of its own can collapse
+// more: read the generator's header for the one measured case.
 %s
 package tailwind
 
@@ -703,8 +689,8 @@ var CollapseFamilies = []CollapseFamily{
 // internal/rules/tailwind's valueIsColorIn asks the live theme's `+"`--color`"+` namespace, which is what
 // upstream does, with IsColorKeyword beside it for the three keywords that sit in no namespace.
 // Measured before the deletion: 558 of its 561 names answered by the theme and the other 3 by
-// colorKeywords, 0 uncovered, and the table knew nothing of the three colours www-connected-app
-// declares because it was generated from ahra.
+// colorKeywords, 0 uncovered, and the table knew nothing of the colours any other repository
+// declares, because it was generated from one.
 
 // TailwindVersion is the version these families were enumerated from.
 //

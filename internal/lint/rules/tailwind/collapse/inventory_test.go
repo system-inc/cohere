@@ -85,7 +85,7 @@ var tablesExemptFromTheInventory = map[string]bool{
 //	FrameworkFunctionalUtilities    33   functionalUtility registrations
 //	FrameworkMultiDeclarationUtilities
 //	                               154   functionalUtility registrations
-//	VariantOrder                   145   the order numbers those registrations sort at
+//	VariantOrder                   143   the order numbers those registrations sort at
 //	FrameworkNamespaces             14   the theme namespaces a root consumes, all Tailwind's own
 //	baseReadings                   374   readings of Tailwind's own utilities, held by the differential
 //	baseStatics                    869   readings of Tailwind's own statics, same
