@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // The gate runs internal/go_language's tests as several 2-thread processes rather than one (#78xwy8k). Its test process
@@ -14,51 +15,126 @@ import (
 // processes of 2 threads ran the same 431 top-level tests in 127s wall and about 440s of system time (#2htryg8). In
 // the last split gate Sun2's half was go_language alone, 707s.
 //
-// The box lists the package's top-level tests, deals them round-robin into a shard per two of its cores, runs every
-// shard at once and prints each one's JSON after the marker naming its tests (sharedBoxShards). Kirk's Mac reads the
-// shards as one package result, and proves, on the Square's terms, that the shards covered the listing exactly once:
-// every listed test in one shard's marker and ending once across them all, none missing, none in two. A gap refuses
-// the landing, naming each test, after any failing test, which is said first. The verdict reads the markers and
-// finishes the package's one result in box_verdict.go, with the rest of a run's reading.
+// The box runs each package of boxShardTable it is handed as a job of its own (sharedBoxGate): it lists the package's
+// top-level tests, deals each of its row's pins a shard of its own and the rest round-robin over the shards its row
+// leaves, runs every shard at once and prints each one's JSON after the marker naming its wall and its tests
+// (sharedBoxShards). Kirk's Mac reads each package's shards as one package result, and proves, on the Square's terms,
+// that its shards covered its listing exactly once: every listed test in one shard's marker and ending once across
+// them all, none missing, none in two. A gap refuses the landing, naming each test and its package, after any failing
+// test, which is said first. The verdict reads the markers and finishes each package's one result in box_verdict.go,
+// with the rest of a run's reading, and says each shard's wall, so the 3-minute bar on a test binary is read off every
+// landing (#d80tydg).
 
-// boxShardedPackage is the one package the gate runs in shards, by its import path. The script shards it only when
-// this path is among its arguments, which a split half's and a Mac's whole gate are; the land-gate job's patterns,
-// `./...`, never name it, so that road runs it unsharded.
-const boxShardedPackage = "github.com/system-inc/cohere/internal/go_language"
+// boxShardTable is the packages the gate runs in shards, a line each: `<import path> <shards> <pin>...`. The shards
+// are how many its tests are dealt into, 0 for a shard per two of the box's cores, bounded by the tests listed. Each
+// pin is a top-level test, or several joined by `+`, dealt a shard of its own together, so tests that share a costly
+// build share it once (#9b9d4x3), counted among the shards, and a pin its package's listing doesn't hold refuses the
+// landing. A pin opening with `<goos>:` holds on that platform alone and is set aside on any other. The script
+// shards a package only when its path is among its arguments, which a split half's and a Mac's whole gate are; the
+// land-gate job's patterns, `./...`, never name one, so that road runs every package unsharded. The script reads it
+// through boxShardTableLine, and TestTheShardTableReads holds it to its grammar.
+const boxShardTable = "github.com/system-inc/cohere/internal/go_language 0\n" +
+	// The engine's rows (#bd5j7v0, #wrpcag3): each package's work is 65 to 88 s on 2 threads alone on Shackler, so 4
+	// shards put each near 20 to 30 s, and no test is slow alone, so none is pinned.
+	"github.com/system-inc/cohere/internal/go_language/check 4\n" +
+	"github.com/system-inc/cohere/internal/go_language/load 4\n" +
+	// The front door's row (#9b9d4x3): 3 shards on 2 threads each ran 30.9, 32.5 and 20.7 s on Sun1 with Swift warm,
+	// and no test is slow alone. It holds only once every serial test puts the package's run state back (#76). The
+	// three real Swift tests, darwin's alone, share one shard, so one cohere-swift build serves them (#9b9d4x3).
+	"github.com/system-inc/cohere/command/cohere 3 darwin:TestARealSwiftRunThatExcludedEveryFileFails+" +
+	"TestASwiftRunReplaysThroughAGitStatusAndNotThroughAGitAddForce+" +
+	"TestASwiftRunInAWorktreeMissesOnAGitAddForceOfAFileOnlyItsSharedExcludeIgnores"
+
+// boxShardTableLine is sharedBoxGate's line setting shardTable, the table it shards by: set in the script itself, so
+// no variable in a shared box's environment can move it. A test replaces the line to shard packages of its own.
+const boxShardTableLine = "shardTable='" + boxShardTable + "'"
+
+// boxShardPinElsewhereMarker opens the line a box's run prints of a pin set aside because it names another platform
+// than hers, the package, the pin and the two platforms after it.
+const boxShardPinElsewhereMarker = "cohere-dev-gate: pin elsewhere "
 
 // boxShardListingMarker opens the line a box's run prints when it shards a package: the package's import path, then
 // every top-level test its listing held, in the listing's order, each separated by a space.
 const boxShardListingMarker = "cohere-dev-gate: listed "
 
-// boxShardMarker opens the line a box's run prints before each shard's JSON: `<index> of <count> <import path>`, the
-// index from 1, then the shard's tests, each separated by a space.
+// boxShardMarker opens the line a box's run prints before each shard's JSON: `<index> of <count> <import path>
+// <seconds>s`, the index from 1 and the seconds the shard's wall, then the shard's tests, each separated by a space.
 const boxShardMarker = "cohere-dev-gate: shard "
 
-// sharedBoxShards is sharedBoxGate's run of the sharded package, given its import path as sharded, countFlag
-// (sharedBoxCacheBlock) and testsFailed, which it sets to 1 when a shard fails. A listing that fails is a package that
+// sharedBoxShards is sharedBoxGate's run of one row of boxShardTable, given its import path as sharded, the shards
+// its row asks for as shardsAsked and its pins as shardPins, countFlag (sharedBoxCacheBlock) and testsFailed, which it
+// sets to 1 when a shard fails or a pin names no test the listing holds. A listing that fails is a package that
 // doesn't build, and one listing no test has nothing to deal, so either runs as one go test, which reports it as the
-// gate always has. Otherwise there is a shard per two cores, the cores being the box's core budget when she has one, at
-// least one shard and never more than the tests listed, and each runs on 2 threads. The shards' outputs are printed
-// after all have ended, each whole after its marker, so Kirk's Mac reads every event under the shard that ran it.
+// gate always has. Otherwise each pin is a shard of its own and the rest are dealt over the shards the row leaves,
+// at least one and never more than the tests left; a row asking for 0 asks for a shard per two cores, the cores being
+// the box's core budget when she has one. Each shard runs on 2 threads. The shards' outputs are printed after all
+// have ended, each whole after its marker, so Kirk's Mac reads every event under the shard that ran it.
 const sharedBoxShards = `listing=$(go test $countFlag -list '.*' "$sharded" 2>&1) || listing=""
 # go test runs tests, examples and fuzz targets' seeds; a benchmark runs only under -bench, so none is dealt.
 listed=$(printf '%s\n' "$listing" | grep -E '^(Test|Example|Fuzz)[^[:space:]]*$' || true)
-if [ -z "$listed" ]; then
+# A pin is a test's name, or several joined by +, a group dealt one shard together, so tests that share a costly
+# build share it once (the Go Square's ruling on #9b9d4x3). pinnedNames is every name the pins hold. A pin is held to
+# a listing that holds tests: one that failed is a package that doesn't build, which its one go test below reports,
+# and a refusal said first would hide it. Unquoted, so each name is its own word: a test's name, which holds no space
+# or glob.
+# A pin may say the one platform its tests are compiled on, the platform and a colon before it: elsewhere its tests aren't in the listing,
+# so it is set aside and said, never refused, while on its own platform it is held to the listing like any pin
+# (#9b9d4x3, the real Swift tests are darwin's alone).
+pinsHere=""; pinPlatform=""
+for pin in $shardPins; do
+  case "$pin" in
+  *:*)
+    [ -n "$pinPlatform" ] || pinPlatform=$(go env GOOS)
+    if [ "${pin%%:*}" = "$pinPlatform" ]; then
+      pinsHere="$pinsHere ${pin#*:}"
+    else
+      echo "` + boxShardPinElsewhereMarker + `$sharded ${pin#*:} holds on ${pin%%:*}, not on $pinPlatform"
+    fi ;;
+  *) pinsHere="$pinsHere $pin" ;;
+  esac
+done
+shardPins="${pinsHere# }"
+pinnedNames="${shardPins//+/ }"
+unlisted=""
+if [ -n "$listed" ]; then
+  for pin in $pinnedNames; do
+    printf '%s\n' "$listed" | grep -qxF -- "$pin" || unlisted="$unlisted $pin"
+  done
+fi
+if [ -n "$unlisted" ]; then
+  echo "` + sharedBoxRefusedMarker + `the shard table pins$unlisted to $sharded, whose listing holds no such test"
+  testsFailed=1
+elif [ -z "$listed" ]; then
   go test $countFlag -timeout ` + sharedBoxTestTimeout + ` -json "$sharded" |
     grep -vE '"Action":"(start|run|pause|cont)"' || testsFailed=1
 else
-  cores="${` + boxCoreBudgetVariable + `:-}"
-  [ -n "$cores" ] || cores=$(sysctl -n hw.ncpu 2>/dev/null || nproc)
-  shardCount=$((cores / 2))
+  shardCount="${shardsAsked:-0}"
+  if [ "$shardCount" = 0 ]; then
+    cores="${` + boxCoreBudgetVariable + `:-}"
+    [ -n "$cores" ] || cores=$(sysctl -n hw.ncpu 2>/dev/null || nproc)
+    shardCount=$((cores / 2))
+  fi
   listedCount=$(($(printf '%s\n' "$listed" | wc -l)))
-  [ "$shardCount" -le "$listedCount" ] || shardCount=$listedCount
-  [ "$shardCount" -ge 1 ] || shardCount=1
+  pinCount=0; pinnedCount=0
+  for pin in $shardPins; do pinCount=$((pinCount + 1)); done
+  for pin in $pinnedNames; do pinnedCount=$((pinnedCount + 1)); done
+  # The pins' shards come first, one each, a group's names together, and the rest of the listing is dealt over what
+  # the count leaves: at least one shard when any test is left, and never more than are left.
+  restCount=$((listedCount - pinnedCount))
+  restShards=$((shardCount - pinCount))
+  [ "$restShards" -le "$restCount" ] || restShards=$restCount
+  [ "$restShards" -ge 1 ] || restShards=1
+  [ "$restCount" -gt 0 ] || restShards=0
+  shardCount=$((pinCount + restShards))
   echo "` + boxShardListingMarker + `$sharded $(printf '%s' "$listed" | tr '\n' ' ')"
-  # Dealt round-robin in the listing's order, read a line at a time so no name is ever globbed.
   shardNames=()
+  shard=0
+  for pin in $shardPins; do shardNames[shard]="${pin//+/ }"; shard=$((shard + 1)); done
+  # The rest dealt round-robin in the listing's order, read a line at a time so no name is ever globbed.
   index=0
   while read -r name; do
-    shard=$((index % shardCount))
+    case " $pinnedNames " in *" $name "*) continue ;; esac
+    shard=$((pinCount + index % restShards))
     shardNames[shard]="${shardNames[shard]:-}${shardNames[shard]:+ }$name"
     index=$((index + 1))
   done <<< "$listed"
@@ -66,8 +142,14 @@ else
   shardProcesses=""
   shard=0
   while [ "$shard" -lt "$shardCount" ]; do
-    GOMAXPROCS=2 go test $countFlag -timeout ` + sharedBoxTestTimeout + ` -json -run "^(${shardNames[shard]// /|})$" \
-      "$sharded" > "$shards/$shard" 2>&1 &
+    # Each shard keeps its own wall, from its start to its end, which its marker says against the bar on a binary.
+    (
+      shardStarted=$(date +%s); shardFailed=0
+      GOMAXPROCS=2 go test $countFlag -timeout ` + sharedBoxTestTimeout + ` -json -run "^(${shardNames[shard]// /|})$" \
+        "$sharded" > "$shards/$shard" 2>&1 || shardFailed=1
+      echo "$(($(date +%s) - shardStarted))" > "$shards/$shard.wall"
+      exit "$shardFailed"
+    ) &
     shardProcesses="$shardProcesses $!"
     shard=$((shard + 1))
   done
@@ -76,7 +158,9 @@ else
   for shardProcess in $shardProcesses; do wait "$shardProcess" || shardsFailed=1; done
   shard=0
   while [ "$shard" -lt "$shardCount" ]; do
-    echo "` + boxShardMarker + `$((shard + 1)) of $shardCount $sharded ${shardNames[shard]}"
+    shardWall=0
+    [ ! -s "$shards/$shard.wall" ] || read -r shardWall < "$shards/$shard.wall"
+    echo "` + boxShardMarker + `$((shard + 1)) of $shardCount $sharded ${shardWall}s ${shardNames[shard]}"
     # A shard that printed nothing the filter keeps ended no test, which Kirk's Mac names as a gap.
     grep -vE '"Action":"(start|run|pause|cont)"' "$shards/$shard" || true
     shard=$((shard + 1))
@@ -100,6 +184,9 @@ type shardedRun struct {
 	slowest     float64
 	// testEnds is each top-level test's pass, fail or skip, by the index of the shard whose JSON said it, in order.
 	testEnds map[string][]int
+	// walls is each shard's wall, from its start to its end, by its index, as its marker said it; a marker saying none,
+	// a stand-in's, adds none.
+	walls map[int]time.Duration
 }
 
 // readShardEvent reads a JSON event of a sharded package, said under the shard at index, into run: a package's pass,
@@ -185,6 +272,19 @@ func (run *shardedRun) coverageGaps(importPath string) []string {
 		}
 	}
 	return gaps
+}
+
+// wallsSaid is the shards' walls as the timing report says them, `<import path> by shard 2m7s, 2m0s`, each by its
+// index's order, empty when no marker said one.
+func (run *shardedRun) wallsSaid(importPath string) string {
+	if len(run.walls) == 0 {
+		return ""
+	}
+	said := []string{}
+	for _, index := range slices.Sorted(maps.Keys(run.walls)) {
+		said = append(said, run.walls[index].String())
+	}
+	return importPath + " by shard " + strings.Join(said, ", ")
 }
 
 // shardIndexes is shard indexes as a sentence says them: `2`, `1 and 3`, `1, 2 and 3`.
