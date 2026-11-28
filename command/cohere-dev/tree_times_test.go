@@ -101,6 +101,15 @@ func TestAnIntegrateJobStampsItsTreeByContent(test *testing.T) {
 		test.Errorf("the fixture's merge holds %d directories of %d entries, want the root, one directory beneath it "+
 			"and a file", directories, len(entries))
 	}
+	// The tree's own .git, the worktree's file naming its git directory, written when the lay made the tree, is at
+	// directoryTime too: a job that lays its tree afresh writes it anew, and a test listing the root reads its stat.
+	gitFile, gitError := os.Lstat(filepath.Join(tree, ".git"))
+	if gitError != nil {
+		test.Fatalf("the laid tree has no .git: %v", gitError)
+	}
+	if !gitFile.ModTime().Equal(directoryTime) {
+		test.Errorf("the laid tree's .git is stamped %v, want directoryTime %v", gitFile.ModTime(), directoryTime)
+	}
 }
 
 // A tracked file whose bytes differ from `HEAD` when the stamp runs, the same size but other bytes, keeps the time it
