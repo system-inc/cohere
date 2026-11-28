@@ -209,6 +209,43 @@ func (job *integrateJobRun) sayTree(when string, trees []string) {
 		}
 		job.say("laid tree %s %s", when, line)
 	}
+	if len(off) > 0 {
+		job.sayTreeDifference(when, trees)
+	}
+}
+
+// treeDifferenceLinesSaid is how many lines of the laid trees' difference from their `HEAD` the account prints at one
+// moment, the rest counted, so a test that rewrites a large tracked file can't fill the job's log.
+const treeDifferenceLinesSaid = 80
+
+// sayTreeDifference says how the tracked files of trees differ from their `HEAD` in bytes, `git diff` a line at a
+// time, or that none does, so a tracked file the walk found moved is read as rewritten with new bytes or only touched:
+// go.work.sum moved during J-dqg0kkx's tests on Shackler and never on the Mac, whose go is another release, and its
+// time alone didn't say what was written (#d49qcjg). The diff takes no optional lock, so reading it writes nothing.
+func (job *integrateJobRun) sayTreeDifference(when string, trees []string) {
+	lines := []string{}
+	for _, tree := range trees {
+		difference, differenceError := gitOutput(tree, "--no-optional-locks", "diff", "--no-ext-diff", "--no-color",
+			"HEAD", "--")
+		if differenceError != nil {
+			job.say("laid tree %s difference unread: %v", when, differenceError)
+			return
+		}
+		if difference != "" {
+			lines = append(lines, strings.Split(difference, "\n")...)
+		}
+	}
+	if len(lines) == 0 {
+		job.say("laid tree %s difference none: no tracked file's bytes differ from its HEAD", when)
+		return
+	}
+	for index, line := range lines {
+		if index == treeDifferenceLinesSaid {
+			job.say("laid tree %s difference and %d more lines", when, len(lines)-treeDifferenceLinesSaid)
+			break
+		}
+		job.say("laid tree %s difference %s", when, line)
+	}
 }
 
 // packagesCached reads a `go test -json` stream and returns how many packages ended, a pass or a fail, how many of
