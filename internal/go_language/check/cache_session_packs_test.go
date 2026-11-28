@@ -26,6 +26,61 @@ func runStore(root string, clock func() time.Time) *cache.Store {
 	return cache.Open(root, cache.NewShardStamps(clock))
 }
 
+// projectShard is the directory of key's shard in the store Open keeps under root.
+func projectShard(root string, key cache.Key) string {
+	return filepath.Join(root, ".cache", "cohere", "go", key.String()[:2])
+}
+
+// modifiedAt is directory's modification time, a shard's stamp as the store reads it.
+func modifiedAt(test *testing.T, directory string) time.Time {
+	test.Helper()
+	information, statError := os.Stat(directory)
+	if statError != nil {
+		test.Fatal(statError)
+	}
+	return information.ModTime()
+}
+
+// afterTheStamp runs write, which stands for another run's write, removal or trim in the shard at shardDirectory
+// since this run read its stamp, once the file system's clock is past the shard's time, and fails unless write moved
+// it. A real run never needs the wait: a pack trusts a stamp only once it is two seconds behind the clock as it was
+// read (cache.ShardStamps), so another run's later write lands in a later tick on any file system whose tick is under
+// two seconds. A test's run reads its stamps under laterClock, which trusts one read microseconds after its shard's
+// write, and ext4 moves a directory's time in the kernel's coarse ticks, a millisecond or so: a write that soon after
+// can land in the same tick, leave the time where it was, and have the pack serve what it replaced, which no run can
+// reach. The clock is probed in a directory of the test's own, so write alone moves the shard. Where times are in
+// nanoseconds, as on APFS, the first probe is past it and nothing waits.
+func afterTheStamp(test *testing.T, shardDirectory string, write func()) {
+	test.Helper()
+	stamped := modifiedAt(test, shardDirectory)
+	probes := test.TempDir()
+	probe := filepath.Join(probes, "probe")
+	// A second is hundreds of coarse ticks: a file system whose directory times stay still that long is too coarse for
+	// a test that reads its stamps under laterClock.
+	deadline := time.Now().Add(time.Second)
+	for {
+		if writeError := os.WriteFile(probe, nil, 0o644); writeError != nil {
+			test.Fatal(writeError)
+		}
+		if removeError := os.Remove(probe); removeError != nil {
+			test.Fatal(removeError)
+		}
+		if modifiedAt(test, probes).After(stamped) {
+			break
+		}
+		if time.Now().After(deadline) {
+			test.Fatalf("the file system's directory times stayed at %v for a second, too coarse for this test",
+				stamped)
+		}
+		// About one coarse tick of the kernel's clock between probes.
+		time.Sleep(time.Millisecond)
+	}
+	write()
+	if modifiedAt(test, shardDirectory).Equal(stamped) {
+		test.Fatalf("the write left the shard's time at %v", stamped)
+	}
+}
+
 // packedSession is an extra build's session over store, a run's, with its packs opened under the source loader, as
 // the build's first Restore opens them before it reads its hits.
 func packedSession(store *cache.Store) *CacheSession {
@@ -127,9 +182,11 @@ func TestAKeyWrittenAgainSinceThePackIsReadFromTheStore(test *testing.T) {
 		test.Fatal(putError)
 	}
 	packedOnce(test, runStore(root, laterClock), key, "the record the pack was made of")
-	if putError := store.Put(key, []byte("the record another run wrote")); putError != nil {
-		test.Fatal(putError)
-	}
+	afterTheStamp(test, projectShard(root, key), func() {
+		if putError := store.Put(key, []byte("the record another run wrote")); putError != nil {
+			test.Fatal(putError)
+		}
+	})
 	session := packedSession(runStore(root, laterClock))
 	if contents, _, found := session.entryAt(session.caching.Store, key); !found ||
 		string(contents) != "the record another run wrote" {
@@ -158,9 +215,11 @@ func TestAKeyTrimmedSinceThePackReadsAsAMiss(test *testing.T) {
 	if timesError := os.Chtimes(recordPath, aged, aged); timesError != nil {
 		test.Fatal(timesError)
 	}
-	if notKept := cache.TrimSystemCache(root, directory, cache.SystemCacheSizeCap); notKept != nil {
-		test.Fatalf("the trim failed: %s", notKept)
-	}
+	afterTheStamp(test, filepath.Dir(recordPath), func() {
+		if notKept := cache.TrimSystemCache(root, directory, cache.SystemCacheSizeCap); notKept != nil {
+			test.Fatalf("the trim failed: %s", notKept)
+		}
+	})
 	if _, statError := os.Stat(recordPath); !os.IsNotExist(statError) {
 		test.Fatalf("the trim kept the record unread for six days: %v", statError)
 	}
@@ -185,7 +244,7 @@ func TestARacyShardIsNeverServed(test *testing.T) {
 		test.Fatal(putError)
 	}
 	tick := time.Unix(1_800_000_000, 0)
-	shardDirectory := filepath.Join(root, ".cache", "cohere", "go", key.String()[:2])
+	shardDirectory := projectShard(root, key)
 	holdTick := func() {
 		test.Helper()
 		if timesError := os.Chtimes(shardDirectory, tick, tick); timesError != nil {
@@ -223,6 +282,43 @@ func TestARacyShardIsNeverServed(test *testing.T) {
 	if contents, _, found := next.entryAt(next.caching.Store, key); !found ||
 		string(contents) != "the record written in the same tick" {
 		test.Errorf("want the record the store holds now, got %q (found %v)", contents, found)
+	}
+}
+
+// A pack serves a shard's entries only when the run read its stamp at least two seconds after the shard's last write
+// (cache.ShardStamps), as a session's pack holds it and not the stamp alone: a run whose clock reads 1.9 s past the
+// shard's time records no stamp of it, and the next run, however long after, reads the key from the store, while a
+// run reading 2 s past records it, and the next run is served from the pack. A write later in the same tick, on a file
+// system whose times are coarse, is then never hidden behind a stamp that has not moved (#b2t9xmf). The run's clock is
+// the test's, set from the shard's time as the file system holds it.
+func TestAPackServesAShardOnlyOnceItsStampIsTwoSecondsBehindTheClock(test *testing.T) {
+	test.Parallel()
+
+	for _, judged := range []struct {
+		behind time.Duration
+		served int64
+	}{
+		{behind: 1900 * time.Millisecond, served: 0},
+		{behind: 2 * time.Second, served: 1},
+	} {
+		root := test.TempDir()
+		store := cache.Open(root, nil)
+		key := cache.Key{0x13}
+		if putError := store.Put(key, []byte("the record the pack was made of")); putError != nil {
+			test.Fatal(putError)
+		}
+		readAt := modifiedAt(test, projectShard(root, key)).Add(judged.behind)
+		packedOnce(test, runStore(root, func() time.Time { return readAt }), key, "the record the pack was made of")
+		next := packedSession(runStore(root, laterClock))
+		if contents, _, found := next.entryAt(next.caching.Store, key); !found ||
+			string(contents) != "the record the pack was made of" {
+			test.Errorf("a stamp read %v after its shard's write: want the record, got %q (found %v)", judged.behind,
+				contents, found)
+		}
+		if served := next.packs.served.Load(); served != judged.served {
+			test.Errorf("a stamp read %v after its shard's write: want %d served from the pack, got %d",
+				judged.behind, judged.served, served)
+		}
 	}
 }
 
@@ -360,10 +456,12 @@ func TestAnEntryReadThroughAnAliasIsReadAgainOnceItsTableIsRewritten(test *testi
 	}
 	packedOnce(test, runStore(root, laterClock), alias, "the entry the alias stands for")
 	// Only the table's shard is written.
-	if addError := newAliasTable(store, cache.Context{}).add(map[cache.Key]cache.Key{alias: second},
-		aliasTableFloor); addError != nil {
-		test.Fatal(addError)
-	}
+	table := newAliasTable(store, cache.Context{})
+	afterTheStamp(test, projectShard(root, table.key), func() {
+		if addError := table.add(map[cache.Key]cache.Key{alias: second}, aliasTableFloor); addError != nil {
+			test.Fatal(addError)
+		}
+	})
 	session := packedSession(runStore(root, laterClock))
 	contents, storedKey, found := session.entryAt(session.caching.Store, alias)
 	if !found || string(contents) != "the entry it stands for now" || storedKey != second {
@@ -405,9 +503,11 @@ func TestAnEntryReadThroughAnAliasIsReadAgainOnceItsTargetIsWrittenAgain(test *t
 	store, alias, target, _ := aliasedStore(test, root)
 	packedOnce(test, runStore(root, laterClock), alias, "the entry the alias stands for")
 	// Only the target's shard is written.
-	if putError := store.Put(target, []byte("the target another run wrote again")); putError != nil {
-		test.Fatal(putError)
-	}
+	afterTheStamp(test, projectShard(root, target), func() {
+		if putError := store.Put(target, []byte("the target another run wrote again")); putError != nil {
+			test.Fatal(putError)
+		}
+	})
 	session := packedSession(runStore(root, laterClock))
 	contents, storedKey, found := session.entryAt(session.caching.Store, alias)
 	if !found || string(contents) != "the target another run wrote again" || storedKey != target {
@@ -429,9 +529,11 @@ func TestAnEntryReadThroughAnAliasIsReadAgainOnceARecordIsWrittenUnderTheAlias(t
 	store, alias, _, _ := aliasedStore(test, root)
 	packedOnce(test, runStore(root, laterClock), alias, "the entry the alias stands for")
 	// Only the alias's shard is written.
-	if putError := store.Put(alias, []byte("a record another run wrote under the alias")); putError != nil {
-		test.Fatal(putError)
-	}
+	afterTheStamp(test, projectShard(root, alias), func() {
+		if putError := store.Put(alias, []byte("a record another run wrote under the alias")); putError != nil {
+			test.Fatal(putError)
+		}
+	})
 	session := packedSession(runStore(root, laterClock))
 	contents, storedKey, found := session.entryAt(session.caching.Store, alias)
 	if !found || string(contents) != "a record another run wrote under the alias" || storedKey != alias {
@@ -460,9 +562,11 @@ func TestAWriteBetweenAReadAndTheSaveIsReadFromTheStoreNextRun(test *testing.T) 
 		string(contents) != "the record the run read" {
 		test.Fatalf("the run read %q (found %v)", contents, found)
 	}
-	if putError := store.Put(key, []byte("the record another run wrote meanwhile")); putError != nil {
-		test.Fatal(putError)
-	}
+	afterTheStamp(test, projectShard(root, key), func() {
+		if putError := store.Put(key, []byte("the record another run wrote meanwhile")); putError != nil {
+			test.Fatal(putError)
+		}
+	})
 	session.writePacks()
 	next := packedSession(runStore(root, laterClock))
 	if contents, _, found := next.entryAt(next.caching.Store, key); !found ||
@@ -484,9 +588,11 @@ func TestATargetWrittenBetweenAReadThroughItsAliasAndTheSaveIsReadFromTheStoreNe
 		string(contents) != "the entry the alias stands for" {
 		test.Fatalf("the run read %q (found %v)", contents, found)
 	}
-	if putError := store.Put(target, []byte("the target another run wrote meanwhile")); putError != nil {
-		test.Fatal(putError)
-	}
+	afterTheStamp(test, projectShard(root, target), func() {
+		if putError := store.Put(target, []byte("the target another run wrote meanwhile")); putError != nil {
+			test.Fatal(putError)
+		}
+	})
 	session.writePacks()
 	next := packedSession(runStore(root, laterClock))
 	if contents, _, found := next.entryAt(next.caching.Store, alias); !found ||
@@ -511,10 +617,12 @@ func TestATableRewrittenBetweenAResolutionAndTheSaveIsReadFromTheStoreNextRun(te
 		string(contents) != "the entry the alias stands for" {
 		test.Fatalf("the run read %q (found %v)", contents, found)
 	}
-	if addError := newAliasTable(store, cache.Context{}).add(map[cache.Key]cache.Key{alias: second},
-		aliasTableFloor); addError != nil {
-		test.Fatal(addError)
-	}
+	table := newAliasTable(store, cache.Context{})
+	afterTheStamp(test, projectShard(root, table.key), func() {
+		if addError := table.add(map[cache.Key]cache.Key{alias: second}, aliasTableFloor); addError != nil {
+			test.Fatal(addError)
+		}
+	})
 	session.writePacks()
 	next := packedSession(runStore(root, laterClock))
 	if contents, storedKey, found := next.entryAt(next.caching.Store, alias); !found ||
@@ -587,7 +695,7 @@ func TestAShardTheRunWroteAfterReadingItsStampIsNeverRecorded(test *testing.T) {
 		test.Errorf("want no stamp of the shard the run wrote, got %v", read.Stamps)
 	}
 	stamped := time.Unix(0, reading.Stamp)
-	shardDirectory := filepath.Join(root, ".cache", "cohere", "go", key.String()[:2])
+	shardDirectory := projectShard(root, key)
 	if timesError := os.Chtimes(shardDirectory, stamped, stamped); timesError != nil {
 		test.Fatal(timesError)
 	}
@@ -656,9 +764,11 @@ func TestAKeyThePackHeldStaleIsServedOnAReloadAsTheRunReadIt(test *testing.T) {
 		test.Fatal(putError)
 	}
 	packedOnce(test, runStore(root, laterClock), key, "the record the pack was made of")
-	if putError := store.Put(key, []byte("the record another run wrote")); putError != nil {
-		test.Fatal(putError)
-	}
+	afterTheStamp(test, projectShard(root, key), func() {
+		if putError := store.Put(key, []byte("the record another run wrote")); putError != nil {
+			test.Fatal(putError)
+		}
+	})
 	session := packedSession(runStore(root, laterClock))
 	if contents, _, found := session.entryAt(session.caching.Store, key); !found ||
 		string(contents) != "the record another run wrote" || session.packs.stale.Load() != 1 {
