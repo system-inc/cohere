@@ -310,14 +310,15 @@ func (verdict *boxVerdict) readShardListing(line string) {
 		return
 	}
 	verdict.shardedRuns[fields[0]] = &shardedRun{listed: fields[1:], shards: map[int][][]string{},
-		packageEnds: map[int]int{}, testEnds: map[string][]int{}}
+		packageEnds: map[int]int{}, testEnds: map[string][]int{}, walls: map[int]time.Duration{}}
 	verdict.shardedPackages = append(verdict.shardedPackages, fields[0])
 }
 
 // readShardMarker reads the line after boxShardMarker, a shard's (sharded_run.go), into verdict, and returns the
 // package it names and the shard's index, which the events after it belong to. A marker that doesn't read, or names a
 // package no listing named, is none: its events read as the stream's, and the shards' coverage finds its tests
-// missing.
+// missing. Its wall, `<seconds>s` after the package, is kept for the timing report; no test's name reads as one, so a
+// marker without it, a stand-in's, holds its tests from there.
 func (verdict *boxVerdict) readShardMarker(line string) (string, int) {
 	fields := strings.Fields(line)
 	if len(fields) < 4 || fields[1] != "of" {
@@ -330,7 +331,16 @@ func (verdict *boxVerdict) readShardMarker(line string) (string, int) {
 		return "", 0
 	}
 	run.count = max(run.count, count)
-	run.shards[index] = append(run.shards[index], fields[4:])
+	names := fields[4:]
+	if len(names) > 0 {
+		if seconds, isWall := strings.CutSuffix(names[0], "s"); isWall {
+			if spent, wallError := strconv.Atoi(seconds); wallError == nil {
+				run.walls[index] = time.Duration(spent) * time.Second
+				names = names[1:]
+			}
+		}
+	}
+	run.shards[index] = append(run.shards[index], names)
 	return fields[3], index
 }
 
@@ -477,7 +487,7 @@ func testsNamed(tests map[string][]string) []string {
 // there is no verdict from it, which refuses the landing. A verdict about another tree than commit is no verdict.
 // setting is what gateVariable says, never gateOffSetting, which runModuleTests keeps on Kirk's Mac. testing is the
 // gate's environment, in which a gate on the house Macs lists its packages here, so a whole gate hands its box import
-// paths as a split one hands each half (gate_split.go), and the box shards boxShardedPackage either way
+// paths as a split one hands each half (gate_split.go), and the box shards boxShardTable's packages either way
 // (sharded_run.go). A run whose shards didn't run each listed test exactly once is no verdict.
 func runBoxGate(
 	worktree string,
@@ -636,7 +646,8 @@ func lastWords(output []byte, fallback string) string {
 }
 
 // timingReport is where a run's time went, in one line: each step it said, then its slowest test binaries, each by
-// import path and seconds. It is empty when the run said neither. A split gate's is each half's, under its box's name.
+// import path and seconds, then each sharded package's shards' walls, so the bar on a test binary is read off every
+// shard. It is empty when the run said none of them. A split gate's is each half's, under its box's name.
 func (verdict boxVerdict) timingReport() string {
 	if len(verdict.parts) > 0 {
 		halves := []string{}
@@ -669,6 +680,11 @@ func (verdict boxVerdict) timingReport() string {
 	}
 	if len(slowest) > 0 {
 		parts = append(parts, "slowest test binaries "+strings.Join(slowest, ", "))
+	}
+	for _, importPath := range verdict.shardedPackages {
+		if walls := verdict.shardedRuns[importPath].wallsSaid(importPath); walls != "" {
+			parts = append(parts, walls)
+		}
 	}
 	return strings.Join(parts, "; ")
 }
