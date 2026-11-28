@@ -1,8 +1,10 @@
 // Command generate records the upstream text every copy in the module is of (internal/go_language/copied) into
-// internal/go_language/copied/testdata/upstream, so the test that holds each copy to upstream reads only the
-// repository. Run it from the module root once a copy is added or bumped, naming where upstream's source lives:
+// internal/go_language/copied/upstream_text/testdata/upstream, so the test that holds each copy to upstream
+// (internal/go_language/copied/every_copy) reads only the repository. Run it from the module root once a copy is
+// added or bumped, naming where upstream's source lives:
 //
-//	go run ./internal/go_language/copied/tools/generate -module-cache <directory> -toolchain-root <directory>
+//	go run ./internal/go_language/copied/upstream_text/tools/generate \
+//		-module-cache <directory> -toolchain-root <directory>
 //
 // -module-cache is the module cache (`go env GOMODCACHE`) and -toolchain-root the root of a Go distribution whose
 // source a std copy is of, `LICENSE` and `VERSION` in it as the release archives ship them; Homebrew's root keeps
@@ -33,7 +35,7 @@ import (
 )
 
 // recordedDirectory is where the recorded text goes, from the module root.
-const recordedDirectory = "internal/go_language/copied/testdata/upstream"
+const recordedDirectory = "internal/go_language/copied/upstream_text/testdata/upstream"
 
 // skippedDirectories are what the walk leaves out, as the test's walk does: the TypeScript submodule, npm's
 // node_modules, and testdata, whose planted copies name nothing that needs recording.
