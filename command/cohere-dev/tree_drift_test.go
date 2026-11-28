@@ -80,6 +80,7 @@ func TestAnIntegrateJobsAccountNamesWhatRanAndWhatMoved(test *testing.T) {
 		`laid tree after tests 2 off the stamp \(a walk, [0-9.]+s\)`,
 		`laid tree after tests moved \. [0-9T:.Z-]+`,
 		`laid tree after tests untracked test-scratch`,
+		`laid tree after tests difference none: no tracked file's bytes differ from its HEAD`,
 	} {
 		if want := regexp.MustCompile(`(?m)^` + integrateJobMarker + line + `$`); !want.MatchString(ran.errors) {
 			test.Errorf("the account doesn't match %s:\n%s", want, ran.errors)
@@ -87,5 +88,33 @@ func TestAnIntegrateJobsAccountNamesWhatRanAndWhatMoved(test *testing.T) {
 	}
 	if strings.Contains(ran.errors, integrateJobMarker+"ran tests example.com/fixture/alpha ") {
 		test.Errorf("the account names a package that replayed as one that ran:\n%s", ran.errors)
+	}
+}
+
+// A tracked file a test rewrites is named moved, and its new bytes are said as the trees' difference from their `HEAD`,
+// so the account reads a rewrite apart from a touch: go.work.sum moved on Shackler with nothing saying what it gained
+// (#d49qcjg).
+func TestAnIntegrateJobsAccountSaysWhatATestRewrote(test *testing.T) {
+	test.Parallel()
+	fixture := newIntegrateJobFixture(test)
+	fixture.reply("measure.run", shacklerSays([]int64{9900, 9700, 9800}))
+	tree := filepath.Join(fixture.home, integrateJobScratch, "tree")
+	fixture.reply("tests.grows", filepath.Join(tree, "command", "cohere", "main.go"))
+	ran := fixture.integrateJob(fixture.merged())
+	if ran.exit != 0 {
+		test.Fatalf("the integrate job exited %d:\n%s", ran.exit, ran.errors)
+	}
+	for _, line := range []string{
+		`laid tree after tests moved command/cohere/main\.go [0-9T:.Z-]+`,
+		`laid tree after tests difference \+\+\+ b/command/cohere/main\.go`,
+		`laid tree after tests difference \+entry`,
+		`laid tree after tests difference -func main\(\) \{\}`,
+	} {
+		if want := regexp.MustCompile(`(?m)^` + integrateJobMarker + line + `$`); !want.MatchString(ran.errors) {
+			test.Errorf("the account doesn't match %s:\n%s", want, ran.errors)
+		}
+	}
+	if strings.Contains(ran.errors, integrateJobMarker+"laid tree before tests difference") {
+		test.Errorf("a tree on its stamp before the tests says a difference:\n%s", ran.errors)
 	}
 }
