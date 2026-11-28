@@ -104,6 +104,12 @@ type pipeline struct {
 	// the test can compare the two.
 	keepsWalkOff bool
 
+	// identifiesAs, set only by a test, is cohere-go's identity in place of the running executable's
+	// (executableIdentity), so a test can run two executables over one root (#s8e6z0n). typesLoaded, a test's too, is
+	// told the load the types phase reads, before its record, so a test can see what that load restored.
+	identifiesAs string
+	typesLoaded  func(loaded *load.Loaded)
+
 	// judgedSkipped, set only by a test, has every extra build also judge each package it skips without judging, as
 	// the plain path judges a visited one, and is told, with the build, each it judged, by which judgment, and why it
 	// declines, empty where it holds: a package the build must never have skipped when why is not (#wcwx8vf,
@@ -491,6 +497,11 @@ func (pipeline *pipeline) run() int {
 				pipeline.session.KeepDeclarationsRecords(decodeDeclarationsRecord)
 			}
 		}
+		// Asked at the host's first restore whatever the builds, so the reason's own judgment of them is the one that
+		// decides whether the host reads its store cold (#s8e6z0n).
+		if pipeline.session != nil {
+			pipeline.session.ReadColdWhen(pipeline.hostReadColdReason)
+		}
 	}
 	// Every go command the run's builds need starts now, before the first load grows the heap (#sktb2y8), and is joined
 	// on every way out, a return or a panic, so none outlives the run.
@@ -525,6 +536,9 @@ func (pipeline *pipeline) run() int {
 		loaded, loadError = nil, nil
 	}
 	pipeline.censusMissed = pipeline.missedByCensus(loaded)
+	if pipeline.typesLoaded != nil && loaded != nil {
+		pipeline.typesLoaded(loaded)
+	}
 	pipeline.runTypes(loaded, loadError)
 	pipeline.checkCensusAgainstLoad()
 	// A rename that wrote loaded the written tree again, which the lint phase reads, so the graph is built again from

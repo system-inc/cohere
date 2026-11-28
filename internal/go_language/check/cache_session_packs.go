@@ -58,18 +58,25 @@ func (session *CacheSession) openPacks(loader string) {
 	packs.opened = true
 	packs.counts.RefusedBy = map[string]int{}
 	if store := session.caching.Store; store != nil && store.ShardStamps() != nil {
-		keyContext := session.keyContextOf(loader)
-		// The project's pack is named by every part of the context its keys hold, so another build, rule set or
-		// executable never reads it, and a run with another loader has its own.
-		packs.open(store, false, cache.PackPlace{Identity: cache.PackIdentity(keyContext.ExecutableIdentity),
-			Name: cache.PackName([]string{"project"}, []string{keyContext.FormatVersion, keyContext.ExecutableIdentity},
-				keyContext.Build, keyContext.RuleSet)})
+		packs.open(store, false, ProjectPackPlace(session.caching.Context, session.caching.CgoToolchain, loader))
 	}
 	if session.KeepsSystemCache() && session.standardLibraryContext != nil &&
 		session.caching.StandardLibrary.System.ShardStamps() != nil {
 		packs.open(session.caching.StandardLibrary.System, true,
 			systemPackPlace(*session.standardLibraryContext, packs.project))
 	}
+}
+
+// ProjectPackPlace is where the project's store keeps the pack of a build whose session's Caching holds context and
+// cgoToolchain, for its loads under loader: named by every part of the context its keys hold (keyContextOf), so another
+// build, rule set or executable never reads it, and a run with another loader has its own. The build's session opens
+// it (openPacks), and the host's run asks, before its first restore, whether every build's is missing (#s8e6z0n), so
+// the two name it alike by construction.
+func ProjectPackPlace(context cache.Context, cgoToolchain []string, loader string) cache.PackPlace {
+	keyContext := keyContextOf(context, cgoToolchain, loader)
+	return cache.PackPlace{Identity: cache.PackIdentity(keyContext.ExecutableIdentity),
+		Name: cache.PackName([]string{"project"}, []string{keyContext.FormatVersion, keyContext.ExecutableIdentity},
+			keyContext.Build, keyContext.RuleSet)}
 }
 
 // systemPackPlace is where the system cache's pack of a build is: named by every part of the standard library's
@@ -164,6 +171,24 @@ func (session *CacheSession) putRecord(store *cache.Store, key cache.Key, entry 
 	return putError
 }
 
+// WritePacksWithoutSave writes the session's packs, an extra build's, from what its loads read, and marks the build
+// run, for a build that ran no save: one whose load found type errors, which runs no rule, one whose load failed, or
+// one whose rules failed. With neither the host of every later run would take this build for one that has never run,
+// and read its own store cold each time (the host reading cold, #s8e6z0n): a project that builds only on its own
+// platform has every extra build fail so, and its host would read cold forever. What a pack holds is what the run read
+// of the store, each shard's stamp taken before it was read, so a run cut short writes one as sound as a save's. It
+// returns what the packs did over the run, for the build's record, nil for a session that keeps none. It writes
+// nothing for a session whose save already wrote them, and nothing for one that keeps no packs or opened none.
+func (session *CacheSession) WritePacksWithoutSave() *PackCounts {
+	if session.packs == nil {
+		return nil
+	}
+	if !session.packs.written {
+		session.writePacks()
+	}
+	return session.counts.Packs
+}
+
 // writePacks writes each pack that changed, was missing or was refused, or whose shards' stamps moved, with what the
 // run read and wrote of its store and the stamp of each shard it was read from, at the save, once every write of the
 // save has run, and counts what the packs did over the run. Each shard's stamp is the run's, taken before anything of
@@ -178,7 +203,17 @@ func (session *CacheSession) writePacks() {
 	if packs == nil {
 		return
 	}
+	packs.written = true
 	for _, pack := range packs.byStore {
+		// The project's pack is marked run whether it changed or not, so a store whose packs this executable wrote
+		// before markers were kept is marked by its next run, and a marker another executable's sweep never removes
+		// says the build has run here (cache.Store.MarkRan, #s8e6z0n). A failed mark is a problem of the store, never
+		// a finding: the next run under another executable's sweep reads cold once more.
+		if !pack.system {
+			if markError := pack.store.MarkRan(pack.place); markError != nil {
+				session.problem(fmt.Sprintf("marking the build's run: %v", markError))
+			}
+		}
 		pack.lock.Lock()
 		entries := slices.Collect(maps.Values(pack.held))
 		pack.lock.Unlock()
