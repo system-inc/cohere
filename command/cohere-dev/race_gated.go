@@ -18,7 +18,7 @@ import (
 // at all let a race land whenever Home, the gate's box then, was busy: the whole list there, with nothing replayed,
 // took 428s of wall and 1,055 CPU-seconds at a load of 8 to 42 (Nov 12).
 //
-// Every package holding a test whose name or file says it runs code at once is here, which
+// Every package holding a test whose name or file says it runs code at once is here, which internal/testing/guard's
 // TestEveryConcurrencyTestIsRaceGated holds, and a package may be here for a reason its test names don't show. An
 // entry runs its whole package unless it names a run, which TestEveryRaceRunSelectsItsPackagesConcurrencyTests holds
 // to every test of its package the guard calls concurrent.
@@ -36,7 +36,7 @@ var raceGated = []raceEntry{
 	},
 	{
 		directory: "internal/go_language",
-		// The guard's own words (concurrencyTestName), so the run selects every test whose name says it runs code at
+		// The guard's own words (concurrency_tests.Name), so the run selects every test whose name says it runs code at
 		// once, and the tests that start goroutines in their own bodies, which the guard reads from the code
 		// (bodyConcurrentTests, #q1v0ern), and none of the package's others.
 		run: "Concurrent|AtOnce|InParallel|Simultaneous|SideBySide|BesideTheLoad|^(" + strings.Join([]string{
