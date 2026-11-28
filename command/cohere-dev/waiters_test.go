@@ -95,6 +95,16 @@ func TestAWaiterNamesEachNewHolder(test *testing.T) {
 	}
 	second := queue("the second run", 1)
 	third := queue("the third run", 2)
+	// The first holder is let go only once the third has named it. A ticket in the line comes before a run's first
+	// look, and on a CPU-bound box that look came after the release: the third's opening list was empty, so it never
+	// named the first holder, though it named the second as the new one (J-bacpn4p on Shackler, Nov 28).
+	namedFirst := func() bool { return strings.Contains(read(third), "the first holder") }
+	for deadline := time.Now().Add(waiterBound); !namedFirst(); time.Sleep(20 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			break
+		}
+	}
+	sawFirst := namedFirst()
 	first.release()
 	named := func() bool {
 		output := read(third)
@@ -102,7 +112,7 @@ func TestAWaiterNamesEachNewHolder(test *testing.T) {
 		return strings.Contains(output, "the first holder") && changed >= 0 &&
 			strings.Contains(output[changed:], "the second run")
 	}
-	for deadline := time.Now().Add(waiterBound); !named(); time.Sleep(50 * time.Millisecond) {
+	for deadline := time.Now().Add(waiterBound); sawFirst && !named(); time.Sleep(50 * time.Millisecond) {
 		if time.Now().After(deadline) {
 			break
 		}
@@ -117,7 +127,9 @@ func TestAWaiterNamesEachNewHolder(test *testing.T) {
 			test.Fatalf("a queued run failed: %v\n%s", waitError, read(run))
 		}
 	}
-	if !sawIt {
+	if !sawFirst {
+		test.Errorf("the third run never named the first holder while it held the token:\n%s", read(third))
+	} else if !sawIt {
 		test.Errorf("the third run did not name the second as the holder while it held the token:\n%s", read(third))
 	}
 }
