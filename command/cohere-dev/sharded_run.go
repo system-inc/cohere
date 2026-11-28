@@ -35,7 +35,10 @@ const boxShardTable = "github.com/system-inc/cohere/internal/go_language 0\n" +
 	// The engine's rows (#bd5j7v0, #wrpcag3): each package's work is 65 to 88 s on 2 threads alone on Shackler, so 4
 	// shards put each near 20 to 30 s, and no test is slow alone, so none is pinned.
 	"github.com/system-inc/cohere/internal/go_language/check 4\n" +
-	"github.com/system-inc/cohere/internal/go_language/load 4"
+	"github.com/system-inc/cohere/internal/go_language/load 4\n" +
+	// The front door's row (#9b9d4x3): 3 shards on 2 threads each ran 30.9, 32.5 and 20.7 s on Sun1 with Swift warm,
+	// and no test is slow alone. It holds only once every serial test puts the package's run state back (#76).
+	"github.com/system-inc/cohere/command/cohere 3"
 
 // boxShardTableLine is sharedBoxGate's line setting shardTable, the table it shards by: set in the script itself, so
 // no variable in a shared box's environment can move it. A test replaces the line to shard packages of its own.
