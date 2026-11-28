@@ -363,6 +363,12 @@ func TestTheShardTableReads(test *testing.T) {
 			test.Errorf("the shard table has %s twice", row.importPath)
 		}
 		paths = append(paths, row.importPath)
+		// A row names a package of this module, so a moved or renamed package can't leave a row sharding nothing.
+		directory, inModule := strings.CutPrefix(row.importPath, "github.com/system-inc/cohere/")
+		information, statError := os.Stat(filepath.Join("..", "..", filepath.FromSlash(directory)))
+		if !inModule || statError != nil || !information.IsDir() {
+			test.Errorf("the shard table names %s, which is no package directory of this module", row.importPath)
+		}
 		for index, pin := range row.pins {
 			if !regexp.MustCompile(`^(Test|Example|Fuzz)[A-Za-z0-9_]*$`).MatchString(pin) ||
 				slices.Contains(row.pins[:index], pin) {
