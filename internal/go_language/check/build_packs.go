@@ -14,6 +14,9 @@ type buildPacks struct {
 
 	// opened is set once the first Restore has read the packs; a reload's Restore serves from what that read.
 	opened bool
+	// written is whether the session has written its packs this run, at its save or without one
+	// (CacheSession.WritePacksWithoutSave), so a build that saved never writes them twice.
+	written bool
 
 	// byStore is each store's pack, in the order the packs were opened, the project's first.
 	byStore []*buildPack

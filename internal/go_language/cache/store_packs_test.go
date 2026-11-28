@@ -37,8 +37,15 @@ func TestAPackWrittenIsReadBack(test *testing.T) {
 	if _, refused := store.ReadPack(samplePackPlace); refused != PackMissing {
 		test.Fatalf("an empty store's pack was refused as %q, want %q", refused, PackMissing)
 	}
+	// HasPack answers by a stat what ReadPack answers by a read (#s8e6z0n).
+	if store.HasPack(samplePackPlace) {
+		test.Error("an empty store has a pack, by HasPack")
+	}
 	if writeError := store.WritePack(samplePackPlace, samplePackEntries, samplePackStamps); writeError != nil {
 		test.Fatal(writeError)
+	}
+	if !store.HasPack(samplePackPlace) {
+		test.Error("the store has no pack after one was written, by HasPack")
 	}
 	if _, statError := os.Stat(filepath.Join(store.directory, "packs", samplePackPlace.Identity.String(),
 		samplePackPlace.Name.String())); statError != nil {
@@ -113,6 +120,10 @@ func TestADamagedPackIsRefusedWhole(test *testing.T) {
 			if refused != damage.want || read.Entries != nil || read.Stamps != nil {
 				test.Errorf("want the pack refused as %q with nothing of it, got %q and %d entries", damage.want,
 					refused, len(read.Entries))
+			}
+			// A pack refused is there, never missing (#s8e6z0n).
+			if !store.HasPack(samplePackPlace) {
+				test.Errorf("the pack refused as %q is missing, by HasPack", refused)
 			}
 		})
 	}

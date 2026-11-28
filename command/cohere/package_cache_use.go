@@ -24,8 +24,10 @@ import (
 // absent when 0. Problems is what kept the cache from being read or written, every build's, which the child notes on
 // stderr one by one and the footer counts, and WriteFailed every entry whose write failed, every build's, of which
 // stderr notes only the first, each absent when 0 (#27r8r24). Packs is what the extra builds did with their packs,
-// every build's summed, absent in a run with no extra build (#b2t9xmf). On is false under `--no-cache`. Only a Go run
-// has one; a Swift run's lint record carries none, so its output is as it was.
+// every build's summed, absent in a run with no extra build (#b2t9xmf). HostReadCold is why the host's build read its
+// findings store cold, every package of it a miss and none it held written again, so its extra builds, whose packs were
+// all missing, restored from what it checked (#s8e6z0n): buildPacksMissing, absent when it read as always. On is false
+// under `--no-cache`. Only a Go run has one; a Swift run's lint record carries none, so its output is as it was.
 type packageCacheUse struct {
 	On                 bool   `json:"on"`
 	Hit                int    `json:"hit"`
@@ -46,6 +48,8 @@ type packageCacheUse struct {
 	WriteFailed        int    `json:"writeFailed,omitempty"`
 
 	Packs *buildPacksUse `json:"packs,omitempty"`
+
+	HostReadCold string `json:"hostReadCold,omitempty"`
 }
 
 // buildPacksUse is what the extra builds did with their packs, as the lint record's `cache.packs` says it
@@ -73,6 +77,10 @@ func (cache packageCacheUse) line() string {
 		return "package cache off" + cache.systemCacheClause() + cache.packsClause() + cache.reloads()
 	}
 	line := fmt.Sprintf("package cache hit %d, missed %d, wrote %d", cache.Hit, cache.Missed, cache.Written)
+	// Beside the counts it explains: a host that read cold hit nothing of a store that may hold everything.
+	if cache.HostReadCold != "" {
+		line += ", host read cold (" + cache.HostReadCold + ")"
+	}
 	line += cache.systemCacheClause()
 	if cache.Unstorable > 0 {
 		line += fmt.Sprintf(", %d unstorable", cache.Unstorable)

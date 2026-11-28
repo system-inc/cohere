@@ -51,7 +51,10 @@ func (pipeline *pipeline) runLint(loaded *load.Loaded, loadError error, earlier 
 		return loaded
 	}
 	if count := len(loaded.Diagnostics); count > 0 {
-		// Whatever the rules beside the load found is dropped unread, as main never ran them.
+		// Whatever the rules beside the load found is dropped unread, as main never ran them. No extra build runs
+		// either, so none writes its packs, and a host that read its store cold for packs missing reads it cold again
+		// each run until it is clean (hostReadColdReason). That costs only the restore of its export data: a host with
+		// type errors runs no rule and saves nothing either way.
 		pipeline.abandonSpeculation()
 		detail := fmt.Sprintf("types bailed: %d type errors, so lint findings against wrong semantics would be noise",
 			count)
@@ -186,6 +189,8 @@ func (pipeline *pipeline) runLint(loaded *load.Loaded, loadError error, earlier 
 		SystemCacheWritten: result.Cache.SystemCacheWritten,
 		SystemCacheOff:     pipeline.systemCache.off,
 		SystemCacheNotKept: systemCacheNotKept,
+
+		HostReadCold: contract.HostReadColdReason(result.Cache.HostReadCold),
 	}
 	if record.Cache.SystemCacheNotKept != "" {
 		pipeline.note("the system cache was not kept: %s", record.Cache.SystemCacheNotKept)
@@ -442,6 +447,15 @@ func (pipeline *pipeline) enabledRules() (enabled []rule.Rule, turnedOff []strin
 	return enabled, turnedOff
 }
 
+// executableIdentity is cohere-go's identity, which every key of the project's store and of the system cache folds in
+// (cache.ExecutableIdentity), or a test's identifiesAs in its place, so a test can run two executables over one root.
+func (pipeline *pipeline) executableIdentity() (string, error) {
+	if pipeline.identifiesAs != "" {
+		return pipeline.identifiesAs, nil
+	}
+	return cache.ExecutableIdentity()
+}
+
 // cacheSession is the findings cache for the run's enabled rules over a load under environment, whose go env answer
 // is goEnvironment, the one the load reads (lintCache), made before the load so the load restores what it holds, whose
 // keys read files' digests rather than hashing those files again, and nil when lintCache gives none, as under
@@ -467,7 +481,7 @@ func (pipeline *pipeline) cacheSession(
 	}
 	enabled, _ := pipeline.enabledRules()
 	caching, cachingError := lintCache(pipeline.request, pipeline.described.workspace, environment, goEnvironment,
-		enabled, pipeline.described.children, pipeline.systemCache, pipeline.shardStamps)
+		enabled, pipeline.described.children, pipeline.systemCache, pipeline.shardStamps, pipeline.executableIdentity)
 	if cachingError != nil {
 		noteTo(notes, "the findings cache sat this run out: %v", cachingError)
 	}

@@ -1071,12 +1071,30 @@ is a miss, checked from source. `"refusedBy"` counts each pack that was there an
 of why: `unreadable`, `short`, `sum`, `version` or `malformed`, and is absent when none was; a pack carries its
 format's version and one sha256 over its contents, and no record is ever served from one that does not match them, so
 a build whose pack was refused reads its store as it would with none, and its findings are the same. `"written"`
-counts the packs written at a build's save, which happens when its run read or wrote a record its pack did not hold,
-a shard's time moved, or its pack was missing or refused, so a warm run whose packs served every record writes none.
+counts the packs written at a build's save, or by a build that ran none, as one whose load found type errors, which
+happens when its run read or wrote a record its pack did not hold, a shard's time moved, or its pack was missing or
+refused, so a warm run whose packs served every record writes none.
 The system cache's trim counts a pack in its size cap and deletes it once unread for five days, as any entry there.
 The project's store is never trimmed, so its packs are kept in a directory of the child that reads them, and the
-first pack a run writes there removes every other child's, file by file, so they stay one for each build. The
-host's build keeps no pack, and a run with no extra build writes no `"packs"`.
+first pack a run writes there removes every other child's, file by file, so they stay one for each build. Beside
+each pack the store keeps an empty marker that the build has run under that child, named as the pack is, in a `ran`
+directory the removal never reads, written once and only stat'd after (#s8e6z0n). A marker says the build's restore
+ran, not that its store holds entries: a build that failed to type-check marks its run too, so a tree whose every
+extra build was broken and is then fixed takes one slow run, its builds checking from source, and settles after it.
+The host's build keeps no pack, and a run with no extra build writes no `"packs"`.
+
+`"hostReadCold":"buildPacksMissing"`, additive within contract 3 and cohere-go's alone, says the host's build read its
+findings store cold (#s8e6z0n). A host whose store holds every package restores nearly all of them, so it keeps for
+the extra builds only what it checks from source, and a build whose own store holds nothing then checks every package
+itself, one build at a time. So when the run's lint phase checks at least one extra build, each restoring from the
+host's run, and every extra build's pack of the findings store is missing, under either loader, and so is its ran
+marker, which the first pack write of another child never removes, all of which a stat of each tells before the
+host's first restore, the host looks up nothing in its store, by first key or second, checks every package from source
+and keeps each for the builds, which restore from it as on a cold run. It writes no entry the store holds already, so
+a warm store stays exactly as it was, and a store new to the child is filled as on any cold run, each entry's second
+key with it. The system cache is read and written as always, and so is each build's own store. `"hit"` is then 0 and
+`"missed"` every package the host reached outside the system cache; the field is absent when the host read its store
+as always.
 
 Under `--build-dependence`, with a store, cohere-go keeps block 1's dependence record of each package the host
 checks beside the package's entry, and reads it back for each package it restores, so its graph of the host is built

@@ -247,7 +247,7 @@ func (session *CacheSession) readPrevious(reachable []*packages.Package) {
 	for _, reloaded := range reachable {
 		key, keyed := session.keys[reloaded]
 		store := session.storeFor(reloaded)
-		if !keyed || store == nil || !session.reloading(reloaded) {
+		if !keyed || store == nil || session.readsColdFrom(store) || !session.reloading(reloaded) {
 			continue
 		}
 		entry, _, stored := storedEntryAt(store, key)

@@ -81,6 +81,10 @@ type CacheCounts struct {
 	// FactsSkipped of what it restored, and Problems.
 	On bool
 
+	// HostReadCold is why the host's session read the project's store cold this run (ReadColdWhen, #s8e6z0n), empty
+	// when it did not: every package of that store is then a miss, though the store may hold it.
+	HostReadCold string
+
 	// Hit is the packages restored from an entry in the store, which nothing analyzed, and on the load from source
 	// nothing parsed or type-checked unless the second key restored it (see SecondKeyHit).
 	Hit int
@@ -263,11 +267,13 @@ type CacheSession struct {
 	// keepsForBuilds is set on the host's session of a run with extra builds (KeepForBuilds), whose every Restore keys
 	// the load, a store or none, into keptKeys, for the portable digests and the reads' owners of the entries it keeps
 	// for them (keepForBuilds). written are the misses whose entry this run wrote to the store, which it reads back
-	// rather than encode again, and buildKeys the keys a run without a store names an entry's reads' owners by
-	// (readsOf).
+	// rather than encode again, held those a session reading its store cold did not write, since the store held their
+	// key already (ReadColdWhen), which the keep reads back from there as it reads a written one, and nothing else
+	// counts, and buildKeys the keys a run without a store names an entry's reads' owners by (readsOf).
 	keepsForBuilds bool
 	keptKeys       *cache.Keyed
 	written        map[*packages.Package]bool
+	held           map[*packages.Package]bool
 	buildKeys      map[*packages.Package]cache.Key
 
 	// keeping is the time the host's run spent keeping its packages for the extra builds over every load: the keys a
@@ -290,6 +296,12 @@ type CacheSession struct {
 
 	// packs are an extra build's packs of its stores (KeepBuildPacks), nil for any other session.
 	packs *buildPacks
+
+	// decideReadCold is what the host's session asks, once, at its first Restore, whether it reads the project's store
+	// cold this run, nil once asked and for any other session (ReadColdWhen); readCold is its answer, why the session
+	// reads cold, empty when it does not (readsColdFrom).
+	decideReadCold func() string
+	readCold       string
 
 	// kept is set once keepForBuilds has let go of the resolver and the answer memo, and cleared by the next Restore,
 	// which starts both afresh. A read of either while it is set is a problem the run reports (readAfterKeep), never
@@ -328,10 +340,16 @@ func NewCacheSession(caching *Caching, rules []rule.Rule, reports ...*analysis.A
 // checked from what the cgo tool made with it, and the toolchain's flags and headers change that (#syscache). Under the
 // source loader the cgo tool never runs, so the toolchain changes no key.
 func (session *CacheSession) keyContextOf(loader string) cache.Context {
-	keyContext := session.caching.Context
+	return keyContextOf(session.caching.Context, session.caching.CgoToolchain, loader)
+}
+
+// keyContextOf is the context a session whose Caching holds context and cgoToolchain keys a load under loader by
+// (CacheSession.keyContextOf), for one who names a build's pack before that session is made (ProjectPackPlace).
+func keyContextOf(context cache.Context, cgoToolchain []string, loader string) cache.Context {
+	keyContext := context
 	keyContext.Build = append(slices.Clone(keyContext.Build), "loader="+loader)
 	if loader == load.LoaderCgoTranslated {
-		keyContext.Build = append(keyContext.Build, session.caching.CgoToolchain...)
+		keyContext.Build = append(keyContext.Build, cgoToolchain...)
 	}
 	return keyContext
 }
@@ -377,6 +395,8 @@ func (session *CacheSession) Restore(
 	reachable []*packages.Package,
 	analyzed []*packages.Package,
 ) map[*packages.Package]*load.Restored {
+	// Before anything of the project's store is read, and before the counts start over, which carry the answer.
+	session.takeReadCold()
 	session.opened = true
 	// Every map starts empty, the keys and the files' digests too, since cohere-go restores a second load when the
 	// long-line wrap wrote a file, and keys this restore could not compute must not leave the first load's in their
@@ -391,6 +411,7 @@ func (session *CacheSession) Restore(
 	session.closures = map[*packages.Package]closureDigest{}
 	session.attempted = map[*packages.Package]bool{}
 	session.written = map[*packages.Package]bool{}
+	session.held = map[*packages.Package]bool{}
 	session.buildKeys = nil
 	session.standardLibraryKeys = nil
 	session.standardLibraryByPath = nil
@@ -415,6 +436,8 @@ func (session *CacheSession) Restore(
 	if session.known == nil {
 		return nil
 	}
+	// Only a session that reads at all says it read cold: one without analyzers sat the cache out.
+	session.counts.HostReadCold = session.readCold
 	// The digests of every file the run has hashed, which the standard library's keys read rather than hash again, so
 	// each standard-library file is hashed once a run (#b9f3bg4): this load's keys' when it keys one, the host's in an
 	// extra build that keys none, and none in a run with neither, which keys only the standard library.
@@ -607,7 +630,8 @@ func (session *CacheSession) hitAt(restoring *packages.Package, key cache.Key) b
 // and its decode is added, so the next build that names the body shares it.
 func (session *CacheSession) readHit(restoring *packages.Package, key cache.Key, bodies *decodedBodies) storeHit {
 	store := session.storeFor(restoring)
-	if store == nil {
+	// A session reading its store cold looks up nothing there, by its first key or its second.
+	if store == nil || session.readsColdFrom(store) {
 		return storeHit{}
 	}
 	contents, storedKey, found := session.entryAt(store, key)
@@ -1026,11 +1050,19 @@ func (session *CacheSession) saveMisses(
 		store := session.storeFor(saved)
 		toSystemCache := store != nil && store != session.caching.Store
 		return func() {
+			// A session reading its store cold writes no entry the store holds already, under the same key, so a warm
+			// store it read nothing of stays exactly as it was, and a cold one is filled as any run fills it
+			// (ReadColdWhen). Its keep reads what it did not write back from the store, as it reads one it wrote
+			// (keepForBuilds). Holds is true for any file under the key, damaged, short of slots or answers, or a
+			// facts-only entry written when the package was only a dependency, so the cold host keeps the stored one
+			// over its own better entry: a build then restores less from it, the keep's read failing closed, and a
+			// later warm run, missing or reloading the package, writes it whole and heals the store.
+			heldAlready := encodeError == nil && session.readsColdFrom(store) && store.Holds(session.keys[saved])
 			var putError error
-			if encodeError == nil && store != nil {
+			if encodeError == nil && store != nil && !heldAlready {
 				putError = session.putRecord(store, session.keys[saved], entry)
 			}
-			writesRecord := keepsRecord && store != nil
+			writesRecord := keepsRecord && store != nil && !heldAlready
 			// A dependence record follows its entry, and only an entry whose write held (#6a3kjvz).
 			var recordError error
 			if writesRecord && encodeError == nil && putError == nil {
@@ -1061,6 +1093,9 @@ func (session *CacheSession) saveMisses(
 			case store == nil:
 				// A run without the project's store keys only the standard library (keyStandardLibraryApart), so no
 				// package without a store is saved; nothing keeps it.
+			case heldAlready:
+				// Not written, since the store holds its key: neither a write nor a failure, and a miss all the same.
+				session.held[saved] = true
 			case putError != nil && toSystemCache:
 				session.systemCacheFailed(putError)
 			case putError != nil:
@@ -1236,7 +1271,10 @@ func storedEntryAt(store *cache.Store, key cache.Key) (cacheEntry, entryRecord, 
 // alias keeps each alias, a second key or the first key of a package a second key restored, with the key of the entry
 // it stands for, in the build's alias table, one write for the round (#m7w1ncy), so the next run with the same inputs
 // hits on it. The table keeps the newest four times as many as the packages the run keyed, or aliasTableFloor. A
-// failed write is a problem, never a finding: the next run misses where it would have hit.
+// failed write is a problem, never a finding: the next run misses where it would have hit. A session reading its store
+// cold writes the aliases of what it wrote, as any run does: over a warm store it wrote nothing, so it adds none and
+// the table is not written (aliasTable.add), and over a store new to the executable its second keys are what the
+// first edit after it restores the packages above the edit by (#s8e6z0n).
 func (session *CacheSession) alias(aliases map[cache.Key]cache.Key) {
 	if session.aliases == nil {
 		return
