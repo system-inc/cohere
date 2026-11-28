@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -13,6 +14,49 @@ import (
 
 // moduleRoot is cohere's root, from this package's directory, where the tests run.
 const moduleRoot = "../.."
+
+// fixtureModule is a module of its own holding copies of the fixture packages patterns name, each a directory
+// relative to cohere's root, at the same paths and under cohere's module path, so the census loads them with the
+// import paths and file names it would read in cohere's tree. Its load then walks these few directories, never the
+// whole tree, which go test's cache would key every census test on, rerunning them on every landing (#0zdyk51). The
+// fixtures import nothing of cohere's, so the copies need nothing else.
+func fixtureModule(test *testing.T, patterns ...string) string {
+	test.Helper()
+	module := test.TempDir()
+	if writeError := os.WriteFile(filepath.Join(module, "go.mod"), []byte("module github.com/system-inc/cohere\n\ngo "+
+		"1.27\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
+	}
+	for _, pattern := range patterns {
+		directory := filepath.FromSlash(strings.TrimPrefix(pattern, "./"))
+		entries, readError := os.ReadDir(filepath.Join(moduleRoot, directory))
+		if readError != nil {
+			test.Fatal(readError)
+		}
+		if makeError := os.MkdirAll(filepath.Join(module, directory), 0o755); makeError != nil {
+			test.Fatal(makeError)
+		}
+		copied := 0
+		for _, entry := range entries {
+			if !entry.Type().IsRegular() {
+				continue
+			}
+			contents, fileError := os.ReadFile(filepath.Join(moduleRoot, directory, entry.Name()))
+			if fileError != nil {
+				test.Fatal(fileError)
+			}
+			if writeError := os.WriteFile(filepath.Join(module, directory, entry.Name()), contents,
+				0o644); writeError != nil {
+				test.Fatal(writeError)
+			}
+			copied++
+		}
+		if copied == 0 {
+			test.Fatalf("%s holds no file to copy, so its fixture module would test nothing", pattern)
+		}
+	}
+	return module
+}
 
 // nilnessFixtures are the nilness port's fixture packages, loaded as packages of cohere's module, as the census loads
 // a tree. Each is named, since a wildcard never matches a package below testdata.
@@ -42,7 +86,7 @@ func TestCensusOverTheFixturesFindsWhatTheTestsFind(test *testing.T) {
 	test.Parallel()
 	standardOutput := &strings.Builder{}
 	standardError := &strings.Builder{}
-	arguments := append([]string{"--rule", "nilness", moduleRoot}, nilnessFixtures...)
+	arguments := append([]string{"--rule", "nilness", fixtureModule(test, nilnessFixtures...)}, nilnessFixtures...)
 	exitCode := run(arguments, standardOutput, standardError)
 	if exitCode != exitRegression {
 		test.Fatalf("the census exited %d, want %d: %s%s", exitCode, exitRegression, standardOutput, standardError)
@@ -75,7 +119,7 @@ func TestCensusOverTheFixturesFindsWhatTheTestsFind(test *testing.T) {
 func TestCensusExitsOnAFindingTheOriginalMakesAlone(test *testing.T) {
 	test.Parallel()
 	swapped := []censusPair{{pair: parity.Pair{Name: "swapped", Original: nil_ness.Analyzer, Port: nilness.Analyzer}}}
-	result, censusError := census(swapped, moduleRoot, moduleRoot, differencesFixture)
+	result, censusError := census(swapped, moduleRoot, fixtureModule(test, differencesFixture...), differencesFixture)
 	if censusError != nil {
 		test.Fatal(censusError)
 	}
@@ -98,7 +142,7 @@ func TestCensusExitsOnAFindingTheOriginalMakesAlone(test *testing.T) {
 // A load that matched nothing is refused, since two empty sides agree and prove nothing.
 func TestCensusRefusesPatternsThatMatchNothing(test *testing.T) {
 	test.Parallel()
-	_, censusError := census(pairs, moduleRoot, moduleRoot,
+	_, censusError := census(pairs, moduleRoot, fixtureModule(test),
 		[]string{"github.com/system-inc/cohere/no_such_directory/..."})
 	if censusError == nil || !strings.Contains(censusError.Error(), "matched no packages") {
 		test.Errorf("a load of nothing gave %v, want it refused", censusError)
@@ -109,8 +153,8 @@ func TestCensusRefusesPatternsThatMatchNothing(test *testing.T) {
 // running on it is counted per side.
 func TestCensusNamesAPackageThatDoesNotLoadClean(test *testing.T) {
 	test.Parallel()
-	result, censusError := census(pairs, moduleRoot, moduleRoot,
-		[]string{"./internal/go_language/check/parity/testdata/src/illtyped"})
+	illtyped := []string{"./internal/go_language/check/parity/testdata/src/illtyped"}
+	result, censusError := census(pairs, moduleRoot, fixtureModule(test, illtyped...), illtyped)
 	if censusError != nil {
 		test.Fatal(censusError)
 	}
@@ -136,7 +180,7 @@ func TestCensusNamesAPackageThatDoesNotLoadClean(test *testing.T) {
 func TestCensusPassesRecordedGains(test *testing.T) {
 	test.Parallel()
 	result, censusError := census(nilnessPair("command/cohere-parity/testdata/gains_differences.txt"), moduleRoot,
-		moduleRoot, differencesFixture)
+		fixtureModule(test, differencesFixture...), differencesFixture)
 	if censusError != nil {
 		test.Fatal(censusError)
 	}
@@ -159,7 +203,7 @@ func TestCensusPassesRecordedGains(test *testing.T) {
 func TestCensusRefusesAGainWithNoReason(test *testing.T) {
 	test.Parallel()
 	_, censusError := census(nilnessPair("command/cohere-parity/testdata/gains_unreasoned.txt"), moduleRoot,
-		moduleRoot, differencesFixture)
+		fixtureModule(test, differencesFixture...), differencesFixture)
 	if censusError == nil || !strings.Contains(censusError.Error(), "gains_unreasoned.txt:3 records a gain with no "+
 		"reason above it") {
 		test.Errorf("a gain with no reason gave %v, want it refused", censusError)
