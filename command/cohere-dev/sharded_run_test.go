@@ -93,14 +93,16 @@ var shardMarkerLine = regexp.MustCompile(
 	`^` + regexp.QuoteMeta(boxShardMarker) + `([0-9]+) of ([0-9]+) (\S+) ([0-9]+)s (.+)$`,
 )
 
-// dealtShards is how sharedBoxShards deals listed into shards: each pin a shard of its own, first, and the rest
-// round-robin in the listing's order over the shards the count leaves.
+// dealtShards is how sharedBoxShards deals listed into shards: each pin a shard of its own, first, a group's names
+// together, and the rest round-robin in the listing's order over the shards the count leaves.
 func dealtShards(listed []string, pins []string, count int) [][]string {
 	dealt := [][]string{}
+	pinned := []string{}
 	for _, pin := range pins {
-		dealt = append(dealt, []string{pin})
+		dealt = append(dealt, strings.Split(pin, "+"))
+		pinned = append(pinned, strings.Split(pin, "+")...)
 	}
-	rest := slices.DeleteFunc(slices.Clone(listed), func(name string) bool { return slices.Contains(pins, name) })
+	rest := slices.DeleteFunc(slices.Clone(listed), func(name string) bool { return slices.Contains(pinned, name) })
 	restShards := min(max(count-len(pins), 1), len(rest))
 	dealt = append(dealt, make([][]string, restShards)...)
 	for index, name := range rest {
@@ -163,6 +165,9 @@ func TestTheGatesShardsDealEveryListedTestOnceAcrossTwoThreadProcesses(test *tes
 		{name: "a pin alone in its shard", sysctl: "64", asked: 3, pins: []string{"TestSix"}, shards: 3},
 		{name: "two pins on 8 cores", sysctl: "8", pins: []string{"FuzzSeven", "TestOne"}, shards: 4},
 		{name: "fewer shards asked than pins", asked: 1, pins: []string{"TestTwo", "TestTen"}, shards: 3},
+		{name: "a group pin together in one shard", asked: 3, pins: []string{"TestSix+TestTwo"}, shards: 3},
+		{name: "a group pin naming one test no listing holds", sysctl: "8", pins: []string{"TestSix+TestGone"},
+			refuses: "TestGone"},
 		{name: "a pin naming no listed test", sysctl: "8", pins: []string{"TestSix", "TestGone"}, refuses: "TestGone"},
 		{name: "a listing that fails", budget: "10", listFails: true},
 		{name: "a listing that fails, with a pin", budget: "10", pins: []string{"TestGone"}, listFails: true},
@@ -252,7 +257,7 @@ func TestTheGatesShardsDealEveryListedTestOnceAcrossTwoThreadProcesses(test *tes
 				test.Errorf("the shards' markers hold %q, want %q", markers, dealt)
 			}
 			for index, pin := range row.pins {
-				if index >= len(markers) || !slices.Equal(markers[index], []string{pin}) {
+				if index >= len(markers) || !slices.Equal(markers[index], strings.Split(pin, "+")) {
 					test.Errorf("the pin %s isn't alone in shard %d: %q", pin, index+1, markers)
 				}
 			}
@@ -369,10 +374,15 @@ func TestTheShardTableReads(test *testing.T) {
 		if !inModule || statError != nil || !information.IsDir() {
 			test.Errorf("the shard table names %s, which is no package directory of this module", row.importPath)
 		}
-		for index, pin := range row.pins {
-			if !regexp.MustCompile(`^(Test|Example|Fuzz)[A-Za-z0-9_]*$`).MatchString(pin) ||
-				slices.Contains(row.pins[:index], pin) {
-				test.Errorf("the shard table pins %q to %s, want a top-level test's name, once", pin, row.importPath)
+		pinned := []string{}
+		for _, pin := range row.pins {
+			for _, name := range strings.Split(pin, "+") {
+				if !regexp.MustCompile(`^(Test|Example|Fuzz)[A-Za-z0-9_]*$`).MatchString(name) ||
+					slices.Contains(pinned, name) {
+					test.Errorf("the shard table pins %q to %s, want top-level tests' names joined by +, each once",
+						pin, row.importPath)
+				}
+				pinned = append(pinned, name)
 			}
 		}
 	}

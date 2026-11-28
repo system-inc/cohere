@@ -27,8 +27,9 @@ import (
 
 // boxShardTable is the packages the gate runs in shards, a line each: `<import path> <shards> <pin>...`. The shards
 // are how many its tests are dealt into, 0 for a shard per two of the box's cores, bounded by the tests listed. Each
-// pin is a top-level test dealt a shard of its own, counted among the shards, and a pin its package's listing doesn't
-// hold refuses the landing. The script shards a package only when its path is among its arguments, which a split
+// pin is a top-level test, or several joined by `+`, dealt a shard of its own together, so tests that share a costly
+// build share it once (#9b9d4x3), counted among the shards, and a pin its package's listing doesn't hold refuses the
+// landing. The script shards a package only when its path is among its arguments, which a split
 // half's and a Mac's whole gate are; the land-gate job's patterns, `./...`, never name one, so that road runs every
 // package unsharded. The script reads it through boxShardTableLine, and TestTheShardTableReads holds it to its grammar.
 const boxShardTable = "github.com/system-inc/cohere/internal/go_language 0\n" +
@@ -63,12 +64,15 @@ const boxShardMarker = "cohere-dev-gate: shard "
 const sharedBoxShards = `listing=$(go test $countFlag -list '.*' "$sharded" 2>&1) || listing=""
 # go test runs tests, examples and fuzz targets' seeds; a benchmark runs only under -bench, so none is dealt.
 listed=$(printf '%s\n' "$listing" | grep -E '^(Test|Example|Fuzz)[^[:space:]]*$' || true)
-# A pin is held to a listing that holds tests: one that failed is a package that doesn't build, which its one go test
-# below reports, and a refusal said first would hide it. Unquoted, so each pin is its own word: a test's name, which
-# holds no space or glob.
+# A pin is a test's name, or several joined by +, a group dealt one shard together, so tests that share a costly
+# build share it once (the Go Square's ruling on #9b9d4x3). pinnedNames is every name the pins hold. A pin is held to
+# a listing that holds tests: one that failed is a package that doesn't build, which its one go test below reports,
+# and a refusal said first would hide it. Unquoted, so each name is its own word: a test's name, which holds no space
+# or glob.
+pinnedNames="${shardPins//+/ }"
 unlisted=""
 if [ -n "$listed" ]; then
-  for pin in $shardPins; do
+  for pin in $pinnedNames; do
     printf '%s\n' "$listed" | grep -qxF -- "$pin" || unlisted="$unlisted $pin"
   done
 fi
@@ -86,11 +90,12 @@ else
     shardCount=$((cores / 2))
   fi
   listedCount=$(($(printf '%s\n' "$listed" | wc -l)))
-  pinCount=0
+  pinCount=0; pinnedCount=0
   for pin in $shardPins; do pinCount=$((pinCount + 1)); done
-  # The pins' shards come first, one each, and the rest of the listing is dealt over what the count leaves: at least
-  # one shard when any test is left, and never more than are left.
-  restCount=$((listedCount - pinCount))
+  for pin in $pinnedNames; do pinnedCount=$((pinnedCount + 1)); done
+  # The pins' shards come first, one each, a group's names together, and the rest of the listing is dealt over what
+  # the count leaves: at least one shard when any test is left, and never more than are left.
+  restCount=$((listedCount - pinnedCount))
   restShards=$((shardCount - pinCount))
   [ "$restShards" -le "$restCount" ] || restShards=$restCount
   [ "$restShards" -ge 1 ] || restShards=1
@@ -99,11 +104,11 @@ else
   echo "` + boxShardListingMarker + `$sharded $(printf '%s' "$listed" | tr '\n' ' ')"
   shardNames=()
   shard=0
-  for pin in $shardPins; do shardNames[shard]="$pin"; shard=$((shard + 1)); done
+  for pin in $shardPins; do shardNames[shard]="${pin//+/ }"; shard=$((shard + 1)); done
   # The rest dealt round-robin in the listing's order, read a line at a time so no name is ever globbed.
   index=0
   while read -r name; do
-    case " $shardPins " in *" $name "*) continue ;; esac
+    case " $pinnedNames " in *" $name "*) continue ;; esac
     shard=$((pinCount + index % restShards))
     shardNames[shard]="${shardNames[shard]:-}${shardNames[shard]:+ }$name"
     index=$((index + 1))
