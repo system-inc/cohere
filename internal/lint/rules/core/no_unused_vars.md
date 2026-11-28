@@ -32,50 +32,6 @@ The stated reason is wrong (it is a correctness rule, not formatting), but the v
 > correctness-versus-style crossed with violation count, and that is blind to
 > whether a rule fights a convention we chose on purpose.
 
-## Violations
+## What fixing looks like
 
-12 in the tree. Showing the first few.
-
-**`libraries/structure/source/services/network/NetworkService.ts:196`**
-
-```
-infer TVariables // Infer but don't use
-```
-
-> 'TVariables' is defined but never used
-
-**`modules/apple/contacts/ContactsApi.ts:170`**
-
-```
-return allContacts.map(({ _pk: _pk, _dbPath: _dbPath, ...contact }) => contact);
-```
-
-> '_pk' is defined but never used
-
-**`modules/apple/contacts/ContactsApi.ts:170`**
-
-```
-return allContacts.map(({ _pk: _pk, _dbPath: _dbPath, ...contact }) => contact);
-```
-
-> '_dbPath' is defined but never used
-
-**`modules/asana/AsanaApi.ts:941`**
-
-```
-static async myTasks(_workspaceGid: string = defaultWorkspace): Promise<void> {
-```
-
-> '_workspaceGid' is assigned a value but never used
-
-**`modules/facets/FacetsMonthlies.ts:127`**
-
-```
-_options: Record<string, string | number | boolean> = {},
-```
-
-> '_options' is assigned a value but never used
-
-### What fixing looks like
-
-Not auto-fixable. Each site needs a human decision, which is what makes the count above the real cost.
+Not auto-fixable. Each site needs a human decision, which is what makes the count in the table above the real cost.

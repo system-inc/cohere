@@ -16,34 +16,6 @@ Require each enum member value to be explicitly initialized
 
 Stylistic. Small enough to adopt if we want the convention, not urgent if we do not.
 
-## Violations
+## What fixing looks like
 
-3 in the tree. Showing the first few.
-
-**`libraries/structure/libraries/nexus/source/types/EnumLike.test.ts:386`**
-
-```
-FIRST, // 0
-```
-
-> The value of the member 'FIRST' should be explicitly defined
-
-**`libraries/structure/libraries/nexus/source/types/EnumLike.test.ts:387`**
-
-```
-SECOND, // 1
-```
-
-> The value of the member 'SECOND' should be explicitly defined
-
-**`libraries/structure/libraries/nexus/source/types/EnumLike.test.ts:388`**
-
-```
-THIRD, // 2
-```
-
-> The value of the member 'THIRD' should be explicitly defined
-
-### What fixing looks like
-
-Not auto-fixable. Each site needs a human decision, which is what makes the count above the real cost.
+Not auto-fixable. Each site needs a human decision, which is what makes the count in the table above the real cost.

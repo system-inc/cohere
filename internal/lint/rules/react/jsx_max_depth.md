@@ -21,50 +21,6 @@ It is an arbitrary structural-complexity cap, not formatting, so Prettier is not
 > correctness-versus-style crossed with violation count, and that is blind to
 > whether a rule fights a convention we chose on purpose.
 
-## Violations
+## What fixing looks like
 
-1111 in the tree. Showing the first few.
-
-**`app/(main-layout)/_layout/navigation/Navigation.tsx:59`**
-
-```
-<ProjectIcon className="size-8" />
-```
-
-> Expected the depth of nested jsx elements to be <= 2, but found 3
-
-**`app/(os-layout)/_components/TasksCenter.tsx:899`**
-
-```
-<TasksDragCommitBridge onCommit={handleDragCommit} />
-```
-
-> Expected the depth of nested jsx elements to be <= 2, but found 3
-
-**`app/(os-layout)/_components/TasksCenter.tsx:900`**
-
-```
-<TasksDragGhost />
-```
-
-> Expected the depth of nested jsx elements to be <= 2, but found 3
-
-**`app/(os-layout)/_components/TasksCenter.tsx:901`**
-
-```
-<TasksDragInsertionLine />
-```
-
-> Expected the depth of nested jsx elements to be <= 2, but found 3
-
-**`app/(os-layout)/_components/TasksCenter.tsx:902`**
-
-```
-<TasksSelectionPageEffects listedTasks={listedTasks} />
-```
-
-> Expected the depth of nested jsx elements to be <= 2, but found 3
-
-### What fixing looks like
-
-Not auto-fixable. Each site needs a human decision, which is what makes the count above the real cost.
+Not auto-fixable. Each site needs a human decision, which is what makes the count in the table above the real cost.

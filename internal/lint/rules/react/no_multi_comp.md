@@ -23,50 +23,6 @@ Kirk ruled on 2026-10-01 that this rule is strict and stays on: one component pe
 > correctness-versus-style crossed with violation count, and that is blind to
 > whether a rule fights a convention we chose on purpose.
 
-## Violations
+## What fixing looks like
 
-86 in the tree. Showing the first few.
-
-**`app/(os-layout)/_components/detail/TaskDetail.tsx:186`**
-
-```
-function TaskDetailDropOverlay() {
-```
-
-> Declare only one React component per file
-
-**`app/(os-layout)/_components/detail/TaskDetailAttachmentPreview.tsx:111`**
-
-```
-function TaskDetailAttachmentCaption(properties: TaskDetailAttachmentCaptionProperties) {
-```
-
-> Declare only one React component per file
-
-**`app/(os-layout)/_components/detail/TaskDetailCommentCards.tsx:95`**
-
-```
-function TaskDetailDrillInCard(properties: { comment: TaskCommentInterface; label: string; tone: 'Cyan' | 'Neutral' }) {
-```
-
-> Declare only one React component per file
-
-**`app/(os-layout)/_components/detail/TaskDetailCommentCards.tsx:134`**
-
-```
-function TaskDetailRulingChipCard(properties: { comment: TaskCommentInterface }) {
-```
-
-> Declare only one React component per file
-
-**`app/(os-layout)/_components/detail/TaskDetailCommentItems.tsx:75`**
-
-```
-function TaskDetailPlainComment(properties: { comment: TaskCommentInterface }) {
-```
-
-> Declare only one React component per file
-
-### What fixing looks like
-
-Not auto-fixable. Each site needs a human decision, which is what makes the count above the real cost.
+Not auto-fixable. Each site needs a human decision, which is what makes the count in the table above the real cost.

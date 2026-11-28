@@ -68,31 +68,9 @@ by file, line and column:
 | www  | 33      | 5    | 38 of 38              |
 | api  | 21      | 1    | 22 of 22              |
 
-## Violations
+## What fixing looks like
 
-64 in ahra with every check on. Two of them:
-
-**`libraries/structure/source/modules/account/Account.ts:59`**
-
-```
-accountQueryData.emailAddress !== undefined ? accountQueryData.emailAddress : this.emailAddress,
-```
-
-> Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read
-
-**`libraries/structure/source/services/cookie/CookieService.ts:46`**
-
-```
-if(cookies[name] === undefined) {
-    cookies[name] = value;
-}
-```
-
-> Prefer using nullish coalescing operator (`??=`) instead of an assignment expression, as it is simpler to read
-
-### What fixing looks like
-
-Not auto-fixable. Every finding carries a suggestion, `accountQueryData.emailAddress ?? this.emailAddress`
-and `cookies[name] ??= value;` above. It is a suggestion because a truthiness ternary (`a ? a : b`)
+Not auto-fixable. Every finding carries a suggestion, `response.title ?? this.title`
+and `cookies[name] ??= value;` among them. It is a suggestion because a truthiness ternary (`a ? a : b`)
 changes meaning for a falsy non-nullish `a`, and the `if` form accepts any assignment operator in its
 body, as upstream's does, so `if (!a) a += b` suggests `a ??= b`. Each site needs a reader.

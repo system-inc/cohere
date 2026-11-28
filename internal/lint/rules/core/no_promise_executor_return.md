@@ -16,50 +16,6 @@ Disallow returning values from Promise executor functions
 
 Catches a defect rather than a preference. The cleanup is real but bounded.
 
-## Violations
+## What fixing looks like
 
-61 in the tree. Showing the first few.
-
-**`libraries/structure/libraries/nexus/source/command-line/Readline.ts:12`**
-
-```
-rl.question(query, function(ans) {
-```
-
-> Return values from promise executor functions cannot be read
-
-**`libraries/structure/libraries/nexus/source/coordination/CountdownLatch.test.ts:85`**
-
-```
-const timeout1 = new Promise((resolve) => setTimeout(resolve, 10));
-```
-
-> Return values from promise executor functions cannot be read
-
-**`libraries/structure/libraries/nexus/source/coordination/CountdownLatch.test.ts:91`**
-
-```
-const timeout2 = new Promise((resolve) => setTimeout(resolve, 10));
-```
-
-> Return values from promise executor functions cannot be read
-
-**`libraries/structure/libraries/nexus/source/coordination/CountdownLatch.test.ts:119`**
-
-```
-const timeout = new Promise((resolve) => setTimeout(resolve, 10));
-```
-
-> Return values from promise executor functions cannot be read
-
-**`libraries/structure/libraries/nexus/source/coordination/CountdownLatch.test.ts:156`**
-
-```
-const timeout = new Promise((resolve) => setTimeout(resolve, 50));
-```
-
-> Return values from promise executor functions cannot be read
-
-### What fixing looks like
-
-Not auto-fixable. Each site needs a human decision, which is what makes the count above the real cost.
+Not auto-fixable. Each site needs a human decision, which is what makes the count in the table above the real cost.

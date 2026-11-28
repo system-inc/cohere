@@ -21,50 +21,6 @@ It requires a destructured value+setter pair, which fights react-hook-no-destruc
 > correctness-versus-style crossed with violation count, and that is blind to
 > whether a rule fights a convention we chose on purpose.
 
-## Violations
+## What fixing looks like
 
-35 in the tree. Showing the first few.
-
-**`app/(os-layout)/_components/detail/TaskDetailFocusOverlay.tsx:57`**
-
-```
-const [animateInitial] = React.useState<boolean>(function() {
-```
-
-> useState call is not destructured into value + setter pair
-
-**`app/(os-layout)/_components/detail/TaskDetailPanel.tsx:185`**
-
-```
-const [animateInitial] = React.useState<boolean>(function() {
-```
-
-> useState call is not destructured into value + setter pair
-
-**`app/(os-layout)/_components/kingdom/hooks/useKingdomLive.tsx:74`**
-
-```
-const [kingdomLiveStore] = React.useState(function() {
-```
-
-> useState call is not destructured into value + setter pair
-
-**`libraries/structure/source/appearance/providers/AppearanceProvider.tsx:105`**
-
-```
-const [appearance, setAppearanceState] = React.useState<AppearanceKindType>(
-```
-
-> useState call is not destructured into value + setter pair
-
-**`libraries/structure/source/components/animations/FadeSweep.tsx:42`**
-
-```
-const [initialChangeKey] = React.useState(properties.changeKey);
-```
-
-> useState call is not destructured into value + setter pair
-
-### What fixing looks like
-
-Not auto-fixable. Each site needs a human decision, which is what makes the count above the real cost.
+Not auto-fixable. Each site needs a human decision, which is what makes the count in the table above the real cost.

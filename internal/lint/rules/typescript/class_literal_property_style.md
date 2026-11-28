@@ -46,50 +46,6 @@ differs: both linters read 0 on `StringSchema.ts` (#cn8sthd).
 
 Stylistic. Small enough to adopt if we want the convention, not urgent if we do not.
 
-## Violations
+## What fixing looks like
 
-8 in the tree. Showing the first few.
-
-**`libraries/structure/libraries/nexus/source/validation/schema/ArraySchema.ts:23`**
-
-```
-get typeName(): string {
-```
-
-> Literals should be exposed using readonly fields
-
-**`libraries/structure/libraries/nexus/source/validation/schema/BooleanSchema.ts:16`**
-
-```
-get typeName(): string {
-```
-
-> Literals should be exposed using readonly fields
-
-**`libraries/structure/libraries/nexus/source/validation/schema/DateSchema.ts:23`**
-
-```
-get typeName(): string {
-```
-
-> Literals should be exposed using readonly fields
-
-**`libraries/structure/libraries/nexus/source/validation/schema/FileSchema.ts:20`**
-
-```
-get typeName(): string {
-```
-
-> Literals should be exposed using readonly fields
-
-**`libraries/structure/libraries/nexus/source/validation/schema/NumberSchema.ts:16`**
-
-```
-get typeName(): string {
-```
-
-> Literals should be exposed using readonly fields
-
-### What fixing looks like
-
-Not auto-fixable. Each site needs a human decision, which is what makes the count above the real cost.
+Not auto-fixable. Each site needs a human decision, which is what makes the count in the table above the real cost.

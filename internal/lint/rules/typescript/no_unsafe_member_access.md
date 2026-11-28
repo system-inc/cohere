@@ -21,51 +21,7 @@ Disallow member access on a value with type `any`
 > correctness-versus-style crossed with violation count, and that is blind to
 > whether a rule fights a convention we chose on purpose.
 
-## Violations
-
-395 in the tree. Showing the first few.
-
-**`app/api/finance/transaction/[transactionId]/attachments/route.ts:42`**
-
-```
-const originalBytes = Buffer.from(await file.arrayBuffer());
-```
-
-> Unsafe member access .from on an `any` value
-
-**`app/api/spotify/callback/route.ts:36`**
-
-```
-const basic = Buffer.from(`${creds.clientId}:${creds.clientSecret}`).toString('base64');
-```
-
-> Unsafe member access .from on an `any` value
-
-**`app/api/spotify/callback/route.ts:36`**
-
-```
-const basic = Buffer.from(`${creds.clientId}:${creds.clientSecret}`).toString('base64');
-```
-
-> Unsafe member access .clientId on an `any` value
-
-**`app/api/spotify/callback/route.ts:36`**
-
-```
-const basic = Buffer.from(`${creds.clientId}:${creds.clientSecret}`).toString('base64');
-```
-
-> Unsafe member access .clientSecret on an `any` value
-
-**`app/api/spotify/callback/route.ts:36`**
-
-```
-const basic = Buffer.from(`${creds.clientId}:${creds.clientSecret}`).toString('base64');
-```
-
-> Unsafe member access .toString on an `any` value
-
-### What fixing looks like
+## What fixing looks like
 
 Not auto-fixable, and site-by-site is the wrong place to start. Measured on ahra, 2026-09-08:
 **188 of 507 sites are `Buffer`**, and they are not unsafe code at all. `@cloudflare/workers-types`

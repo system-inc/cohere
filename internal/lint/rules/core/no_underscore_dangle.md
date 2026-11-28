@@ -16,50 +16,6 @@ Disallow dangling underscores in identifiers
 
 Stylistic with a cleanup cost that is not obviously worth the convention it buys.
 
-## Violations
+## What fixing looks like
 
-100 in the tree. Showing the first few.
-
-**`libraries/structure/libraries/nexus/source/collections/Dictionary.test.ts:405`**
-
-```
-return this._value;
-```
-
-> Unexpected dangling '_' in '_value'
-
-**`libraries/structure/libraries/nexus/source/collections/Dictionary.test.ts:408`**
-
-```
-this._value = value;
-```
-
-> Unexpected dangling '_' in '_value'
-
-**`libraries/structure/libraries/nexus/source/collections/Dictionary.test.ts:415`**
-
-```
-expect(result._value).toBe('internal');
-```
-
-> Unexpected dangling '_' in '_value'
-
-**`libraries/structure/libraries/nexus/source/protocols/rpc/RpcResponse.ts:85`**
-
-```
-response.__version === '1.0' &&
-```
-
-> Unexpected dangling '_' in '__version'
-
-**`libraries/structure/libraries/nexus/source/protocols/rpc/RpcResponse.ts:87`**
-
-```
-response.__protocol === 'BaseRPC'
-```
-
-> Unexpected dangling '_' in '__protocol'
-
-### What fixing looks like
-
-Not auto-fixable. Each site needs a human decision, which is what makes the count above the real cost.
+Not auto-fixable. Each site needs a human decision, which is what makes the count in the table above the real cost.

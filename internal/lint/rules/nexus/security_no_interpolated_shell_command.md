@@ -21,65 +21,59 @@ skipped. The rule's doc comment carries the precise version.
 
 ## Where it came from
 
-`modules/apple/contacts/ContactsApi.ts:79` in ahra: contact search splices `LIKE '%${word}%'` built
-from the searched words into `sqlite3 "${databasePath}" "${query}"`. `O'Brien` breaks the SQL and the
-catch reports no contacts; `$(...)` in a name read from an email runs (`#5na28yw`). Found by both
-research passes of `#tevhg3f`, built as `#ednac8q`.
+A contact search that builds `LIKE '%${term}%'` from the searched words and hands it to the shell as
+`` `sqlite3 "${file}" "${sql}"` ``. An apostrophe in a name breaks the SQL and the catch reports no
+matches, and `$(...)` in a name that arrived from outside runs. Found by both research passes of
+`#tevhg3f`, built as `#ednac8q`.
 
 ## Counts against the research
 
 ahra has 37 `exec`/`execSync` calls cohere resolves (a categorizing probe of this rule, on the same run):
 25 reported, 4 built but safe, 6 all-literal, 2 opaque. No `exec` call is promisified today, and the one
-`shell: true` call (`FigmaMcpLauncher.ts:22`) has only literal arguments.
+`shell: true` call has only literal arguments.
 
 - **Cross-language pass, 31 dynamic + 6 literal + 1 `shell: true`:** exact match. 31 = 25 reported +
-  4 safe + 2 opaque; the 6 literal and the Figma call are silent.
+  4 safe + 2 opaque; the 6 literal and the `shell: true` call are silent.
 - **JS pass, 20 string-typed + 8 non-literal + 3 literal-typed + 1 `shell:`:** the 20 direct templates
   are exactly cohere's 20 direct-template findings. Of its 8 non-literal commands, cohere reports 5,
-  because it follows `const` bindings and `+`: `PhiCustomerApi.ts:236`, `PlanetScaleApi.ts:380`,
-  `MidjourneyApi.ts:1004` and `:1021` (a `const` template) and `ConversationsBackup.ts:78` (a
-  concatenation). It leaves 3: `MacOsApi.ts:128` (a `let`), `PlanetScaleApi.ts:344` (`run(command)`, a
-  parameter) and `i18n-conversion.ts:243` (its only non-literal value is SQL in a quoted heredoc). The
-  3 literal-typed sites are silent: `iMessageApi.ts:527` and `PhiAnalyticsApi.ts:262` (`const` string
-  literals) and `AhraOsWatchers.ts:720` (a `number`). 20 + 5 = 25.
+  because it follows `const` bindings and `+`: four `const` templates and one concatenation. It leaves
+  3: a command held in a `let`, a command taken as a parameter, and one whose only non-literal value is
+  SQL in a quoted heredoc. The 3 literal-typed sites are silent: two `const` string literals and a
+  `number`. 20 + 5 = 25.
 
-The first draft reported 26: `i18n-conversion.ts:243` was false, since the shell expands nothing in a
-quoted heredoc. The heredoc scan removed it, and `PlanetScaleApi.ts:380`, whose database and branch sit
-unquoted on the opener line, still reports.
+The first draft reported 26: the site whose only non-literal value sat in a quoted heredoc was false,
+since the shell expands nothing there. The heredoc scan removed it, and a site whose values sit unquoted
+on the heredoc's opener line still reports.
 
 ## The findings, read one by one
 
 **Real or latent bugs (6)**: a value from a person, an agent or a command line reaches the shell.
 
-| Site                                                | Value                                                      | Reading                                                               |
-| --------------------------------------------------- | ---------------------------------------------------------- | --------------------------------------------------------------------- |
-| `modules/apple/contacts/ContactsApi.ts:79`          | search words in `query`                                    | **Bug** (`#5na28yw`): an apostrophe breaks the search, `$(...)` runs  |
-| `modules/apple/imessage/iMessageApi.ts:135`         | `parameters.sourcePath` in `"..."`                         | Latent: an attachment path with `"`, `$` or a backtick breaks or runs |
-| `modules/apple/macos/MacOsApi.ts:134`               | `finalPath`, the caller's `customPath`                     | Latent, same shape                                                    |
-| `modules/midjourney/MidjourneyApi.ts:1004`, `:1021` | `inputPath` from the command line                          | Latent, same shape                                                    |
-| `modules/planetscale/PlanetScaleApi.ts:380`         | `database`, `branch`, `org` unquoted on the heredoc opener | Latent: command-line arguments split and expanded by `bash`           |
+| Shape                                                         | Count | Reading                                                   |
+| ------------------------------------------------------------- | ----- | --------------------------------------------------------- |
+| Search words in a quoted SQL string inside the command        | 1     | **Bug**: an apostrophe breaks the search, `$(...)` runs   |
+| A file path from a caller or the command line, inside `"..."` | 4     | Latent: a path with `"`, `$` or a backtick breaks or runs |
+| Command-line arguments unquoted on a heredoc's opener line    | 1     | Latent: the arguments are split and expanded by `bash`    |
 
 **True but harmless today (19)**: the shell does parse a non-literal value, but where it comes from
 holds no shell syntax, or it is escaped correctly.
 
-| Site                                                                                                                               | Value                                      | Why harmless now                                                     |
-| ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ | -------------------------------------------------------------------- |
-| `iMessageApi.ts:425`, `:713`, `:789`, `:857`, `:935`, `:1039`, `:1149`, `:1207`, `:1360`; `iMessageWatch.ts:185`; `MacOsApi.ts:71` | a script in `'...'` with every `'` escaped | Correct POSIX escaping (11 sites); still a shell string              |
-| `ContactsApi.ts:131`                                                                                                               | `databasePath`, `pkList`                   | AddressBook paths found on disk; integer keys from SQLite output     |
-| `ContactsApi.ts:231`                                                                                                               | `databasePath`, `digits`                   | `digits` is `\D` stripped                                            |
-| `ContactsImport.ts:94`                                                                                                             | `databasePath`, the query                  | Code-written queries with no `"` or `$`                              |
-| `iMessageApi.ts:668`                                                                                                               | `scriptPath` with a `randomUUID()`         | A UUID has no shell syntax                                           |
-| `ConversationsBackup.ts:78`, `:87`                                                                                                 | `JSON.stringify(destinationPath)`          | Code-built path; note `JSON.stringify` leaves `$` and backticks live |
-| `PhiCustomerApi.ts:236`                                                                                                            | `database` on the opener line              | Every caller passes `'phi'`; the SQL is in a quoted heredoc          |
-| `SpotifyApi.ts:220`                                                                                                                | `authUrl`                                  | `clientId` from the credentials file, the rest `encodeURIComponent`  |
+| Shape                                                                     | Count | Why harmless now                                                                                  |
+| ------------------------------------------------------------------------- | ----- | ------------------------------------------------------------------------------------------------- |
+| A script in `'...'` with every `'` escaped                                | 11    | Correct POSIX escaping; still a shell string                                                      |
+| A database path found on disk, with integer keys, digits or fixed queries | 3     | Integer keys from SQLite output, `\D` stripped digits, or code-written queries with no `"` or `$` |
+| A script path built from `randomUUID()`                                   | 1     | A UUID has no shell syntax                                                                        |
+| `JSON.stringify` of a code-built path                                     | 2     | Code-built path; note `JSON.stringify` leaves `$` and backticks live                              |
+| A value on a heredoc's opener line                                        | 1     | Every caller passes a constant; the SQL is in a quoted heredoc                                    |
+| An authorization URL                                                      | 1     | The client id from a credentials file, the rest `encodeURIComponent`                              |
 
 **False: 0.**
 
 ## Verification
 
-- Fixtures both ways: the real ContactsApi search before (fires on the command, through two `const`
-  bindings) and after (`execFileSync('sqlite3', [databasePath, query])`, silent); 25 firing shapes, 26
-  silent shapes, the older `@types/node` module layout, and the no-checker decline.
+- Fixtures both ways: the originating search before (fires on the command, through two `const`
+  bindings) and after (`execFileSync('sqlite3', [file, sql])`, silent); 25 firing shapes, 26 silent
+  shapes, the older `@types/node` module layout, and the no-checker decline.
 - Mutation check, 25 mutants, each through `go test -overlay` and each killed: the module-name check,
   the module-block requirement, the `__promisify__` mapping, the shell gate, the shell option's type,
   the non-empty shell string, the built gate, the built gate through `const`, literal types as safe,

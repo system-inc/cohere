@@ -21,57 +21,6 @@ All 6 samples are `export async function generateMetadata(): Promise<Metadata>`,
 > correctness-versus-style crossed with violation count, and that is blind to
 > whether a rule fights a convention we chose on purpose.
 
-## Violations
+## What fixing looks like
 
-**Stale, kept as the audit's record.** The 436 below were the `generateMetadata` world, and that world
-is gone: on 2026-10-01, 43 route files write `generateMetadata` without `async`, and the core
-`require-await` rule cohere enables reports none of the 22 that keep it. The core rule's current numbers
-(cohere 3, ESLint 89, and why 86 of ESLint's are contract sites cohere is right to leave) are in
-`../core/require_await.md`. This typed variant is not ported, so it has no cohere count, and its
-ESLint count was not re-measured.
-
-436 in the tree when audited. Showing the first few.
-
-**`app/(os-layout)/ahra/page.tsx:12`**
-
-```
-export async function generateMetadata(): Promise<Metadata> {
-```
-
-> Async function 'generateMetadata' has no 'await' expression
-
-**`app/(os-layout)/art/page.tsx:8`**
-
-```
-export async function generateMetadata(): Promise<Metadata> {
-```
-
-> Async function 'generateMetadata' has no 'await' expression
-
-**`app/(os-layout)/contacts/[id]/page.tsx:9`**
-
-```
-export async function generateMetadata(): Promise<Metadata> {
-```
-
-> Async function 'generateMetadata' has no 'await' expression
-
-**`app/(os-layout)/contacts/page.tsx:11`**
-
-```
-export async function generateMetadata(): Promise<Metadata> {
-```
-
-> Async function 'generateMetadata' has no 'await' expression
-
-**`app/(os-layout)/data/layout.tsx:14`**
-
-```
-export async function generateMetadata(): Promise<Metadata> {
-```
-
-> Async function 'generateMetadata' has no 'await' expression
-
-### What fixing looks like
-
-Not auto-fixable. Each site needs a human decision, which is what makes the count above the real cost.
+Not auto-fixable. Each site needs a human decision, which is what makes the count in the table above the real cost.

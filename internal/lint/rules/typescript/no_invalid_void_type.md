@@ -21,50 +21,6 @@ Every sampled site is `useWriteRequest<void, {...}>`, matching that hook's own d
 > correctness-versus-style crossed with violation count, and that is blind to
 > whether a rule fights a convention we chose on purpose.
 
-## Violations
+## What fixing looks like
 
-18 in the tree. Showing the first few.
-
-**`app/(os-layout)/finance/_components/FinanceFloorView.tsx:70`**
-
-```
-const designateRequest = networkService.useWriteRequest<void, { accountId: string; designated: boolean }>({
-```
-
-> void is only valid as a return type or generic type argument
-
-**`app/(os-layout)/finance/_components/FinanceReviewView.tsx:78`**
-
-```
-void,
-```
-
-> void is only valid as a return type or generic type argument
-
-**`app/(os-layout)/finance/_components/FinanceReviewView.tsx:86`**
-
-```
-void,
-```
-
-> void is only valid as a return type or generic type argument
-
-**`app/(os-layout)/finance/_components/transactions/FinanceTransactionDetail.tsx:109`**
-
-```
-const commentRequest = networkService.useWriteRequest<void, { transactionId: string; content: string }>({
-```
-
-> void is only valid as a return type or generic type argument
-
-**`app/(os-layout)/finance/_components/transactions/FinanceTransactionDetail.tsx:113`**
-
-```
-const commentDeleteRequest = networkService.useWriteRequest<void, { transactionId: string; commentId: string }>({
-```
-
-> void is only valid as a return type or generic type argument
-
-### What fixing looks like
-
-Not auto-fixable. Each site needs a human decision, which is what makes the count above the real cost.
+Not auto-fixable. Each site needs a human decision, which is what makes the count in the table above the real cost.

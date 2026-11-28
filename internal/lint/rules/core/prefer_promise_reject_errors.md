@@ -16,18 +16,6 @@ Require using Error objects as Promise rejection reasons
 
 Stylistic. Small enough to adopt if we want the convention, not urgent if we do not.
 
-## Violations
+## What fixing looks like
 
-1 in the tree.
-
-**`modules/kingdom/pentair/PentairApi.ts:78`**
-
-```
-reject(error as Error);
-```
-
-> Expected the Promise rejection reason to be an Error
-
-### What fixing looks like
-
-Not auto-fixable. Each site needs a human decision, which is what makes the count above the real cost.
+Not auto-fixable. Each site needs a human decision, which is what makes the count in the table above the real cost.

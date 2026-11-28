@@ -16,42 +16,6 @@ Disallow definitions of unused propTypes
 
 Stylistic. Small enough to adopt if we want the convention, not urgent if we do not.
 
-## Violations
+## What fixing looks like
 
-4 in the tree. Showing the first few.
-
-**`libraries/structure/source/components/images/editor/ImageEditor.tsx:55`**
-
-```
-minimumWidth?: number;
-```
-
-> 'minimumWidth' PropType is defined but prop is never used
-
-**`libraries/structure/source/components/images/editor/ImageEditor.tsx:56`**
-
-```
-maximumWidth?: number;
-```
-
-> 'maximumWidth' PropType is defined but prop is never used
-
-**`libraries/structure/source/components/images/editor/ImageEditor.tsx:57`**
-
-```
-minimumHeight?: number;
-```
-
-> 'minimumHeight' PropType is defined but prop is never used
-
-**`libraries/structure/source/components/images/editor/ImageEditor.tsx:58`**
-
-```
-maximumHeight?: number;
-```
-
-> 'maximumHeight' PropType is defined but prop is never used
-
-### What fixing looks like
-
-Not auto-fixable. Each site needs a human decision, which is what makes the count above the real cost.
+Not auto-fixable. Each site needs a human decision, which is what makes the count in the table above the real cost.

@@ -22,50 +22,6 @@ The option is `reactCompiler` in the second element (`["always", {"reactCompiler
 
 Stylistic. Small enough to adopt if we want the convention, not urgent if we do not.
 
-## Violations
-
-8 in the tree. Showing the first few.
-
-**`libraries/structure/source/components/forms/fields/FieldMessage.tsx:104`**
-
-```
-shouldShowSuccesses = shouldShowSuccesses && !hasErrors && validationResults.successes.length > 0;
-```
-
-> Assignment (=) can be replaced with operator assignment (&&=)
-
-**`libraries/structure/source/components/markdown/utilities/MarkdownUtilities.ts:58`**
-
-```
-node.data = node.data || {};
-```
-
-> Assignment (=) can be replaced with operator assignment (||=)
-
-**`libraries/structure/source/components/markdown/utilities/MarkdownUtilities.ts:59`**
-
-```
-node.data.hProperties = node.data.hProperties || {};
-```
-
-> Assignment (=) can be replaced with operator assignment (||=)
-
-**`libraries/structure/source/components/markdown/utilities/MarkdownUtilities.ts:189`**
-
-```
-current.data = current.data || {};
-```
-
-> Assignment (=) can be replaced with operator assignment (||=)
-
-**`libraries/structure/source/components/markdown/utilities/MarkdownUtilities.ts:209`**
-
-```
-node.data = node.data || {};
-```
-
-> Assignment (=) can be replaced with operator assignment (||=)
-
-### What fixing looks like
+## What fixing looks like
 
 Auto-fixable. `eslint --fix` rewrites these, so the cleanup is a command plus a review of the diff.

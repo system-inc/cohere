@@ -16,50 +16,6 @@ Enforce a maximum depth that blocks can be nested
 
 Stylistic with a cleanup cost that is not obviously worth the convention it buys.
 
-## Violations
+## What fixing looks like
 
-176 in the tree. Showing the first few.
-
-**`libraries/structure/code-quality/lint/rules/BoundaryNoProjectThemeValueRule.ts:146`**
-
-```
-if(componentPrefix) {
-```
-
-> Blocks are nested too deeply (5). Maximum allowed is 4
-
-**`libraries/structure/code-quality/lint/rules/BoundaryNoProjectThemeValueRule.ts:148`**
-
-```
-if(keys.length > 0) {
-```
-
-> Blocks are nested too deeply (6). Maximum allowed is 4
-
-**`libraries/structure/libraries/nexus/code-quality/lint/rules/ConsistencyNoPropertyAliasRule.ts:65`**
-
-```
-if(arrayParent.callee.type === 'Identifier' && isHookName(arrayParent.callee.name)) {
-```
-
-> Blocks are nested too deeply (5). Maximum allowed is 4
-
-**`libraries/structure/libraries/nexus/code-quality/lint/rules/ConsistencyNoPropertyAliasRule.ts:69`**
-
-```
-if(
-```
-
-> Blocks are nested too deeply (5). Maximum allowed is 4
-
-**`libraries/structure/code-quality/lint/rules/ConsistencyOrganizeImportsRule.ts:570`**
-
-```
-if(comment.type === 'Line') {
-```
-
-> Blocks are nested too deeply (5). Maximum allowed is 4
-
-### What fixing looks like
-
-Not auto-fixable. Each site needs a human decision, which is what makes the count above the real cost.
+Not auto-fixable. Each site needs a human decision, which is what makes the count in the table above the real cost.

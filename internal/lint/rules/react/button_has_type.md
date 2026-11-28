@@ -41,50 +41,6 @@ these rows verbatim (Nexus fc3a1cc), so the linters agree on the site (#cn8sthd)
 
 Stylistic. Small enough to adopt if we want the convention, not urgent if we do not.
 
-## Violations
+## What fixing looks like
 
-13 in the tree. Showing the first few.
-
-**`libraries/structure/source/components/buttons/Button.tsx:218`**
-
-```
-<button ref={ref as React.Ref<HTMLButtonElement>} type={type} disabled={isDisabled} {...commonProperties}>
-```
-
-> The button type attribute must be specified by a static string or a trivial ternary expression
-
-**`libraries/structure/source/components/containers/AccordionItem.tsx:54`**
-
-```
-<button
-```
-
-> Missing an explicit type attribute for button
-
-**`libraries/structure/source/components/forms/fields/markup/lexical/LexicalFloatingLinkEditor.tsx:93`**
-
-```
-<button onClick={handleUpdateLink}>{translations.LexicalFloatingLinkEditor.update}</button>
-```
-
-> Missing an explicit type attribute for button
-
-**`libraries/structure/source/components/forms/fields/markup/lexical/LexicalFloatingLinkEditor.tsx:94`**
-
-```
-<button onClick={handleRemoveLink}>{translations.LexicalFloatingLinkEditor.remove}</button>
-```
-
-> Missing an explicit type attribute for button
-
-**`libraries/structure/source/components/markdown/ContentNavigator.tsx:127`**
-
-```
-<button
-```
-
-> Missing an explicit type attribute for button
-
-### What fixing looks like
-
-Not auto-fixable. Each site needs a human decision, which is what makes the count above the real cost.
+Not auto-fixable. Each site needs a human decision, which is what makes the count in the table above the real cost.

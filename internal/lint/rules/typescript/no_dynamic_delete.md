@@ -16,50 +16,6 @@ Disallow using the `delete` operator on computed key expressions
 
 Stylistic. Small enough to adopt if we want the convention, not urgent if we do not.
 
-## Violations
+## What fixing looks like
 
-16 in the tree. Showing the first few.
-
-**`libraries/structure/command-line/Structure.ts:220`**
-
-```
-delete environment[verifyBinaryOverrideVariable];
-```
-
-> Do not delete dynamically computed property keys
-
-**`libraries/structure/libraries/nexus/source/protocols/http/CloudflareRequest.ts:20`**
-
-```
-delete out[key];
-```
-
-> Do not delete dynamically computed property keys
-
-**`libraries/structure/source/components/tables/hooks/useTable.ts:478`**
-
-```
-else delete copy[rowId];
-```
-
-> Do not delete dynamically computed property keys
-
-**`libraries/structure/source/components/tables/hooks/useTable.ts:500`**
-
-```
-else delete next[row.id];
-```
-
-> Do not delete dynamically computed property keys
-
-**`libraries/structure/source/components/tables/hooks/useTable.ts:528`**
-
-```
-delete next[columnId];
-```
-
-> Do not delete dynamically computed property keys
-
-### What fixing looks like
-
-Not auto-fixable. Each site needs a human decision, which is what makes the count above the real cost.
+Not auto-fixable. Each site needs a human decision, which is what makes the count in the table above the real cost.

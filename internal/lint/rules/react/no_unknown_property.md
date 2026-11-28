@@ -21,50 +21,6 @@ An unknown DOM property is silently dropped by React at runtime, making this a c
 > correctness-versus-style crossed with violation count, and that is blind to
 > whether a rule fights a convention we chose on purpose.
 
-## Violations
-
-18 in the tree. Showing the first few.
-
-**`libraries/structure/assets/icons/commerce/MastercardIcon.tsx:16`**
-
-```
-fill-rule="evenodd"
-```
-
-> Unknown property 'fill-rule' found, use 'fillRule' instead
-
-**`libraries/structure/assets/icons/commerce/MastercardIcon.tsx:17`**
-
-```
-clip-rule="evenodd"
-```
-
-> Unknown property 'clip-rule' found, use 'clipRule' instead
-
-**`libraries/structure/assets/icons/commerce/MastercardIcon.tsx:22`**
-
-```
-fill-rule="evenodd"
-```
-
-> Unknown property 'fill-rule' found, use 'fillRule' instead
-
-**`libraries/structure/assets/icons/commerce/MastercardIcon.tsx:23`**
-
-```
-clip-rule="evenodd"
-```
-
-> Unknown property 'clip-rule' found, use 'clipRule' instead
-
-**`libraries/structure/assets/icons/commerce/MastercardIcon.tsx:28`**
-
-```
-fill-rule="evenodd"
-```
-
-> Unknown property 'fill-rule' found, use 'fillRule' instead
-
-### What fixing looks like
+## What fixing looks like
 
 Auto-fixable. `eslint --fix` rewrites these, so the cleanup is a command plus a review of the diff.

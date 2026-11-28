@@ -16,18 +16,6 @@ Disallow comparisons where both sides are exactly the same
 
 Catches a defect rather than a preference, and the cleanup is small enough to do in one pass.
 
-## Violations
+## What fixing looks like
 
-1 in the tree.
-
-**`libraries/structure/libraries/nexus/source/errors/Assert.test.ts:9`**
-
-```
-expect(() => assert('hello' === 'hello')).not.toThrow();
-```
-
-> Comparing to itself is potentially pointless
-
-### What fixing looks like
-
-Not auto-fixable. Each site needs a human decision, which is what makes the count above the real cost.
+Not auto-fixable. Each site needs a human decision, which is what makes the count in the table above the real cost.

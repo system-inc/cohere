@@ -46,50 +46,6 @@ So adopting this means choosing which of the two rules the tree wants, and turni
 Adding a key without removing the other leaves both enabled, which reports the thirteen the extension
 exists to suppress.
 
-## Violations
+## What fixing looks like
 
-121 in the tree. Showing the first few.
-
-**`app/(os-layout)/_components/detail/TaskDetailCommandRulingCard.tsx:92`**
-
-```
-return function() {
-```
-
-> Function expected no return value
-
-**`app/(os-layout)/_components/detail/TaskDetailFocusOverlay.tsx:94`**
-
-```
-return function() {
-```
-
-> Function expected no return value
-
-**`app/(os-layout)/_components/detail/TaskDetailProjects.tsx:113`**
-
-```
-return registerProjectRegion({ addToProjectId: structuralProjectId, element });
-```
-
-> Function expected no return value
-
-**`app/(os-layout)/_components/detail/TaskDetailSubtasks.tsx:82`**
-
-```
-return registerReparentRegion({ reparentToTaskId: openTaskId, element });
-```
-
-> Function expected no return value
-
-**`app/(os-layout)/_components/drag/TasksDragGhostClone.tsx:25`**
-
-```
-return function() {
-```
-
-> Function expected no return value
-
-### What fixing looks like
-
-Not auto-fixable. Each site needs a human decision, which is what makes the count above the real cost.
+Not auto-fixable. Each site needs a human decision, which is what makes the count in the table above the real cost.

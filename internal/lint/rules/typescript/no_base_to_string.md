@@ -21,50 +21,6 @@ Real signal, but it is explicitly disabled in VerifySettings.json (`typescript/n
 > correctness-versus-style crossed with violation count, and that is blind to
 > whether a rule fights a convention we chose on purpose.
 
-## Violations
+## What fixing looks like
 
-53 in the tree. Showing the first few.
-
-**`app/(os-layout)/finance/_components/FinanceChart.tsx:86`**
-
-```
-return typeof value === 'number' ? moneyCompact(value, { unit: 'Cents' }) : String(value ?? '');
-```
-
-> 'value ?? ''' will use Object's default stringification format ('[object Object]') when stringified
-
-**`app/(os-layout)/os/reports/_components/ReportBlockRenderer.tsx:90`**
-
-```
-return value === undefined || value === null ? '' : String(value);
-```
-
-> 'value' will use Object's default stringification format ('[object Object]') when stringified
-
-**`libraries/structure/command-line/StructureDoctor.ts:171`**
-
-```
-current: packageJson[key] ? (isSimple ? String(packageJson[key]) : '(differs)') : '(missing)',
-```
-
-> 'packageJson[key]' will use Object's default stringification format ('[object Object]') when stringified
-
-**`libraries/structure/libraries/nexus/source/errors/BaseErrorSerializer.ts:191`**
-
-```
-return createBaseErrorData(`Unknown value caught error: ${String(error)}`);
-```
-
-> 'error' may use Object's default stringification format ('[object Object]') when stringified
-
-**`libraries/structure/libraries/nexus/source/structured-text/tables/Csv.ts:14`**
-
-```
-const stringValue = typeof value === 'object' ? JSON.stringify(value) : String(value);
-```
-
-> 'value' will use Object's default stringification format ('[object Object]') when stringified
-
-### What fixing looks like
-
-Not auto-fixable. Each site needs a human decision, which is what makes the count above the real cost.
+Not auto-fixable. Each site needs a human decision, which is what makes the count in the table above the real cost.

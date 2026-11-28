@@ -16,34 +16,6 @@ Disallow use of chained assignment expressions
 
 Stylistic. Small enough to adopt if we want the convention, not urgent if we do not.
 
-## Violations
+## What fixing looks like
 
-3 in the tree. Showing the first few.
-
-**`baselines/DumpRuleInventory.ts:159`**
-
-```
-const bucket = (byPlugin[record.plugin] ??= { known: 0, enabled: 0 });
-```
-
-> Unexpected chained assignment
-
-**`libraries/structure/source/components/code/Code.tsx:67`**
-
-```
-target.selectionStart = target.selectionEnd = start + 2;
-```
-
-> Unexpected chained assignment
-
-**`modules/finance/connections/FinanceQuickBooksEnricher.ts:261`**
-
-```
-const bucket = (samples[plan.outcome] ??= []);
-```
-
-> Unexpected chained assignment
-
-### What fixing looks like
-
-Not auto-fixable. Each site needs a human decision, which is what makes the count above the real cost.
+Not auto-fixable. Each site needs a human decision, which is what makes the count in the table above the real cost.
