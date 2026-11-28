@@ -16,8 +16,9 @@
 // text runs on through the lines of its comment below it, to the first blank comment line or the comment's end, and
 // is never empty: a copy says when it goes away.
 //
-// Every line of the file outside its marked changes is upstream's, which a test beside this file holds true
-// against upstream's text recorded in testdata/upstream, each file with its digest, by tools/generate. A std copy's
+// Every line of the file outside its marked changes is upstream's, which every_copy's test holds true against
+// upstream's text recorded in upstream_text/testdata/upstream, each file with its digest, by upstream_text's
+// tools/generate. A std copy's
 // own package also holds the toolchain to the sources of the release the copy names, so a toolchain that moves past
 // them fails until the copy is bumped. A
 // marked change is a run of lines that differ from upstream's and hold a comment with `cohere:` in it, the header
