@@ -31,7 +31,11 @@ import (
 // hold refuses the landing. The script shards a package only when its path is among its arguments, which a split
 // half's and a Mac's whole gate are; the land-gate job's patterns, `./...`, never name one, so that road runs every
 // package unsharded. The script reads it through boxShardTableLine, and TestTheShardTableReads holds it to its grammar.
-const boxShardTable = "github.com/system-inc/cohere/internal/go_language 0"
+const boxShardTable = "github.com/system-inc/cohere/internal/go_language 0\n" +
+	// The engine's rows (#bd5j7v0, #wrpcag3): each package's work is 65 to 88 s on 2 threads alone on Shackler, so 4
+	// shards put each near 20 to 30 s, and no test is slow alone, so none is pinned.
+	"github.com/system-inc/cohere/internal/go_language/check 4\n" +
+	"github.com/system-inc/cohere/internal/go_language/load 4"
 
 // boxShardTableLine is sharedBoxGate's line setting shardTable, the table it shards by: set in the script itself, so
 // no variable in a shared box's environment can move it. A test replaces the line to shard packages of its own.
