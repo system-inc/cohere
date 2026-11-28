@@ -131,3 +131,59 @@ func TestAnIntegrateJobsAccountSaysWhatATestRewrote(test *testing.T) {
 		test.Errorf("a tree on its stamp before the tests says a difference:\n%s", ran.errors)
 	}
 }
+
+// A job killed while its tests hold the laid tree still, by `SIGKILL` to its own pid, never runs its release, so the
+// tree stays read-only. The next job lays the same path over it and integrates, since its lay gives the tree back first
+// (giveTreeBack): before, every landing after one killed job was broken until a hand repaired the box (the Go Square's
+// must on #d49qcjg).
+func TestAJobKilledWhileItsTreeIsHeldLeavesTheNextOneItsLay(test *testing.T) {
+	test.Parallel()
+	fixture := newIntegrateJobFixture(test)
+	fixture.reply("measure.run", shacklerSays([]int64{9900, 9700, 9800}))
+	fixture.reply("tests.wait", "")
+	merge := fixture.merged()
+	tree := filepath.Join(fixture.home, integrateJobScratch, "tree")
+	job := exec.Command(fixture.wrapper, "integrate-job", "--merge", merge, "--task", fixtureTask, "--message",
+		"a module whose job is killed")
+	job.Dir = fixture.job
+	job.Env = append(fixture.environment, integrateJobCommitVariable+"="+fixture.git(fixture.repository, "rev-parse",
+		"main"))
+	if startError := job.Start(); startError != nil {
+		test.Fatal(startError)
+	}
+	// The stand-in's tests wait for tests.go once they've started, so they end whatever happens to the job.
+	defer func() {
+		if writeError := os.WriteFile(filepath.Join(fixture.replies, "tests.go"), nil, 0o644); writeError != nil {
+			test.Error(writeError)
+		}
+	}()
+	for deadline := time.Now().Add(2 * time.Minute); ; time.Sleep(20 * time.Millisecond) {
+		if _, statError := os.Stat(filepath.Join(fixture.replies, "tests.started")); statError == nil {
+			break
+		}
+		if time.Now().After(deadline) {
+			// Ignored: the job is stopped because the test is ending, and its exit says nothing more.
+			_ = job.Process.Kill()
+			// Ignored: as above, it's the job this test killed, and how it ended is the kill.
+			_ = job.Wait()
+			test.Fatal("the job's tests never started")
+		}
+	}
+	if killError := job.Process.Kill(); killError != nil {
+		test.Fatal(killError)
+	}
+	// Ignored: a job killed by its signal exits with it, which is the point.
+	_ = job.Wait()
+	information, statError := os.Stat(filepath.Join(tree, "command"))
+	if statError != nil || information.Mode().Perm()&0o200 != 0 {
+		test.Fatalf("the killed job's tree isn't held still, so this shows nothing: %v, %v", information, statError)
+	}
+	if removeError := os.Remove(filepath.Join(fixture.replies, "tests.wait")); removeError != nil {
+		test.Fatal(removeError)
+	}
+	ran := fixture.integrateJob(merge)
+	if ran.exit != 0 || ran.integrated == "" {
+		test.Fatalf("the job after the killed one exited %d and integrated %q:\n%s", ran.exit, ran.integrated,
+			ran.errors)
+	}
+}

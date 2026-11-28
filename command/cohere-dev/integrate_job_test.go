@@ -55,7 +55,8 @@ type integrateJobFixture struct {
 // with no `tests.run` it prints where its modules came from, as an integrate job's gate says it, then a passing run of
 // every package it was handed, but `tests.fails`, which fails, with `tests.cached`'s package replayed `(cached)`, and
 // then, unless one failed, a passing -race run of each race token's package. With `tests.grows` it writes an entry at
-// the path it names, as a run that compiles grows the cache.
+// the path it names, as a run that compiles grows the cache. With `tests.wait`, the tests write `tests.started` and
+// wait for `tests.go`, so a test can stop the job while its tests run.
 const integrateJobShell = `#!/bin/sh
 replies="$INTEGRATE_JOB_REPLIES"
 staged="$replies/stdin.$$"
@@ -65,6 +66,10 @@ mv "$staged" "$replies/$kind.script"
 shift 2
 printf '%s\n' "$@" > "$replies/$kind.arguments"
 echo "$kind" >> "$replies/calls"
+if [ "$kind" = tests ] && [ -e "$replies/tests.wait" ]; then
+  : > "$replies/tests.started"
+  while [ ! -e "$replies/tests.go" ]; do sleep 0.05; done
+fi
 printf '%s' "${` + release.SwiftResolvedVariable + `:-}" > "$replies/$kind.swift"
 commit="$1"
 if [ -e "$replies/$kind.run" ]; then

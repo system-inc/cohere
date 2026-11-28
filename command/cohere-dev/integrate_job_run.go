@@ -819,6 +819,11 @@ func pullRequestTitle(message string, task string) (string, string) {
 // lay checks the merge's tree out under the integrate job's scratch, a worktree of its own cohere.git, borrowing the
 // history, kept across jobs, with its TypeScript at the pin it records.
 func (job *integrateJobRun) lay() (string, int) {
+	// A job killed while its tests held the tree still left it read-only, which the checkout below can't write over.
+	if giveBackError := giveTreeBack(job.tree); giveBackError != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: laying the merge's tree at %s: %v\n", job.tree, giveBackError)
+		return "", 1
+	}
 	if _, statError := os.Stat(filepath.Join(job.tree, ".git")); statError != nil {
 		// Ignored: a prune with nothing to prune says nothing, and the add below says why it failed if it does.
 		_, _ = gitCombined(job.repository, "worktree", "prune")

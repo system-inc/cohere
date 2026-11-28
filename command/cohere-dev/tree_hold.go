@@ -17,6 +17,16 @@ import (
 //     with that test named.
 //   - The walk after the tests (treeOffTheStamp) refuses a landing whose tree is off its stamp, which is how a tracked
 //     file rewritten in place shows: a read-only directory still lets a writable file be written.
+//
+// Go's test cache keys a directory a test reads on its mode with the rest of its stat, so a key saved under the hold
+// holds `r-x` for every directory of the tree. That is consistent because every integrate job's tests run held, and
+// it is why they must: tests run on Shackler unheld, with the same tree and the same cache, replay nothing that reads a
+// directory (the Go Square's note on #d49qcjg). The first job under the hold reruns those packages once, for the same
+// reason.
+//
+// A job killed before it releases its hold, by a ceiling, a `SIGKILL` or the box going down, leaves its tree read-only,
+// and the next job's lay checks out over it in place, which can't create or remove an entry there. So the lay gives
+// the tree back first (giveTreeBack), whatever a job before it held.
 
 // heldDirectory is one directory holdTreeStill made read-only and the mode it had, which its release puts back.
 type heldDirectory struct {
@@ -71,4 +81,34 @@ func holdTreeStill(tree string) (func() error, error) {
 		return nil, fmt.Errorf("holding %s still: %w", tree, walkError)
 	}
 	return release, nil
+}
+
+// giveTreeBack gives every directory under tree that holdTreeStill made read-only its owner's write again, but for
+// what is inside a .git directory, which the hold never touched: what a job killed while holding it left behind, which
+// the lay must be able to check out over and clean. A directory its owner can already write is left as it is, and a
+// tree that isn't there is nothing to give back.
+func giveTreeBack(tree string) error {
+	walkError := filepath.WalkDir(tree, func(place string, entry fs.DirEntry, pathError error) error {
+		if pathError != nil {
+			return pathError
+		}
+		if !entry.IsDir() {
+			return nil
+		}
+		if entry.Name() == ".git" && place != tree {
+			return fs.SkipDir
+		}
+		information, informationError := entry.Info()
+		if informationError != nil {
+			return informationError
+		}
+		if mode := information.Mode().Perm(); mode&0o200 == 0 {
+			return os.Chmod(place, mode|0o200)
+		}
+		return nil
+	})
+	if walkError != nil && !errors.Is(walkError, fs.ErrNotExist) {
+		return fmt.Errorf("giving %s back its owner's write: %w", tree, walkError)
+	}
+	return nil
 }
