@@ -150,7 +150,9 @@ func fastTest(root string, base []string, arguments []string, limit *bound) int 
 // TypeScript a symlink, from a shell with no go flags, go list failed on VCS stamping and the fast tier
 // stopped there (2026-11-05). go's stderr goes in the error, which said only "exit status 1" without it.
 func modulePackagesIn(root string, environment []string, patterns []string) (map[string]bool, error) {
-	command := exec.Command("go", append([]string{"list", "-f", "{{.ImportPath}} {{.Module.Path}}"}, patterns...)...)
+	// Tab-separated, since a directory's path may hold a space.
+	command := exec.Command("go", append([]string{"list", "-f",
+		"{{.ImportPath}}\t{{.Module.Path}}\t{{.Dir}}\t{{.Module.GoMod}}"}, patterns...)...)
 	command.Dir = root
 	command.Env = environment
 	output, outputError := command.Output()
@@ -165,17 +167,22 @@ func modulePackagesIn(root string, environment []string, patterns []string) (map
 		return nil, fmt.Errorf("listing the module's packages: %w", outputError)
 	}
 	packages := map[string]bool{}
+	listed := []listed_directories.Package{}
 	for _, line := range strings.Split(strings.TrimSpace(string(output)), "\n") {
-		fields := strings.Fields(line)
-		if len(fields) != 2 {
+		fields := strings.Split(line, "\t")
+		if len(fields) != 4 {
 			continue
 		}
 		relative := strings.TrimPrefix(fields[0], fields[1])
 		packages["."+relative] = true
+		listed = append(listed, listed_directories.Package{ImportPath: fields[0], Directory: fields[2], Root: true,
+			MainModule: true, MainGoMod: fields[3]})
 	}
-	// What go list walked, read again in this process, so a test that lists the module has its result keyed on a
-	// package added or removed (#cmpsz8p).
-	listed_directories.Open(root, patterns, nil)
+	// What go list read, read again in this process, so a test that lists packages has its result keyed on them: each
+	// listed package's directory and its module's go.mod, and for `./...` every directory the walk looked in, so a
+	// package added, emptied or removed is a changed input (#cmpsz8p). Handed no packages, Open keyed a pattern with no
+	// `/...` on nothing at all (the Go Square's must on #0zdyk51).
+	listed_directories.Open(root, patterns, listed)
 	return packages, nil
 }
 
