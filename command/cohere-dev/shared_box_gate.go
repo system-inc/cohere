@@ -239,7 +239,7 @@ if [ -n "${` + boxCoreBudgetVariable + `:-}" ]; then
 fi
 ` + sharedBoxCacheBlock + `# The shards' outputs and the run's own temporary directory, when the script before this
 # made one, go with the cache, and a kept cache stays.
-trap '[ -n "${keepCache:-}" ] || rm -rf "$gocache"; [ -z "${shards:-}" ] || rm -rf "$shards"; [ -z "${gatetemp:-}" ] || { chmod -R u+w "$gatetemp" 2>/dev/null; rm -rf "$gatetemp"; }' EXIT
+trap '[ -n "${keepCache:-}" ] || rm -rf "$gocache"; [ -z "${shards:-}" ] || rm -rf "$shards"; [ -z "${beside:-}" ] || rm -rf "$beside"; [ -z "${gatetemp:-}" ] || { chmod -R u+w "$gatetemp" 2>/dev/null; rm -rf "$gatetemp"; }' EXIT
 export GOCACHE="$gocache"
 echo "` + boxMarker + `$(git rev-parse HEAD) on $(go env GOOS)/$(go env GOARCH)"
 step toolchain
@@ -261,46 +261,92 @@ sharded=""; others=""
 for package in "$@"; do
   if [ "$package" = "` + boxShardedPackage + `" ]; then sharded="$package"; else others="$others $package"; fi
 done
-# A failing go test is remembered rather than ending the script under set -e, so the shards still run after a plain
-# run that failed, as one go test of every package would have run them, and the run ends failed once both have.
-testsFailed=0
-if [ -z "$sharded" ]; then
-  go test $countFlag -timeout ` + sharedBoxTestTimeout + ` -json "$@" | grep -vE '"Action":"(start|run|pause|cont)"' ||
-    testsFailed=1
-elif [ -n "$others" ]; then
-  # Unquoted, so each package is its own argument: an import path, which holds no space or glob.
-  go test $countFlag -timeout ` + sharedBoxTestTimeout + ` -json $others |
-    grep -vE '"Action":"(start|run|pause|cont)"' || testsFailed=1
-fi
-step tests
+# The tests, the shards, the -race run and its narrowed runs each run beside the others, a background job apiece
+# writing its JSON to a file of its own and its end, its failure and its seconds, to another, so the stage takes about as long
+# as its longest job (#df7s7ej). Each job's output is printed whole once all have ended, in the order the jobs ran one
+# after another before: the module's run, its shards, then the race marker and the -race runs. A -race run beside a
+# module run that failed is never printed, as it never ran then, so the verdict is what it was.
+beside=$(mktemp -d "${TMPDIR:-/tmp}/cohere-gate-beside.XXXXXX")
+besideStarted=$(date +%s)
+# ended writes a job's end: whether it failed, and its own seconds from when it started.
+ended() { echo "$1 $(($(date +%s) - $2))" > "$beside/$3.end"; }
+(
+  started=$(date +%s); failed=0
+  # A failing go test is remembered rather than ending the job under set -e, so its end is always written.
+  if [ -z "$sharded" ]; then
+    go test $countFlag -timeout ` + sharedBoxTestTimeout + ` -json "$@" |
+      grep -vE '"Action":"(start|run|pause|cont)"' || failed=1
+  elif [ -n "$others" ]; then
+    # Unquoted, so each package is its own argument: an import path, which holds no space or glob.
+    go test $countFlag -timeout ` + sharedBoxTestTimeout + ` -json $others |
+      grep -vE '"Action":"(start|run|pause|cont)"' || failed=1
+  fi
+  ended "$failed" "$started" tests
+) > "$beside/tests" 2>&1 &
+besideJobs="$!"
 if [ -n "$sharded" ]; then
-` + sharedBoxShards + `step sharded
+  (
+    started=$(date +%s); testsFailed=0
+    trap '[ -z "${shards:-}" ] || rm -rf "$shards"' EXIT
+` + sharedBoxShards + `    ended "$testsFailed" "$started" sharded
+  ) > "$beside/sharded" 2>&1 &
+  besideJobs="$besideJobs $!"
 fi
-[ "$testsFailed" = 0 ] || exit 1
 if [ -n "$races" ]; then
-  echo "` + boxRaceMarker + `"
   # Split on commas alone, never on a run's characters, and each run quoted, so nothing of it globs.
   IFS=, read -r -a raceTokens <<< "$races"
   plainRaces=""
   for race in "${raceTokens[@]}"; do
     case "$race" in *` + raceRunSeparator + `*) ;; *) plainRaces="$plainRaces $race" ;; esac
   done
-  # A failing go test is remembered rather than ending the script under set -e, so every token still runs.
-  raceFailed=0
-  # Unquoted, so each plain token is its own argument: a directory of the module, which holds no space or glob.
-  if [ -n "$plainRaces" ]; then
-    go test $countFlag -timeout ` + sharedBoxTestTimeout + ` -json -race $plainRaces |
-      grep -vE '"Action":"(start|run|pause|cont)"' || raceFailed=1
+  (
+    started=$(date +%s); failed=0
+    # Unquoted, so each plain token is its own argument: a directory of the module, which holds no space or glob.
+    if [ -n "$plainRaces" ]; then
+      go test $countFlag -timeout ` + sharedBoxTestTimeout + ` -json -race $plainRaces |
+        grep -vE '"Action":"(start|run|pause|cont)"' || failed=1
+    fi
+    ended "$failed" "$started" race
+  ) > "$beside/race" 2>&1 &
+  besideJobs="$besideJobs $!"
+  (
+    started=$(date +%s); failed=0
+    # A failing go test is remembered rather than ending the job under set -e, so every token still runs.
+    for race in "${raceTokens[@]}"; do
+      case "$race" in
+      *` + raceRunSeparator + `*)
+        go test $countFlag -timeout ` + sharedBoxTestTimeout + ` -json -race -run "${race#*` + raceRunSeparator + `}" \
+          "${race%%` + raceRunSeparator + `*}" | grep -vE '"Action":"(start|run|pause|cont)"' || failed=1 ;;
+      esac
+    done
+    ended "$failed" "$started" race-runs
+  ) > "$beside/race-runs" 2>&1 &
+  besideJobs="$besideJobs $!"
+fi
+# Each job's own exit is its end file, so the waits never end the script, and every job is waited for.
+for besideJob in $besideJobs; do wait "$besideJob" || true; done
+# printJob prints a job's output and its step, its own seconds marked beside, which the stage's wall counts once.
+# A job with no end file ended before writing it, and fails.
+printJob() {
+  cat "$beside/$1"
+  if [ -s "$beside/$1.end" ]; then
+    read -r jobFailed jobSeconds < "$beside/$1.end"
+  else
+    jobFailed=1; jobSeconds=0
+    echo "` + sharedBoxRefusedMarker + `the $1 run ended before it said how it ended"
   fi
-  step race
-  for race in "${raceTokens[@]}"; do
-    case "$race" in
-    *` + raceRunSeparator + `*)
-      go test $countFlag -timeout ` + sharedBoxTestTimeout + ` -json -race -run "${race#*` + raceRunSeparator + `}" \
-        "${race%%` + raceRunSeparator + `*}" | grep -vE '"Action":"(start|run|pause|cont)"' || raceFailed=1 ;;
-    esac
-  done
-  step race-runs
+  echo "` + boxStepMarker + `$1 $jobSeconds ` + boxStepBeside + `"
+}
+testsFailed=0
+printJob tests; [ "$jobFailed" = 0 ] || testsFailed=1
+if [ -n "$sharded" ]; then printJob sharded; [ "$jobFailed" = 0 ] || testsFailed=1; fi
+stepStarted=$besideStarted; step beside
+[ "$testsFailed" = 0 ] || exit 1
+if [ -n "$races" ]; then
+  echo "` + boxRaceMarker + `"
+  raceFailed=0
+  printJob race; [ "$jobFailed" = 0 ] || raceFailed=1
+  printJob race-runs; [ "$jobFailed" = 0 ] || raceFailed=1
   [ "$raceFailed" = 0 ] || exit 1
 fi
 `

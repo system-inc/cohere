@@ -277,26 +277,38 @@ func TestASharedBoxGateTrustsNothingTheBoxKept(test *testing.T) {
 					}
 				}
 			}
-			// The log opens each go test's line with `test`, then its arguments whole, their own `test` first.
-			if !strings.HasPrefix(lines[2], "test test -count=1 -timeout "+sharedBoxTestTimeout+
-				" -json -race ./internal/edit |") {
-				test.Errorf("the -race run of the plain tokens is not of the race list: %s", lines[2])
+			// The log opens each go test's line with `test`, then its arguments whole, their own `test` first. The
+			// module's run and the -race runs run beside each other (#df7s7ej), so each is found by what it asked,
+			// once, in whatever order they reached the log.
+			once := func(prefix string, what string) string {
+				test.Helper()
+				found := []string{}
+				for _, line := range lines[1:] {
+					if strings.HasPrefix(line, prefix) {
+						found = append(found, line)
+					}
+				}
+				if len(found) != 1 {
+					test.Errorf("%s was asked %d times, want once: %q", what, len(found), lines[1:])
+					return ""
+				}
+				return found[0]
 			}
-			// A token with a run is a go test of its own, its run whole, after the plain tokens' and through the same
-			// flags.
-			if !strings.HasPrefix(lines[3], "test test -count=1 -timeout "+sharedBoxTestTimeout+
-				" -json -race -run AtOnce|SideBy.* ./internal/go_language |") {
-				test.Errorf("the -race run of the token with a run is not its own go test: %s", lines[3])
-			}
+			tests := once("test test -count=1 -timeout "+sharedBoxTestTimeout+" -json ./... |", "the module's run")
+			once("test test -count=1 -timeout "+sharedBoxTestTimeout+" -json -race ./internal/edit |",
+				"the -race run of the plain tokens")
+			// A token with a run is a go test of its own, its run whole, through the same flags.
+			once("test test -count=1 -timeout "+sharedBoxTestTimeout+" -json -race -run AtOnce|SideBy.* "+
+				"./internal/go_language |", "the -race run of the token with a run")
 			if !strings.Contains(string(output), boxRaceMarker+"\n") {
 				test.Errorf("the gate printed no %q before its -race run:\n%s", boxRaceMarker, output)
 			}
 			// A pinned node is on the tests' path, before the system's own; an absent one is nowhere on it.
 			// The path is the line's last field, so it is read whole, the system's sbin directories included.
-			onPath := strings.HasSuffix(lines[1], "path "+goroot+"/bin:"+node+"/bin:/usr/bin:/bin:/usr/sbin:/sbin")
-			offPath := strings.HasSuffix(lines[1], "path "+goroot+"/bin:/usr/bin:/bin:/usr/sbin:/sbin")
+			onPath := strings.HasSuffix(tests, "path "+goroot+"/bin:"+node+"/bin:/usr/bin:/bin:/usr/sbin:/sbin")
+			offPath := strings.HasSuffix(tests, "path "+goroot+"/bin:/usr/bin:/bin:/usr/sbin:/sbin")
 			if (row.node == "pinned" && !onPath) || (row.node == "absent" && !offPath) {
-				test.Errorf("with the box's node %s, the tests ran on the wrong path: %s", row.node, lines[1])
+				test.Errorf("with the box's node %s, the tests ran on the wrong path: %s", row.node, tests)
 			}
 			left, readError := os.ReadDir(temporary)
 			if readError != nil {

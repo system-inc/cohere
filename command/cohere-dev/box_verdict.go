@@ -65,6 +65,11 @@ const boxRaceMarker = "cohere-dev-gate: race"
 // what its gate's time went to (#bc8nf0r).
 const boxStepMarker = "cohere-dev-gate: step "
 
+// boxStepBeside ends a step's line when the step ran beside others (#df7s7ej): its seconds are its own, said so the
+// account shows where each job's time went, and never added to the run's wall, which the step named beside, the
+// stage's own wall, counts once.
+const boxStepBeside = "beside"
+
 // slowestPackagesShown is how many of a run's slowest test binaries the land line names, each with its time.
 const slowestPackagesShown = 8
 
@@ -183,11 +188,17 @@ func readTestJson(output []byte) boxVerdict {
 			continue
 		}
 		if step, isStep := strings.CutPrefix(line, boxStepMarker); isStep {
-			name, seconds, _ := strings.Cut(strings.TrimSpace(step), " ")
+			name, rest, _ := strings.Cut(strings.TrimSpace(step), " ")
+			seconds, mark, _ := strings.Cut(rest, " ")
 			// Ignored: a step whose seconds don't read is said as 0s, since steps only say where the time went and no
 			// verdict comes from them.
 			spent, _ := strconv.Atoi(seconds)
-			verdict.steps = append(verdict.steps, name+" "+(time.Duration(spent)*time.Second).String())
+			said := name + " " + (time.Duration(spent) * time.Second).String()
+			if mark == boxStepBeside {
+				verdict.steps = append(verdict.steps, said+" "+boxStepBeside)
+				continue
+			}
+			verdict.steps = append(verdict.steps, said)
 			verdict.stepsWall += time.Duration(spent) * time.Second
 			continue
 		}
