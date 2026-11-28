@@ -24,9 +24,9 @@ import (
 // before and after the tests, which say how much was compiled against how much was cached, read that way rather than
 // counted compile by compile; how many test packages ran and how many replayed `(cached)`, for the plain run and the
 // -race run, and each package that ran by name with its test binary's seconds; every path of the laid trees off their
-// stamp, before the tests and after (treeOffTheStamp); every step the replay store skipped; and the volume's free space
-// and the integrate path's size before and after. A line that reads the disk says its own seconds beside it, since
-// `du` of a big cache is what may cost.
+// stamp, before the tests and after (treeOffTheStamp); every step the replay store skipped; the cohere cache the
+// self-check ran on (linkCohereCache); and the volume's free space and the integrate path's size before and after. A
+// line that reads the disk says its own seconds beside it, since `du` of a big cache is what may cost.
 
 // say prints one account line, integrateJobMarker and what follows, to the job's log as it happens.
 func (job *integrateJobRun) say(format string, arguments ...any) {

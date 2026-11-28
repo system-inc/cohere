@@ -1210,8 +1210,8 @@ const fillIsolatesNothing = "a fill judges main's own tip, which changes nothing
 
 // checks runs the gate's other checks here, each through the gate's own function and in its environment: go vet, the
 // rule CPU budget, the unit isolation of the rules the landing changes, the docs data, replayed when its inputs match a
-// pass the store recorded (integrateJobReplay), and cohere on the tree. share is the pool token's environment for a
-// step.
+// pass the store recorded (integrateJobReplay), and cohere on the tree, on the cohere cache the runner keeps when it
+// declares one (linkCohereCache). share is the pool token's environment for a step.
 func (job *integrateJobRun) checks(share func(string) []string) (string, int) {
 	covered, readGatedWorkspaceError := readGatedWorkspace(job.tree)
 	if readGatedWorkspaceError != nil {
@@ -1258,6 +1258,10 @@ func (job *integrateJobRun) checks(share func(string) []string) (string, int) {
 				})
 		}},
 		{"self-check", func() (int, string) {
+			// After the tests, so the cache the runner keeps is never what a test reads.
+			if code := job.linkCohereCache(); code != 0 {
+				return code, ""
+			}
 			code, ran := checkCohere(job.tree, gateCohereArguments,
 				func() []string { return gateEnvironment(share("building cohere")) },
 				func() []string { return gateEnvironment(share("cohere on the tree")) })
