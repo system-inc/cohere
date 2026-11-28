@@ -80,11 +80,11 @@ func ViewProgram(program *compiler.Program, sourceFile *ast.SourceFile, subject 
 // allocates nothing. tspath's general answer splits both paths into components and joins them again, and
 // a fingerprint names every file of the program, once per computation: on an edit run of ahra that was
 // 1.6 GB (#9prvp67). The slice is the string tspath gives for a descendant, which
-// TestFingerprintPathSlicesWhatTspathWouldJoin holds over every file of this repository, both ways a host
-// can treat case. On a case-insensitive host a program's paths are canonical, lowercased, while the
-// directory keeps its case, so the directory is compared as tspath lowers it; only an ASCII directory takes
-// the slice, since ToFileNameLowerCase treats a few other characters specially. Anything else, a path
-// outside the directory or a directory spelled otherwise, takes tspath's answer.
+// TestFingerprintPathSlicesWhatTspathWouldJoin holds over a written tree of every shape a repository's
+// names take, both ways a host can treat case. On a case-insensitive host a program's paths are canonical,
+// lowercased, while the directory keeps its case, so the directory is compared as tspath lowers it; only an
+// ASCII directory takes the slice, since ToFileNameLowerCase treats a few other characters specially.
+// Anything else, a path outside the directory or a directory spelled otherwise, takes tspath's answer.
 func FingerprintPath(program Program, path string) string {
 	directory := program.GetCurrentDirectory()
 	if inside, under := fingerprintPathUnder(directory, path, program.UseCaseSensitiveFileNames()); under {
