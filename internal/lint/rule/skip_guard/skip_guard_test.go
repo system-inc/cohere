@@ -1,4 +1,8 @@
-package rule
+// Package skip_guard holds the one test of rule that reads every rule's source on purpose: that each Skip and
+// SkipCovered under internal/lint/rules says which kind it is. It has no code of its own. Go's test cache keys a
+// result on every file a test opens, so while it lived in rule, an edit to any rule reran all of rule's tests. Here,
+// alone, an edit to a rule reruns this guard only, and rule's own tests replay from the cache (#0zdyk51).
+package skip_guard
 
 import (
 	"go/ast"
@@ -11,14 +15,15 @@ import (
 	"testing"
 )
 
-// TestEverySkipSaysWhichKindItIs reads every rule's source: each Skip gives its reason, and each
-// SkipCovered names a declared cover and gives its reason, as a string literal a reader can find. A skip
-// with no reason is a rule that checked nothing and said nothing, which is the failure Skip exists to end.
+// TestEverySkipSaysWhichKindItIs reads every rule's source, on purpose, and lives in this package alone so that
+// only it reruns when a rule changes. Each Skip gives its reason, and each SkipCovered names a declared cover and
+// gives its reason, as a string literal a reader can find. A skip with no reason is a rule that checked nothing and
+// said nothing, which is the failure Skip exists to end.
 func TestEverySkipSaysWhichKindItIs(test *testing.T) {
 	test.Parallel()
 	covers := map[string]bool{"CoverTypeCheck": true}
 	calls := 0
-	walkError := filepath.WalkDir("../rules", func(path string, entry fs.DirEntry, pathError error) error {
+	walkError := filepath.WalkDir("../../rules", func(path string, entry fs.DirEntry, pathError error) error {
 		if pathError != nil || entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
 			return pathError
 		}
@@ -70,6 +75,6 @@ func TestEverySkipSaysWhichKindItIs(test *testing.T) {
 	}
 	// The walk finding no skip at all would pass every assertion above, so it must find the ones that exist.
 	if calls == 0 {
-		test.Fatal("found no Skip or SkipCovered call under ../rules, so nothing was checked")
+		test.Fatal("found no Skip or SkipCovered call under ../../rules, so nothing was checked")
 	}
 }
