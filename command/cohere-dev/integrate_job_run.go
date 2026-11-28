@@ -1094,9 +1094,15 @@ func (job *integrateJobRun) tests(share func(string) []string) (string, int) {
 	fmt.Fprintf(streams.Errors, "cohere-dev: testing %s here, %d packages, %s\n", shortCommit(job.merge),
 		len(listing.packages), job.cacheSaid())
 	streams.Show(streams.Errors)
+	trees := []string{job.tree}
+	if pin != "" {
+		trees = append(trees, filepath.Join(job.tree, "TypeScript"))
+	}
+	job.sayTree("before tests", trees)
 	before := job.readCache()
 	output, runError := runIntegrateJobScript(job.scratch, script, arguments)
 	job.sayCache(before, job.readCache())
+	job.sayTree("after tests", trees)
 	for _, line := range testEnvironment(output) {
 		job.say("test environment %s", line)
 	}
