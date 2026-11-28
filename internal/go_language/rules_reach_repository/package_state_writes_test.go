@@ -1,4 +1,4 @@
-package check
+package rules_reach_repository
 
 import (
 	"go/ast"
