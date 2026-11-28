@@ -159,6 +159,10 @@ found=$(cd "$goroot" && find . -type f -print0 | LC_ALL=C sort -z | xargs -0 sha
 [ "$found" = "$digest" ] || refuse "the Go toolchain at $goroot digests to $found, not the pinned $digest"
 `
 
+// boxSeriesMarker opens the line a box's run prints when its core budget runs its test jobs one after another rather
+// than beside each other (#df7s7ej), the reason after it.
+const boxSeriesMarker = "cohere-dev-gate: series "
+
 // boxCoreBudgetVariable carries a gate box's core budget (macBoxCoreBudgets) to her script, unset for a box with none.
 const boxCoreBudgetVariable = "COHERE_DEV_GATE_CORES"
 
@@ -262,12 +266,23 @@ for package in "$@"; do
   if [ "$package" = "` + boxShardedPackage + `" ]; then sharded="$package"; else others="$others $package"; fi
 done
 # The tests, the shards, the -race run and its narrowed runs each run beside the others, a background job apiece
-# writing its JSON to a file of its own and its end, its failure and its seconds, to another, so the stage takes about as long
-# as its longest job (#df7s7ej). Each job's output is printed whole once all have ended, in the order the jobs ran one
+# writing its JSON to a file of its own and its end, its failure and its seconds, to another, so the stage takes about
+# as long as its longest job (#df7s7ej). A box with a core budget runs them one after another: each job sizes its go to
+# the whole budget, so four at once would hold four budgets' threads, and a budgeted box shares herself with other
+# work (the Go Square's must on #df7s7ej). Each job's output is printed whole once all have ended, in the order the jobs ran one
 # after another before: the module's run, its shards, then the race marker and the -race runs. A -race run beside a
 # module run that failed is never printed, as it never ran then, so the verdict is what it was.
 beside=$(mktemp -d "${TMPDIR:-/tmp}/cohere-gate-beside.XXXXXX")
 besideStarted=$(date +%s)
+besideAtOnce=1
+if [ -n "${` + boxCoreBudgetVariable + `:-}" ]; then
+  besideAtOnce=""
+  echo "` + boxSeriesMarker + `a core budget of ${` + boxCoreBudgetVariable + `} cores runs the test jobs" \
+    "one after another"
+fi
+besideJobs=""
+# besideJob keeps a job's pid to wait for, and on a budgeted box waits for it before the next starts.
+besideJob() { besideJobs="$besideJobs $1"; [ -n "$besideAtOnce" ] || wait "$1" || true; }
 # ended writes a job's end: whether it failed, and its own seconds from when it started.
 ended() { echo "$1 $(($(date +%s) - $2))" > "$beside/$3.end"; }
 (
@@ -283,14 +298,14 @@ ended() { echo "$1 $(($(date +%s) - $2))" > "$beside/$3.end"; }
   fi
   ended "$failed" "$started" tests
 ) > "$beside/tests" 2>&1 &
-besideJobs="$!"
+besideJob "$!"
 if [ -n "$sharded" ]; then
   (
     started=$(date +%s); testsFailed=0
     trap '[ -z "${shards:-}" ] || rm -rf "$shards"' EXIT
 ` + sharedBoxShards + `    ended "$testsFailed" "$started" sharded
   ) > "$beside/sharded" 2>&1 &
-  besideJobs="$besideJobs $!"
+  besideJob "$!"
 fi
 if [ -n "$races" ]; then
   # Split on commas alone, never on a run's characters, and each run quoted, so nothing of it globs.
@@ -308,7 +323,7 @@ if [ -n "$races" ]; then
     fi
     ended "$failed" "$started" race
   ) > "$beside/race" 2>&1 &
-  besideJobs="$besideJobs $!"
+  besideJob "$!"
   (
     started=$(date +%s); failed=0
     # A failing go test is remembered rather than ending the job under set -e, so every token still runs.
@@ -321,32 +336,39 @@ if [ -n "$races" ]; then
     done
     ended "$failed" "$started" race-runs
   ) > "$beside/race-runs" 2>&1 &
-  besideJobs="$besideJobs $!"
+  besideJob "$!"
 fi
 # Each job's own exit is its end file, so the waits never end the script, and every job is waited for.
 for besideJob in $besideJobs; do wait "$besideJob" || true; done
 # printJob prints a job's output and its step, its own seconds marked beside, which the stage's wall counts once.
-# A job with no end file ended before writing it, and fails.
+# A job whose end isn't a regular file holding a 0 or a 1 and its whole seconds ended before saying how it ended: it
+# fails, and is named in unspoken, which the script refuses on once the jobs before the next marker are printed, so the
+# refusal is the last line the reader of that part sees.
+unspoken=""
 printJob() {
   cat "$beside/$1"
-  if [ -s "$beside/$1.end" ]; then
-    read -r jobFailed jobSeconds < "$beside/$1.end"
-  else
-    jobFailed=1; jobSeconds=0
-    echo "` + sharedBoxRefusedMarker + `the $1 run ended before it said how it ended"
+  jobFailed=""; jobSeconds=""
+  if [ -f "$beside/$1.end" ]; then
+    read -r jobFailed jobSeconds < "$beside/$1.end" || true
   fi
+  case "$jobFailed:$jobSeconds" in
+  [01]:[0-9]*) case "$jobSeconds" in *[!0-9]*) jobFailed=1; jobSeconds=0; unspoken="$1" ;; esac ;;
+  *) jobFailed=1; jobSeconds=0; unspoken="$1" ;;
+  esac
   echo "` + boxStepMarker + `$1 $jobSeconds ` + boxStepBeside + `"
 }
 testsFailed=0
 printJob tests; [ "$jobFailed" = 0 ] || testsFailed=1
 if [ -n "$sharded" ]; then printJob sharded; [ "$jobFailed" = 0 ] || testsFailed=1; fi
 stepStarted=$besideStarted; step beside
+[ -z "$unspoken" ] || refuse "the $unspoken run ended before it said how it ended"
 [ "$testsFailed" = 0 ] || exit 1
 if [ -n "$races" ]; then
   echo "` + boxRaceMarker + `"
   raceFailed=0
   printJob race; [ "$jobFailed" = 0 ] || raceFailed=1
   printJob race-runs; [ "$jobFailed" = 0 ] || raceFailed=1
+  [ -z "$unspoken" ] || refuse "the $unspoken run ended before it said how it ended"
   [ "$raceFailed" = 0 ] || exit 1
 fi
 `

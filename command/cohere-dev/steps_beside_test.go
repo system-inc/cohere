@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -24,9 +25,23 @@ case "$1" in
 env) [ "$2" = GOOS ] && echo darwin; [ "$2" = GOARCH ] && echo arm64; exit 0 ;;
 mod) [ "$2" = verify ] && echo "all modules verified"; exit 0 ;;
 test)
+  # A job whose end is planted unwritable, a directory in the end file's place, ends before it says how it ended.
+  case " $* " in
+  *" -race -run "*) ;;
+  *" -race "*) [ "${GATE_UNSPOKEN:-}" != race ] || mkdir "$(echo "$TMPDIR"/cohere-gate-beside.*)/race.end" ;;
+  *) [ "${GATE_UNSPOKEN:-}" != tests ] || mkdir "$(echo "$TMPDIR"/cohere-gate-beside.*)/tests.end" ;;
+  esac
+  # With GATE_ALONE, a run that finds another in flight beside it says so and fails, so runs one after another pass.
+  if [ -n "${GATE_ALONE:-}" ]; then
+    mkdir "$GATE_BARRIER/running.$$"; sleep 0.5
+    if [ "$(ls -d "$GATE_BARRIER"/running.* | wc -l)" -gt 1 ]; then
+      echo '{"Action":"fail","Package":"example.com/beside"}'; rmdir "$GATE_BARRIER/running.$$"; exit 1
+    fi
+    rmdir "$GATE_BARRIER/running.$$"
+  fi
   touch "$GATE_BARRIER/$$"
   waited=0
-  while [ "$(ls "$GATE_BARRIER" | wc -l)" -lt "$GATE_BARRIER_COUNT" ]; do
+  while [ "$(ls "$GATE_BARRIER" | grep -cv '^running\.')" -lt "$GATE_BARRIER_COUNT" ]; do
     sleep 0.1; waited=$((waited + 1))
     if [ "$waited" -ge 200 ]; then echo '{"Action":"fail","Package":"example.com/alone"}'; exit 1; fi
   done
@@ -103,7 +118,8 @@ func TestTheGatesTestRunsRunBesideEachOther(test *testing.T) {
 				test.Errorf("the runs aren't printed module, marker, -race:\n%s", said)
 			}
 			for _, step := range []string{"tests", "race", "race-runs"} {
-				if !strings.Contains(said, boxStepMarker+step+" ") || !strings.Contains(said, " "+boxStepBeside+"\n") {
+				if !regexp.MustCompile(`(?m)^` + regexp.QuoteMeta(boxStepMarker+step) + ` [0-9]+ ` +
+					boxStepBeside + `$`).MatchString(said) {
 					test.Errorf("the run doesn't say the step %s beside the others:\n%s", step, said)
 				}
 			}
@@ -127,5 +143,98 @@ func TestAStepBesideOthersIsListedAndNotAddedToTheWall(test *testing.T) {
 		"beside 11m45s"}
 	if strings.Join(verdict.steps, "|") != strings.Join(want, "|") {
 		test.Errorf("the steps read %q, want %q", verdict.steps, want)
+	}
+}
+
+// gateRun is the gate script run for real with bash against the barrier go, in a tree that is a git repository so the
+// run says what it tested, with the race tokens of TestTheGatesTestRunsRunBesideEachOther and the environment given.
+func gateRun(test *testing.T, environment ...string) (string, []byte, error) {
+	test.Helper()
+	goroot := filepath.Join(test.TempDir(), "go")
+	writeFixtureFile(test, filepath.Join(goroot, "src", "fmt", "print.go"), "package fmt\n")
+	if makeError := os.MkdirAll(filepath.Join(goroot, "bin"), 0o755); makeError != nil {
+		test.Fatal(makeError)
+	}
+	if writeError := executable_testing.WriteFile(filepath.Join(goroot, "bin", "go"), []byte(barrierGo),
+		0o755); writeError != nil {
+		test.Fatal(writeError)
+	}
+	digest := toolchainDigest(test, goroot)
+	tree := test.TempDir()
+	writeFixtureFile(test, filepath.Join(tree, "go.mod"), "module example.com/module\n\ngo 1.27\n")
+	gitEnvironment := append(append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null",
+		"GIT_AUTHOR_NAME=test", "GIT_AUTHOR_EMAIL=test@example.com", "GIT_COMMITTER_NAME=test",
+		"GIT_COMMITTER_EMAIL=test@example.com"), gitWithoutMaintenance...)
+	for _, arguments := range [][]string{{"init", "-q"}, {"add", "."}, {"commit", "-q", "-m", "a module"}} {
+		git := exec.Command("git", arguments...)
+		git.Dir, git.Env = tree, gitEnvironment
+		if output, gitError := git.CombinedOutput(); gitError != nil {
+			test.Fatalf("git %v: %v\n%s", arguments, gitError, output)
+		}
+	}
+	commit := exec.Command("git", "rev-parse", "HEAD")
+	commit.Dir, commit.Env = tree, gitEnvironment
+	head, headError := commit.Output()
+	if headError != nil {
+		test.Fatal(headError)
+	}
+	script := "set -euo pipefail\n" +
+		`goroot="$1"; digest="$2"; node="$3"; nodeDigest="$4"; races="$5"; shift 5` + "\n" + sharedBoxGate
+	gate := exec.Command("bash", "-c", script, "gate", goroot, digest, filepath.Join(tree, "no-node"),
+		strings.Repeat("0", 64), "./internal/edit,./internal/go_language@AtOnce", "./...")
+	gate.Dir = tree
+	gate.Env = append(append(own_go_cache.Environment(withoutModuleCache(os.Environ()), test.TempDir()),
+		"TMPDIR="+test.TempDir(), "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null"), environment...)
+	output, gateError := gate.CombinedOutput()
+	return strings.TrimSpace(string(head)), output, gateError
+}
+
+// A job that ends before it says how it ended, its end file never written, fails the run in words, for a module job as
+// for a -race job, and the box's run reads as refused or as no verdict naming it, never as passed (the Go Square's
+// must on #df7s7ej): read as passed, a job killed before its end would land.
+func TestAJobThatNeverSaidHowItEndedRefusesTheRun(test *testing.T) {
+	test.Parallel()
+	needs.Tool(test, "bash", "the gate is a bash script")
+	needs.Tool(test, "sha256sum", "the gate digests the toolchain with it, as the boxes do")
+	races := []string{"./internal/edit", "./internal/go_language@AtOnce"}
+	for _, kind := range []string{"tests", "race"} {
+		test.Run(kind, func(test *testing.T) {
+			test.Parallel()
+			commit, output, gateError := gateRun(test, "GATE_BARRIER="+test.TempDir(), "GATE_BARRIER_COUNT=3",
+				"GATE_UNSPOKEN="+kind)
+			want := "the " + kind + " run ended before it said how it ended"
+			if gateError == nil || !strings.Contains(string(output), sharedBoxRefusedMarker+want) {
+				test.Fatalf("the gate didn't fail saying %q (%v):\n%s", want, gateError, output)
+			}
+			verdict, unavailable := readBoxRun(output, gateError, "Shackler", commit, races)
+			if !strings.Contains(verdict.refused, want) && !strings.Contains(unavailable, want) {
+				test.Errorf("the box's run reads as refused %q, no verdict %q, want either to say %q", verdict.refused,
+					unavailable, want)
+			}
+		})
+	}
+}
+
+// A box with a core budget runs the test jobs one after another, saying so: each job sizes its go to the whole
+// budget, so beside each other they would hold the budget several times over (the Go Square's must on #df7s7ej).
+// Each go test the barrier go is asked fails when it finds another in flight beside it, so the run passes only one
+// after another.
+func TestABudgetedBoxRunsItsTestJobsOneAfterAnother(test *testing.T) {
+	test.Parallel()
+	needs.Tool(test, "bash", "the gate is a bash script")
+	needs.Tool(test, "sha256sum", "the gate digests the toolchain with it, as the boxes do")
+	_, output, gateError := gateRun(test, "GATE_BARRIER="+test.TempDir(), "GATE_BARRIER_COUNT=1", "GATE_ALONE=1",
+		boxCoreBudgetVariable+"=4")
+	said := string(output)
+	if gateError != nil || strings.Contains(said, "example.com/beside") {
+		test.Fatalf("the budgeted run ran its jobs beside each other (%v):\n%s", gateError, said)
+	}
+	if !strings.Contains(said, boxSeriesMarker+"a core budget of 4 cores runs the test jobs one after another") {
+		test.Errorf("the budgeted run doesn't say it runs one job after another:\n%s", said)
+	}
+	for _, step := range []string{"tests", "race", "race-runs"} {
+		if !strings.Contains(said, boxStepMarker+step+" ") {
+			test.Errorf("the budgeted run doesn't say the step %s:\n%s", step, said)
+		}
 	}
 }
