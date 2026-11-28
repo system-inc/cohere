@@ -83,7 +83,7 @@ func TestTheGatesTestRunsRunBesideEachOther(test *testing.T) {
 			writeFixtureFile(test, filepath.Join(tree, "go.mod"), "module example.com/module\n\ngo 1.27\n")
 			barrier := test.TempDir()
 			environment := append(own_go_cache.Environment(withoutModuleCache(os.Environ()), test.TempDir()),
-				"TMPDIR="+test.TempDir(), "GATE_BARRIER="+barrier, "GATE_BARRIER_COUNT=3")
+				"TMPDIR="+test.TempDir(), "GATE_BARRIER="+barrier, "GATE_BARRIER_COUNT=3", boxBesideVariable+"=on")
 			if row.moduleFails {
 				environment = append(environment, "GATE_MODULE_FAILS=1")
 			}
@@ -201,7 +201,7 @@ func TestAJobThatNeverSaidHowItEndedRefusesTheRun(test *testing.T) {
 		test.Run(kind, func(test *testing.T) {
 			test.Parallel()
 			commit, output, gateError := gateRun(test, "GATE_BARRIER="+test.TempDir(), "GATE_BARRIER_COUNT=3",
-				"GATE_UNSPOKEN="+kind)
+				"GATE_UNSPOKEN="+kind, boxBesideVariable+"=on")
 			want := "the " + kind + " run ended before it said how it ended"
 			if gateError == nil || !strings.Contains(string(output), sharedBoxRefusedMarker+want) {
 				test.Fatalf("the gate didn't fail saying %q (%v):\n%s", want, gateError, output)
@@ -219,22 +219,42 @@ func TestAJobThatNeverSaidHowItEndedRefusesTheRun(test *testing.T) {
 // budget, so beside each other they would hold the budget several times over (the Go Square's must on #df7s7ej).
 // Each go test the barrier go is asked fails when it finds another in flight beside it, so the run passes only one
 // after another.
-func TestABudgetedBoxRunsItsTestJobsOneAfterAnother(test *testing.T) {
+//
+// A box asked for nothing runs them one after another too, saying why (system_cohere's ruling on #df7s7ej, Nov 28): on
+// a CPU-bound Shackler the jobs at once bought no time and turned timing tests red. Asked to run them beside, a
+// budgeted box still runs them one after another.
+func TestAGateBoxRunsItsTestJobsOneAfterAnotherUnlessAsked(test *testing.T) {
 	test.Parallel()
 	needs.Tool(test, "bash", "the gate is a bash script")
 	needs.Tool(test, "sha256sum", "the gate digests the toolchain with it, as the boxes do")
-	_, output, gateError := gateRun(test, "GATE_BARRIER="+test.TempDir(), "GATE_BARRIER_COUNT=1", "GATE_ALONE=1",
-		boxCoreBudgetVariable+"=4")
-	said := string(output)
-	if gateError != nil || strings.Contains(said, "example.com/beside") {
-		test.Fatalf("the budgeted run ran its jobs beside each other (%v):\n%s", gateError, said)
-	}
-	if !strings.Contains(said, boxSeriesMarker+"a core budget of 4 cores runs the test jobs one after another") {
-		test.Errorf("the budgeted run doesn't say it runs one job after another:\n%s", said)
-	}
-	for _, step := range []string{"tests", "race", "race-runs"} {
-		if !strings.Contains(said, boxStepMarker+step+" ") {
-			test.Errorf("the budgeted run doesn't say the step %s:\n%s", step, said)
-		}
+	const budgeted = "a core budget of 4 cores runs the test jobs one after another"
+	for _, row := range []struct {
+		name        string
+		environment []string
+		says        string
+	}{
+		{"a budgeted box", []string{boxCoreBudgetVariable + "=4"}, budgeted},
+		{"a budgeted box asked to run them beside", []string{boxCoreBudgetVariable + "=4", boxBesideVariable + "=on"},
+			budgeted},
+		{"a box asked for nothing", nil, "the test jobs run one after another, since " + boxBesideVariable +
+			" is not on"},
+	} {
+		test.Run(row.name, func(test *testing.T) {
+			test.Parallel()
+			_, output, gateError := gateRun(test, append([]string{"GATE_BARRIER=" + test.TempDir(),
+				"GATE_BARRIER_COUNT=1", "GATE_ALONE=1"}, row.environment...)...)
+			said := string(output)
+			if gateError != nil || strings.Contains(said, "example.com/beside") {
+				test.Fatalf("the run ran its jobs beside each other (%v):\n%s", gateError, said)
+			}
+			if !strings.Contains(said, boxSeriesMarker+row.says) {
+				test.Errorf("the run doesn't say %q:\n%s", row.says, said)
+			}
+			for _, step := range []string{"tests", "race", "race-runs"} {
+				if !strings.Contains(said, boxStepMarker+step+" ") {
+					test.Errorf("the run doesn't say the step %s:\n%s", step, said)
+				}
+			}
+		})
 	}
 }
