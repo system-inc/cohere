@@ -42,7 +42,13 @@ func TestEveryLandingGateOnlyEntryStillEarnsItsPlace(test *testing.T) {
 	if absolutePathError != nil {
 		test.Fatal(absolutePathError)
 	}
-	packages, modulePackagesInError := modulePackagesIn(root, os.Environ())
+	// The entries' own packages, never the whole module, so this test reruns when they change and not whenever any
+	// file in the tree does (#0zdyk51). A pattern that names no package fails the listing in go's words.
+	patterns := []string{}
+	for _, entry := range landingGateOnly {
+		patterns = append(patterns, entry.pattern)
+	}
+	packages, modulePackagesInError := modulePackagesIn(root, os.Environ(), patterns)
 	if modulePackagesInError != nil {
 		test.Fatal(modulePackagesInError)
 	}
@@ -161,12 +167,16 @@ func TestAnInnerRunInheritsTheOuterDeadline(test *testing.T) {
 
 // The fast tier lists the module's packages in the environment its tests run in, not the caller's, and a
 // failed listing says go's own reason. A flag go does not know fails the listing only if the environment
-// given is the one go list reads.
+// given is the one go list reads. It lists a module of its own, one package, since listing cohere's would key this
+// test on every directory in the tree (#0zdyk51).
 func TestTheFastTierListsPackagesInTheRunsEnvironment(test *testing.T) {
 	test.Parallel()
-	root, absolutePathError := filepath.Abs(filepath.Join("..", ".."))
-	if absolutePathError != nil {
-		test.Fatal(absolutePathError)
+	root := test.TempDir()
+	for name, contents := range map[string]string{"go.mod": "module example.com/fixture\n\ngo 1.27\n",
+		"fixture.go": "package fixture\n"} {
+		if writeError := os.WriteFile(filepath.Join(root, name), []byte(contents), 0o644); writeError != nil {
+			test.Fatal(writeError)
+		}
 	}
 	environment := []string{}
 	for _, variable := range os.Environ() {
@@ -174,7 +184,9 @@ func TestTheFastTierListsPackagesInTheRunsEnvironment(test *testing.T) {
 			environment = append(environment, variable)
 		}
 	}
-	_, modulePackagesInError := modulePackagesIn(root, append(environment, "GOFLAGS=-not-a-go-flag"))
+	// Last, so it wins over any the process carries: the fixture is no module of any workspace.
+	_, modulePackagesInError := modulePackagesIn(root, append(environment, "GOWORK=off", "GOFLAGS=-not-a-go-flag"),
+		[]string{"./..."})
 	if modulePackagesInError == nil {
 		test.Fatal("go list succeeded with a go flag it does not know, so it did not run in the environment given")
 	}
