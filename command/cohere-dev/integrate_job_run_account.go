@@ -7,9 +7,11 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -21,8 +23,10 @@ import (
 // from the first landings' logs. Each step's wall seconds and the job's total; the kept Go cache's size and entries
 // before and after the tests, which say how much was compiled against how much was cached, read that way rather than
 // counted compile by compile; how many test packages ran and how many replayed `(cached)`, for the plain run and the
-// -race run; every step the replay store skipped; and the volume's free space and the integrate path's size before and
-// after. A line that reads the disk says its own seconds beside it, since `du` of a big cache is what may cost.
+// -race run, and each package that ran by name with its test binary's seconds; every path of the laid trees off their
+// stamp, before the tests and after (treeOffTheStamp); every step the replay store skipped; and the volume's free space
+// and the integrate path's size before and after. A line that reads the disk says its own seconds beside it, since
+// `du` of a big cache is what may cost.
 
 // say prints one account line, integrateJobMarker and what follows, to the job's log as it happens.
 func (job *integrateJobRun) say(format string, arguments ...any) {
@@ -160,15 +164,59 @@ func (job *integrateJobRun) sayPackages(output []byte) {
 			job.say("packages %s none run", run.name)
 			continue
 		}
-		ended, cached := packagesCached(run.stream)
+		ended, cached, ran := packagesCached(run.stream)
 		job.say("packages %s %d ran, %d replayed (cached)", run.name, ended-cached, cached)
+		for _, ranLine := range ran {
+			job.say("ran %s %s", run.name, ranLine)
+		}
 	}
 }
 
-// packagesCached reads a `go test -json` stream and returns how many packages ended, a pass or a fail, and how many of
-// them replayed from the cache, their package output line ending in `(cached)`.
-func packagesCached(stream []byte) (int, int) {
+// treeLinesSaid is how many of a laid tree's paths off its stamp the account names at one moment, so a test that
+// writes a large scratch tree into the module can't fill the job's log; the rest are counted.
+const treeLinesSaid = 60
+
+// sayTree says, when, `before tests` or `after tests`, every path of trees off its stamp (treeOffTheStamp): how many,
+// with the seconds the walk took, then each, up to treeLinesSaid, the count of the rest after them. Read beside the
+// packages that ran, a path that is there after the tests and not before is one a test's key holds and the next job's
+// lookup doesn't, and a path off the stamp before the tests is one something in the job wrote first.
+func (job *integrateJobRun) sayTree(when string, trees []string) {
+	started := time.Now()
+	off := []string{}
+	for _, tree := range trees {
+		treeOff, offError := treeOffTheStamp(tree)
+		if offError != nil {
+			job.say("laid tree %s unread: %v", when, offError)
+			return
+		}
+		for _, line := range treeOff {
+			kind, path, _ := strings.Cut(line, " ")
+			// Each tree is the laid tree or a submodule beneath it, so its paths are named from the laid tree's root.
+			within := filepath.ToSlash(
+				strings.TrimPrefix(strings.TrimPrefix(tree, job.tree), string(filepath.Separator)),
+			)
+			if within != "" {
+				path = map[bool]string{true: within, false: within + "/" + path}[path == "."]
+			}
+			off = append(off, kind+" "+path)
+		}
+	}
+	job.say("laid tree %s %d off the stamp (a walk, %s)", when, len(off), integrateJobSeconds(time.Since(started)))
+	for index, line := range off {
+		if index == treeLinesSaid {
+			job.say("laid tree %s and %d more", when, len(off)-treeLinesSaid)
+			break
+		}
+		job.say("laid tree %s %s", when, line)
+	}
+}
+
+// packagesCached reads a `go test -json` stream and returns how many packages ended, a pass or a fail, how many of
+// them replayed from the cache, their package output line ending in `(cached)`, and each that ran rather than replayed,
+// by import path in order, its test binary's seconds after it and `failed` when it failed.
+func packagesCached(stream []byte) (int, int, []string) {
 	ended, cached := map[string]bool{}, map[string]bool{}
+	elapsed, failed := map[string]float64{}, map[string]bool{}
 	scanner := bufio.NewScanner(bytes.NewReader(stream))
 	scanner.Buffer(make([]byte, 0, 64*1024), 16*1024*1024)
 	for scanner.Scan() {
@@ -179,6 +227,8 @@ func packagesCached(stream []byte) (int, int) {
 		switch event.Action {
 		case "pass", "fail":
 			ended[event.Package] = true
+			elapsed[event.Package] = event.Elapsed
+			failed[event.Package] = event.Action == "fail"
 		case "output":
 			if strings.HasSuffix(strings.TrimSpace(event.Output), "(cached)") {
 				cached[event.Package] = true
@@ -191,7 +241,18 @@ func packagesCached(stream []byte) (int, int) {
 			count++
 		}
 	}
-	return len(ended), count
+	ran := []string{}
+	for _, name := range slices.Sorted(maps.Keys(ended)) {
+		if cached[name] {
+			continue
+		}
+		line := fmt.Sprintf("%s %.1fs", name, elapsed[name])
+		if failed[name] {
+			line += " failed"
+		}
+		ran = append(ran, line)
+	}
+	return len(ended), count, ran
 }
 
 // sizeKilobytes is `du -sk` of path.
