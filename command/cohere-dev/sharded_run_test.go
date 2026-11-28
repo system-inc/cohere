@@ -93,6 +93,22 @@ var shardMarkerLine = regexp.MustCompile(
 	`^` + regexp.QuoteMeta(boxShardMarker) + `([0-9]+) of ([0-9]+) (\S+) ([0-9]+)s (.+)$`,
 )
 
+// pinsOn is the pins a box on platform deals: a pin naming no platform, and one naming platform with its name taken
+// off, in order, every pin of another platform set aside.
+func pinsOn(platform string, pins []string) []string {
+	kept := []string{}
+	for _, pin := range pins {
+		named, isNamed := strings.CutPrefix(pin, platform+":")
+		switch {
+		case isNamed:
+			kept = append(kept, named)
+		case !strings.Contains(pin, ":"):
+			kept = append(kept, pin)
+		}
+	}
+	return kept
+}
+
 // dealtShards is how sharedBoxShards deals listed into shards: each pin a shard of its own, first, a group's names
 // together, and the rest round-robin in the listing's order over the shards the count leaves.
 func dealtShards(listed []string, pins []string, count int) [][]string {
@@ -168,6 +184,9 @@ func TestTheGatesShardsDealEveryListedTestOnceAcrossTwoThreadProcesses(test *tes
 		{name: "a group pin together in one shard", asked: 3, pins: []string{"TestSix+TestTwo"}, shards: 3},
 		{name: "a group pin naming one test no listing holds", sysctl: "8", pins: []string{"TestSix+TestGone"},
 			refuses: "TestGone"},
+		{name: "a pin of this platform held to the listing", asked: 3, pins: []string{"darwin:TestSix+TestTwo"},
+			shards: 3},
+		{name: "a pin of another platform set aside", asked: 3, pins: []string{"linux:TestGone"}, shards: 3},
 		{name: "a pin naming no listed test", sysctl: "8", pins: []string{"TestSix", "TestGone"}, refuses: "TestGone"},
 		{name: "a listing that fails", budget: "10", listFails: true},
 		{name: "a listing that fails, with a pin", budget: "10", pins: []string{"TestGone"}, listFails: true},
@@ -243,7 +262,8 @@ func TestTheGatesShardsDealEveryListedTestOnceAcrossTwoThreadProcesses(test *tes
 				}
 				return
 			}
-			dealt := dealtShards(shardListed, row.pins, row.shards)
+			pins := pinsOn("darwin", row.pins)
+			dealt := dealtShards(shardListed, pins, row.shards)
 			if len(dealt) != row.shards {
 				test.Fatalf("the test deals %d shards, want %d", len(dealt), row.shards)
 			}
@@ -256,7 +276,7 @@ func TestTheGatesShardsDealEveryListedTestOnceAcrossTwoThreadProcesses(test *tes
 			if !slices.EqualFunc(markers, dealt, slices.Equal) {
 				test.Errorf("the shards' markers hold %q, want %q", markers, dealt)
 			}
-			for index, pin := range row.pins {
+			for index, pin := range pins {
 				if index >= len(markers) || !slices.Equal(markers[index], strings.Split(pin, "+")) {
 					test.Errorf("the pin %s isn't alone in shard %d: %q", pin, index+1, markers)
 				}
@@ -376,7 +396,15 @@ func TestTheShardTableReads(test *testing.T) {
 		}
 		pinned := []string{}
 		for _, pin := range row.pins {
-			for _, name := range strings.Split(pin, "+") {
+			platform, named, hasPlatform := strings.Cut(pin, ":")
+			if hasPlatform && !regexp.MustCompile(`^[a-z0-9]+$`).MatchString(platform) {
+				test.Errorf("the shard table pins %q to %s, want a platform of Go's spelling before its colon", pin,
+					row.importPath)
+			}
+			if !hasPlatform {
+				named = pin
+			}
+			for _, name := range strings.Split(named, "+") {
 				if !regexp.MustCompile(`^(Test|Example|Fuzz)[A-Za-z0-9_]*$`).MatchString(name) ||
 					slices.Contains(pinned, name) {
 					test.Errorf("the shard table pins %q to %s, want top-level tests' names joined by +, each once",

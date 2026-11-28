@@ -29,21 +29,29 @@ import (
 // are how many its tests are dealt into, 0 for a shard per two of the box's cores, bounded by the tests listed. Each
 // pin is a top-level test, or several joined by `+`, dealt a shard of its own together, so tests that share a costly
 // build share it once (#9b9d4x3), counted among the shards, and a pin its package's listing doesn't hold refuses the
-// landing. The script shards a package only when its path is among its arguments, which a split
-// half's and a Mac's whole gate are; the land-gate job's patterns, `./...`, never name one, so that road runs every
-// package unsharded. The script reads it through boxShardTableLine, and TestTheShardTableReads holds it to its grammar.
+// landing. A pin opening with `<goos>:` holds on that platform alone and is set aside on any other. The script
+// shards a package only when its path is among its arguments, which a split half's and a Mac's whole gate are; the
+// land-gate job's patterns, `./...`, never name one, so that road runs every package unsharded. The script reads it
+// through boxShardTableLine, and TestTheShardTableReads holds it to its grammar.
 const boxShardTable = "github.com/system-inc/cohere/internal/go_language 0\n" +
 	// The engine's rows (#bd5j7v0, #wrpcag3): each package's work is 65 to 88 s on 2 threads alone on Shackler, so 4
 	// shards put each near 20 to 30 s, and no test is slow alone, so none is pinned.
 	"github.com/system-inc/cohere/internal/go_language/check 4\n" +
 	"github.com/system-inc/cohere/internal/go_language/load 4\n" +
 	// The front door's row (#9b9d4x3): 3 shards on 2 threads each ran 30.9, 32.5 and 20.7 s on Sun1 with Swift warm,
-	// and no test is slow alone. It holds only once every serial test puts the package's run state back (#76).
-	"github.com/system-inc/cohere/command/cohere 3"
+	// and no test is slow alone. It holds only once every serial test puts the package's run state back (#76). The
+	// three real Swift tests, darwin's alone, share one shard, so one cohere-swift build serves them (#9b9d4x3).
+	"github.com/system-inc/cohere/command/cohere 3 darwin:TestARealSwiftRunThatExcludedEveryFileFails+" +
+	"TestASwiftRunReplaysThroughAGitStatusAndNotThroughAGitAddForce+" +
+	"TestASwiftRunInAWorktreeMissesOnAGitAddForceOfAFileOnlyItsSharedExcludeIgnores"
 
 // boxShardTableLine is sharedBoxGate's line setting shardTable, the table it shards by: set in the script itself, so
 // no variable in a shared box's environment can move it. A test replaces the line to shard packages of its own.
 const boxShardTableLine = "shardTable='" + boxShardTable + "'"
+
+// boxShardPinElsewhereMarker opens the line a box's run prints of a pin set aside because it names another platform
+// than hers, the package, the pin and the two platforms after it.
+const boxShardPinElsewhereMarker = "cohere-dev-gate: pin elsewhere "
 
 // boxShardListingMarker opens the line a box's run prints when it shards a package: the package's import path, then
 // every top-level test its listing held, in the listing's order, each separated by a space.
@@ -69,6 +77,23 @@ listed=$(printf '%s\n' "$listing" | grep -E '^(Test|Example|Fuzz)[^[:space:]]*$'
 # a listing that holds tests: one that failed is a package that doesn't build, which its one go test below reports,
 # and a refusal said first would hide it. Unquoted, so each name is its own word: a test's name, which holds no space
 # or glob.
+# A pin may say the one platform its tests are compiled on, the platform and a colon before it: elsewhere its tests aren't in the listing,
+# so it is set aside and said, never refused, while on its own platform it is held to the listing like any pin
+# (#9b9d4x3, the real Swift tests are darwin's alone).
+pinsHere=""; pinPlatform=""
+for pin in $shardPins; do
+  case "$pin" in
+  *:*)
+    [ -n "$pinPlatform" ] || pinPlatform=$(go env GOOS)
+    if [ "${pin%%:*}" = "$pinPlatform" ]; then
+      pinsHere="$pinsHere ${pin#*:}"
+    else
+      echo "` + boxShardPinElsewhereMarker + `$sharded ${pin#*:} holds on ${pin%%:*}, not on $pinPlatform"
+    fi ;;
+  *) pinsHere="$pinsHere $pin" ;;
+  esac
+done
+shardPins="${pinsHere# }"
 pinnedNames="${shardPins//+/ }"
 unlisted=""
 if [ -n "$listed" ]; then
