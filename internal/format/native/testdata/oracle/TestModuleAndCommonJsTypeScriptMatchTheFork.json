@@ -1,0 +1,9 @@
+{
+ "digest": "61573b94b6f4507420b448b348c232f988c86f60dc9b23d089ce3b179b2afc98",
+ "answers": {
+  "197603f7cf101e4011fc9baf099db2a20f96babd18e6b54e65648a5d491c4d06": {"output": "import { join } from 'node:path';\nconst a = 1;\nconst b = <number>a;\nconst identity = <T>(value: T) => value;\nexport default join(String(b), String(identity(a)));\n"},
+  "1bab19a336473b43aa106b0b116204cbb18749cb7fccdfcf8efa13acd7f52425": {"output": "import { join } from 'node:path';\nconst a = 1;\nconst b = <number>a;\nconst identity = <T,>(value: T) => value;\nexport default join(String(b), String(identity(a)));\n"},
+  "a9c7b86530e42a904a665aadde508df88e834caa580ae1efe7095dbab8d906be": {"error": "formatting probe.tsx: SyntaxError: Unexpected token. Did you mean `{'>'}` or `&gt;`? (4:33)\n  2 | const a  =   1\n  3 | const b = <number>a\n> 4 | const identity = <T>(value: T) => value\n    |                                 ^\n  5 | export default join(String(b), String(identity(a)))\n  6 |"},
+  "aac291ac950e9e267d60c719fe841df54f7e5301481a7f930c86dcae5a5bff73": {"output": "import { join } from 'node:path';\nconst a = 1;\nconst b = <number>a;\nconst identity = <T,>(value: T) => value;\nexport default join(String(b), String(identity(a)));\n"}
+ }
+}

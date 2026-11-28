@@ -1,6 +1,9 @@
 package micromark
 
-import "strings"
+import (
+	"strings"
+	"testing"
+)
 
 // definitionFixtures are definitions on their own, with no later reference, `[[` or `[^`: written while
 // labelEnd, wiki-link and gfm-footnote were stubs, so nothing here leans on them. References to defined
@@ -190,4 +193,19 @@ var definitionReferenceFixtures = []string{
 	"[a]: b\n\n[a] [a]",
 	"[a]: b\n\n[c][]",
 	"> [a]: b\n\n[a]",
+}
+
+func TestDefinitionEvents(test *testing.T) {
+	test.Parallel()
+	compareEvents(test, definitionFixtures)
+}
+
+func TestDefinitionFailureEvents(test *testing.T) {
+	test.Parallel()
+	compareEvents(test, definitionFailureFixtures)
+}
+
+func TestDefinitionReferenceEvents(test *testing.T) {
+	test.Parallel()
+	compareEvents(test, definitionReferenceFixtures)
 }

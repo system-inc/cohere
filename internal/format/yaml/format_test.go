@@ -1,6 +1,8 @@
 package yaml
 
 import (
+	"fmt"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -9,6 +11,7 @@ import (
 	"github.com/system-inc/cohere/internal/format/oracle_testing"
 	"github.com/system-inc/cohere/internal/format/printing"
 	"github.com/system-inc/cohere/internal/format/yaml/unist"
+	"github.com/system-inc/cohere/internal/testing/recorded"
 )
 
 // formatFixtures reach the printer's branches: every node type, comments in every slot they attach to,
@@ -412,16 +415,96 @@ func parseFixture(test testing.TB, text string) *unist.Node {
 	return root
 }
 
+// unsettledFixtures are the inputs whose fork output the fork itself rewrites, so Format, which prints as the fork
+// does, rewrites it on a second pass too. Their second pass is held to the fork's own, recorded beside the first in
+// <test>SecondPass.json, so a change to it in either direction fails, settling included. One whose recorded
+// second pass settles everywhere fails too, so the list only shrinks.
+var unsettledFixtures = map[string]bool{
+	// The mapping is indented anew but the block scalar keeps its indentation indicator, so its text no longer sits
+	// where `|2` says and the output does not parse.
+	"a:\n  b: |2\n     x\n    y": true,
+	// The ignored item keeps the indentation of its source and its sibling takes the new one, so the two no longer
+	// start at one column and the output does not parse.
+	"a:\n  # prettier-ignore\n  b:   {c:   d}\n  e:   {f:   g}": true,
+	// A comment alone in an empty flow sequence prints after a lone comma, which does not parse.
+	"a: [\n  # c\n]": true,
+	// A comment alone in an empty flow mapping prints after a lone comma, which does not parse.
+	"a: {\n  # c\n}": true,
+	// The yaml-test-suite's M5DY, Spec Example 2.11: the second key, a flow sequence, drops its `?` and prints as an
+	// implicit key on the line after the first pair's explicit `?` and `:`, which the fork's parser refuses on a second
+	// pass ("Map comment with trailing content" at 5:1).
+	"? - Detroit Tigers\n  - Chicago cubs\n:\n  - 2001-07-23\n\n" +
+		"? [ New York Yankees,\n    Atlanta Braves ]\n: [ 2001-07-02, 2001-08-12,\n    2001-08-14 ]\n": true,
+}
+
+// secondPass is what is wrong with expected, the fork's output for input, formatted again under options and
+// proseWrap, or "" when nothing is: formatted output formats to itself, or every run rewrites what the last one
+// wrote. An input in unsettledList is held instead to the fork's own second pass, which forkAgain answers from its
+// recording: the same text, or a refusal on both sides, Format's a syntax error. unsettledAsListed says the fork's
+// second pass did not settle.
+func secondPass(
+	unsettledList map[string]bool,
+	input string,
+	expected string,
+	options format_options.Options,
+	proseWrap string,
+	forkAgain func() (string, error),
+) (wrong string, unsettledAsListed bool) {
+	again, againError := formatFullStack("fixture.yaml", expected, options, proseWrap, nil)
+	if !unsettledList[input] {
+		if againError != nil || again != expected {
+			return fmt.Sprintf("formatted again (%v): %s", againError, differential.FirstDifference(expected, again)),
+				false
+		}
+		return "", false
+	}
+	want, wantError := forkAgain()
+	unsettledAsListed = wantError != nil || want != expected
+	switch {
+	case wantError != nil && againError != nil:
+		if !printing.IsSyntax(againError) {
+			return fmt.Sprintf("formatted again, refused as the fork refuses it, but not as syntax: %v", againError),
+				unsettledAsListed
+		}
+	case (wantError != nil) != (againError != nil) || again != want:
+		return fmt.Sprintf("formatted again, not as the fork formats it again (%v, the fork %v): %s", againError,
+			wantError, differential.FirstDifference(want, again)), unsettledAsListed
+	}
+	return "", unsettledAsListed
+}
+
+// requireUnsettled fails for each input of unsettledList the comparison asked about whose recorded second pass in
+// the fork settled every time, so a fix upstream shrinks the list rather than leaving an entry that no longer holds.
+func requireUnsettled(test *testing.T, unsettledList map[string]bool, inputs []string, unsettled map[string]bool) {
+	test.Helper()
+	// Only a clean run judges the list: an input whose first pass differed never reached its second.
+	if test.Failed() {
+		return
+	}
+	for _, input := range inputs {
+		if unsettledList[input] && !unsettled[input] {
+			test.Errorf("the fork formats %q to itself on a second pass, so take it out of the unsettled list", input)
+		}
+	}
+}
+
 // compareFormat formats every input with Prettier and with the port, Format from the text, under every
 // variant, and reports each difference. Where Prettier fails, Format must fail too, with an error
-// printing.IsSyntax recognizes.
-func compareFormat(test *testing.T, inputs []string) int {
+// printing.IsSyntax recognizes. Prettier's answers are golden's, recorded (see oracle_testing) so no JavaScript
+// runs here, and its second passes forkAgainGolden's; a test that compares in subtests opens both once and
+// shares them, so each golden is held to every answer across all of them.
+func compareFormat(
+	test *testing.T,
+	golden *oracle_testing.Golden,
+	forkAgainGolden *oracle_testing.Golden,
+	inputs []string,
+) int {
 	test.Helper()
 	failures, compared, oracleFailures := 0, 0, 0
-	// The oracle's answers, recorded (see oracle_testing), so no JavaScript runs here.
-	golden := oracle_testing.Open(test, test.Name())
+	unsettled := map[string]bool{}
 	for variantIndex, options := range formatVariants {
 		formatter := golden.Formatter(options)
+		forkAgain := forkAgainGolden.Formatter(options)
 		for _, input := range inputs {
 			expected, oracleError := formatter.Format("fixture.yaml", input)
 			fullStack, fullStackError := formatFullStack("fixture.yaml", input, options, "preserve", nil)
@@ -453,9 +536,22 @@ func compareFormat(test *testing.T, inputs []string) int {
 					input,
 					differential.FirstDifference(expected, fullStack),
 				)
+			} else if wrong, unsettledAsListed := secondPass(
+				unsettledFixtures,
+				input,
+				expected,
+				options,
+				"preserve",
+				func() (string, error) { return forkAgain.Format("fixture.yaml", expected) },
+			); wrong != "" {
+				failures++
+				test.Errorf("variant %d, %q: %s", variantIndex, input, wrong)
+			} else if unsettledAsListed {
+				unsettled[input] = true
 			}
 		}
 	}
+	requireUnsettled(test, unsettledFixtures, inputs, unsettled)
 	test.Logf(
 		"%d comparisons over %d fixtures and %d option sets: %d differ; %d oracle failures (syntax errors)",
 		compared,
@@ -469,7 +565,8 @@ func compareFormat(test *testing.T, inputs []string) int {
 
 func TestFormatFixturesMatchOracle(test *testing.T) {
 	test.Parallel()
-	compareFormat(test, formatFixtures)
+	compareFormat(test, oracle_testing.Open(test, test.Name()), oracle_testing.Open(test, test.Name()+"SecondPass"),
+		formatFixtures)
 }
 
 // TestFormatOracleCanFail proves the comparison sees a difference: the port's output for one input
@@ -509,5 +606,40 @@ func TestPrintDocLeavesTheTrailingHardline(test *testing.T) {
 	}
 	if strings.Contains(printed, "\r") {
 		test.Fatal("a doc has no line endings of its own")
+	}
+}
+
+// suiteDirectory holds the yaml-test-suite's cases, recorded from the package in the Prettier fork's
+// node_modules (see package recorded), with the suite's MIT notices beside them.
+var suiteDirectory = filepath.Join("testdata", "yaml_test_suite")
+
+// suiteInputs is every input of one part of the yaml-test-suite (cases_<n>.json), and each case's canonical
+// dump (dumps_<n>.json).
+func suiteInputs(test *testing.T, cases string, part int) []string {
+	test.Helper()
+	read, _ := readInputs(test, cases, filepath.Join(suiteDirectory, fmt.Sprintf("dumps_%d.json", part)))
+	inputs := make([]string, len(read))
+	for index, input := range read {
+		inputs[index] = input.Text
+	}
+	return inputs
+}
+
+// TestYamlTestSuiteMatchesOracle runs the suite through both sides under every option set. Inputs the
+// oracle cannot format (the suite's error cases) must fail in the parser too. Each of the suite's parts
+// is a subtest, and all of them read the one golden, split into parts of its own under 50 KB.
+func TestYamlTestSuiteMatchesOracle(test *testing.T) {
+	test.Parallel()
+	parts, partsError := recorded.Parts(suiteDirectory, "cases_")
+	if partsError != nil {
+		test.Fatal(partsError)
+	}
+	golden := oracle_testing.Open(test, test.Name())
+	forkAgainGolden := oracle_testing.Open(test, test.Name()+"SecondPass")
+	for index, cases := range parts {
+		test.Run(fmt.Sprintf("part_%d", index+1), func(test *testing.T) {
+			test.Parallel()
+			compareFormat(test, golden, forkAgainGolden, suiteInputs(test, cases, index+1))
+		})
 	}
 }

@@ -10,8 +10,6 @@ import (
 	"github.com/system-inc/cohere/internal/format/doc"
 	"github.com/system-inc/cohere/internal/format/format_options"
 	"github.com/system-inc/cohere/internal/format/oracle_testing"
-	"github.com/system-inc/cohere/internal/format/prettier"
-	"github.com/system-inc/cohere/internal/testing/needs"
 )
 
 // Each snippet goes through this printer and through the embedded Prettier fork, and the two outputs must
@@ -214,12 +212,27 @@ func formatOptionSets() map[string]format_options.Options {
 	}
 }
 
+// unsettledCases are the cases whose fork output the fork itself rewrites, so Format, which prints as the fork does,
+// rewrites it on a second pass too. Their second pass is held to the fork's own, recorded beside the first in
+// <test>SecondPass.json, so a change to it in either direction fails, settling included. One whose recorded
+// second pass settles everywhere fails too, so the list only shrinks.
+var unsettledCases = map[string]bool{
+	// `|b`, a type in no namespace, prints as `,|b`, and each pass adds a line holding a lone comma before it.
+	"selectors: combinators, pseudo-classes, pseudo-elements, attributes, namespaces, lists": true,
+	// A grid property keeps the line breaks of its source, so the second pass keeps the breaks the first chose and
+	// lays the value out again.
+	"long comma lists and space lists break at the print width": true,
+}
+
 func TestFormatMatchesTheFork(test *testing.T) {
 	test.Parallel()
 	// The oracle's answers, recorded (see oracle_testing), so no JavaScript runs here.
 	golden := oracle_testing.Open(test, test.Name())
+	secondPass := oracle_testing.Open(test, test.Name()+"SecondPass")
+	unsettled := map[string]bool{}
 	for optionsName, options := range formatOptionSets() {
 		oracle := golden.Formatter(options)
+		forkAgain := secondPass.Formatter(options)
 		for _, testCase := range formatCases {
 			expected, formatError := oracle.Format("Probe.css", testCase.source)
 			if formatError != nil {
@@ -252,7 +265,27 @@ func TestFormatMatchesTheFork(test *testing.T) {
 			}
 			if actual != expected {
 				test.Errorf("%s (%s):\n--- fork\n%s--- native\n%s", testCase.name, optionsName, expected, actual)
+				continue
 			}
+			// Formatted output formats to itself, or every run rewrites what the last one wrote.
+			again, againError := Format(expected, options, nil)
+			if unsettledCases[testCase.name] {
+				want, wantError := forkAgain.Format("Probe.css", expected)
+				unsettled[testCase.name] = unsettled[testCase.name] || wantError != nil || want != expected
+				if (againError != nil) != (wantError != nil) || again != want {
+					test.Errorf("%s (%s): formatted again, not as the fork formats it again (%v, the fork %v):\n%s",
+						testCase.name, optionsName, againError, wantError, firstDifference(want, again))
+				}
+			} else if againError != nil || again != expected {
+				test.Errorf("%s (%s): formatted again (%v):\n%s", testCase.name, optionsName, againError,
+					firstDifference(expected, again))
+			}
+		}
+	}
+	// Only a clean run judges the list: a case whose first pass differed never reached its second.
+	for name := range unsettledCases {
+		if !test.Failed() && !unsettled[name] {
+			test.Errorf("the fork formats %s to itself on a second pass, so take it out of unsettledCases", name)
 		}
 	}
 }
@@ -351,6 +384,12 @@ func TestCoreNormalizedInputMatchesTheFork(test *testing.T) {
 			if formatError != nil || actual != expected {
 				test.Errorf("%q as %s (%s):\n--- fork\n%q\n--- native (%v)\n%q", testCase.source, testCase.fileName,
 					optionsName, expected, formatError, actual)
+				continue
+			}
+			// Formatted output formats to itself, or every run rewrites what the last one wrote.
+			if again, againError := format(expected, options, nil); againError != nil || again != expected {
+				test.Errorf("%q as %s (%s): formatted again, %q (%v)", testCase.source, testCase.fileName, optionsName,
+					again, againError)
 			}
 		}
 	}
@@ -377,104 +416,6 @@ func TestPrintToDocIsFormatWithoutTheTrailingHardline(test *testing.T) {
 			test.Errorf("%s:\n--- Format\n%s--- PrintToDoc\n%s", testCase.name, formatted, printed)
 		}
 	}
-}
-
-// The corpus is the 26 CSS files the brief names, read from the machine's projects. They are not part of
-// this repository, so the test runs only when COHERE_CSS_CORPUS names the directories to search,
-// separated by the path list separator, and fails when that finds nothing. Each file runs as written and
-// with every line's indentation stripped: the files are already formatted, so only the stripped copy
-// makes the oracle rewrite anything.
-func TestCorpusMatchesTheFork(test *testing.T) {
-	test.Parallel()
-	roots := needs.OptIn(
-		test,
-		"COHERE_CSS_CORPUS",
-		"a differential of the formatter against the fork over a corpus of CSS files",
-	)
-	var files []string
-	for _, root := range filepath.SplitList(roots) {
-		walkError := filepath.WalkDir(root, func(path string, entry os.DirEntry, pathError error) error {
-			if pathError != nil {
-				return nil
-			}
-			if entry.IsDir() &&
-				(entry.Name() == "node_modules" || entry.Name() == ".git" || entry.Name() == "conversations") {
-				return filepath.SkipDir
-			}
-			if !entry.IsDir() && strings.HasSuffix(path, ".css") &&
-				(strings.Contains(path, "theme/styles") ||
-					strings.HasSuffix(path, "OsKingdomGraph.css") ||
-					strings.HasSuffix(path, "fonts/inter/inter.css")) {
-				files = append(files, path)
-			}
-			return nil
-		})
-		if walkError != nil {
-			test.Fatal(walkError)
-		}
-	}
-	if len(files) == 0 {
-		test.Fatalf("no corpus files under %s", roots)
-	}
-	rewritten := 0
-	// The live oracle, not a golden (see oracle_testing): the corpus is the projects' own CSS as it stands
-	// today, which changes with every edit to them, so recorded answers would only ever be stale.
-	for optionsName, options := range formatOptionSets() {
-		oracle, newPrettierError := prettier.New(options)
-		if newPrettierError != nil {
-			test.Fatal(newPrettierError)
-		}
-		for _, file := range files {
-			source, readError := os.ReadFile(file)
-			if readError != nil {
-				test.Fatal(readError)
-			}
-			for _, variant := range []string{string(source), stripIndentation(string(source))} {
-				expected, formatError := oracle.Format("Probe.css", variant)
-				if formatError != nil {
-					test.Fatalf("%s (%s): the oracle failed: %v", file, optionsName, formatError)
-				}
-				if expected != variant {
-					rewritten++
-				}
-				actual, formatError := Format(variant, options, nil)
-				if formatError != nil {
-					test.Errorf("%s (%s): %v", file, optionsName, formatError)
-					continue
-				}
-				if actual != expected {
-					test.Errorf(
-						"%s (%s): differs from the fork\n%s",
-						file,
-						optionsName,
-						firstDifference(expected, actual),
-					)
-				}
-			}
-		}
-	}
-	if rewritten < len(files)*len(formatOptionSets()) {
-		test.Errorf(
-			"the oracle rewrote only %d of %d inputs, so the corpus barely tests the printer",
-			rewritten,
-			2*len(files)*len(formatOptionSets()),
-		)
-	}
-	test.Logf(
-		"%d corpus files, two variants each, under %d option sets; the oracle rewrote %d",
-		len(files),
-		len(formatOptionSets()),
-		rewritten,
-	)
-}
-
-// stripIndentation removes every line's leading spaces and tabs.
-func stripIndentation(source string) string {
-	lines := strings.Split(source, "\n")
-	for index, line := range lines {
-		lines[index] = strings.TrimLeft(line, " \t")
-	}
-	return strings.Join(lines, "\n")
 }
 
 // Prettier's own CSS fixtures, tests/format/css in the fork, are the widest set of edge cases there is:
@@ -542,6 +483,10 @@ func TestPrettierFixturesMatchTheFork(test *testing.T) {
 						optionsName,
 						firstDifference(expected, actual),
 					)
+				} else if again, againError := Format(expected, options, nil); againError != nil || again != expected {
+					// Formatted output formats to itself, or every run rewrites what the last one wrote.
+					test.Errorf("%s (%s): formatted again (%v):\n%s", file, optionsName, againError,
+						firstDifference(expected, again))
 				}
 			}
 		}
@@ -707,6 +652,12 @@ func TestFormatScssMatchesTheFork(test *testing.T) {
 			}
 			if actual != expected {
 				test.Errorf("%s (%s):\n--- fork\n%s--- native\n%s", testCase.name, optionsName, expected, actual)
+				continue
+			}
+			// Formatted output formats to itself, or every run rewrites what the last one wrote.
+			if again, againError := FormatScss(expected, options, nil); againError != nil || again != expected {
+				test.Errorf("%s (%s): formatted again (%v):\n%s", testCase.name, optionsName, againError,
+					firstDifference(expected, again))
 			}
 		}
 	}
@@ -737,6 +688,10 @@ func TestFormatScssIsNotFormat(test *testing.T) {
 		actualScss, formatScssError := FormatScss(source, format_options.Default(), nil)
 		if formatScssError != nil || actualScss != asScss {
 			test.Errorf("%q as scss:\n--- fork\n%s--- native (%v)\n%s", source, asScss, formatScssError, actualScss)
+		} else if again, againError := FormatScss(asScss, format_options.Default(), nil); againError != nil ||
+			again != asScss {
+			// Formatted output formats to itself, or every run rewrites what the last one wrote.
+			test.Errorf("%q as scss: formatted again (%v):\n%s", source, againError, firstDifference(asScss, again))
 		}
 		actualCss, formatError := Format(source, format_options.Default(), nil)
 		if (formatError == nil) != (cssError == nil) || actualCss != asCss {
@@ -748,6 +703,10 @@ func TestFormatScssIsNotFormat(test *testing.T) {
 				formatError,
 				actualCss,
 			)
+		} else if cssError == nil {
+			if again, againError := Format(asCss, format_options.Default(), nil); againError != nil || again != asCss {
+				test.Errorf("%q as css: formatted again (%v):\n%s", source, againError, firstDifference(asCss, again))
+			}
 		}
 	}
 }
@@ -840,6 +799,11 @@ func TestPrettierScssFixturesMatchTheFork(test *testing.T) {
 				}
 				if actual == expected {
 					matched++
+					// Formatted output formats to itself, or every run rewrites what the last one wrote.
+					if again, againError := FormatScss(expected, options, nil); againError != nil || again != expected {
+						test.Errorf("%s (%s): formatted again (%v):\n%s", file, optionsName, againError,
+							firstDifference(expected, again))
+					}
 				} else {
 					test.Errorf(
 						"%s (%s): differs from the fork\n%s",

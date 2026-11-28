@@ -1,5 +1,7 @@
 package micromark
 
+import "testing"
+
 // wikiLinkFixtures are inputs where every `[` that reaches the text tokenizer opens a wiki link that
 // closes, so labelStartLink and labelEnd never keep a token. They hold no list, emphasis, strikethrough,
 // math, liquid, html, table, footnote or autolink-literal syntax, and no stray `[`: where those
@@ -156,4 +158,14 @@ func longTarget(size int) string {
 		target[index] = 'a'
 	}
 	return string(target)
+}
+
+func TestWikiLinkEvents(test *testing.T) {
+	test.Parallel()
+	compareEvents(test, wikiLinkFixtures)
+}
+
+func TestWikiLinkRefusalEvents(test *testing.T) {
+	test.Parallel()
+	compareEvents(test, wikiLinkRefusalFixtures)
 }

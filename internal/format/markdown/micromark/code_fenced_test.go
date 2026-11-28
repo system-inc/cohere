@@ -1,5 +1,7 @@
 package micromark
 
+import "testing"
+
 // codeFencedFixtures hold no block quote, list, setext, html, definition, emphasis, strikethrough or
 // math syntax: those constructs are not ported yet, so a fixture leaning on them would differ for reasons
 // that are not codeFenced's. Where a fence fails and its backticks fall to a paragraph, the fixture is
@@ -116,4 +118,9 @@ var codeFencedFixtures = []string{
 	"é```\nx",
 	"```é\nx\n```",
 	"```\n\U0001F600\n```\U0001F600",
+}
+
+func TestCodeFencedEvents(test *testing.T) {
+	test.Parallel()
+	compareEvents(test, codeFencedFixtures)
 }

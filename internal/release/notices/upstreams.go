@@ -86,6 +86,25 @@ var Upstreams = []Upstream{
 		Reach:   Compiled, LicenseFile: "prettier.txt",
 	},
 	{
+		Name: "Prettier's format test fixtures", Url: "https://github.com/prettier/prettier", License: "MIT",
+		Carries: "Prettier's own CSS, SCSS and YAML format fixtures, vendored in internal/format/css/testdata/prettier and internal/format/yaml/testdata/prettier_tests, which the formatter's tests read.",
+		Reach:   RepositoryOnly, LicenseFile: "prettier.txt",
+	},
+	{
+		Name: "yaml-test-suite", Url: "https://github.com/yaml/yaml-test-suite", License: "MIT",
+		Carries: "The YAML test suite's cases, vendored in internal/format/yaml/testdata/yaml_test_suite, which the YAML parser's and printer's tests read.",
+		Reach:   RepositoryOnly, LicenseFile: "yaml-test-suite.txt",
+	},
+	{
+		// GFM's spec is CommonMark's with GitHub's extensions, under the same license, so one entry carries both.
+		Name: "CommonMark Spec and GitHub Flavored Markdown Spec", Url: "https://spec.commonmark.org",
+		License: "CC-BY-SA-4.0",
+		Carries: "Examples from the CommonMark and GFM specs, quoted by number in the fixture lists of " +
+			"internal/format/markdown/micromark's tests.",
+		Reach:       RepositoryOnly,
+		LicenseFile: "cc-by-sa-4.0.txt",
+	},
+	{
 		Name: "yaml", Url: "https://github.com/eemeli/yaml", License: "ISC", Version: "2",
 		Carries: "The YAML parser in internal/format/yaml, ported.",
 		Reach:   Compiled, LicenseFile: "yaml.txt",
@@ -523,11 +542,6 @@ var Upstreams = []Upstream{
 		LicenseFile: "cspell-dict-software-terms.txt",
 	},
 	{
-		Name: "Prettier's bundled builds", Url: "https://github.com/system-inc/prettier", License: "MIT",
-		Carries: "Built Prettier bundles vendored in internal/format/prettier/bundles, which tests compare the formatter against. They bundle many other projects, whose licenses are in internal/format/prettier/bundles/THIRD-PARTY-NOTICES.md.",
-		Reach:   RepositoryOnly, LicenseFile: "prettier.txt",
-	},
-	{
 		Name:        "staticcheck's check fixtures",
 		Url:         "https://pkg.go.dev/honnef.co/go/tools@v0.8.1",
 		License:     "MIT",
@@ -542,21 +556,19 @@ var Upstreams = []Upstream{
 // graph or go.mod. A module missing here stops the generator by name, so a new dependency is read
 // before it is credited.
 var moduleLicenses = map[string]string{
-	"github.com/Microsoft/go-winio":     "MIT",
-	"github.com/klauspost/cpuid/v2":     "MIT",
-	"github.com/dlclark/regexp2/v2":     "MIT",
-	"github.com/zeebo/xxh3":             "BSD-2-Clause",
-	"golang.org/x/sync":                 "BSD-3-Clause",
-	"golang.org/x/sys":                  "BSD-3-Clause",
-	"golang.org/x/text":                 "BSD-3-Clause",
-	"github.com/dop251/goja":            "MIT",
-	"github.com/go-sourcemap/sourcemap": "BSD-2-Clause",
-	"github.com/google/pprof":           "Apache-2.0",
-	"golang.org/x/mod":                  "BSD-3-Clause",
-	"golang.org/x/tools":                "BSD-3-Clause",
-	"github.com/BurntSushi/toml":        "MIT",
-	"golang.org/x/exp/typeparams":       "BSD-3-Clause",
-	"honnef.co/go/tools":                "MIT",
+	"github.com/Microsoft/go-winio": "MIT",
+	"github.com/klauspost/cpuid/v2": "MIT",
+	"github.com/dlclark/regexp2/v2": "MIT",
+	"github.com/zeebo/xxh3":         "BSD-2-Clause",
+	"golang.org/x/sync":             "BSD-3-Clause",
+	"golang.org/x/sys":              "BSD-3-Clause",
+	"golang.org/x/text":             "BSD-3-Clause",
+	"github.com/google/pprof":       "Apache-2.0",
+	"golang.org/x/mod":              "BSD-3-Clause",
+	"golang.org/x/tools":            "BSD-3-Clause",
+	"github.com/BurntSushi/toml":    "MIT",
+	"golang.org/x/exp/typeparams":   "BSD-3-Clause",
+	"honnef.co/go/tools":            "MIT",
 }
 
 // swiftLicense is a Swift package's license expression and its text under licenses/.

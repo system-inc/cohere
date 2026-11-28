@@ -1,0 +1,6 @@
+{
+ "about": "the text of unist_test.go's TestLoaderConvertsOffsets at 69a8e49c5",
+ "inputs": [
+  {"name":"astral and multi-byte","text":"é: 🍐\n'中': \"x\"\n"}
+ ]
+}

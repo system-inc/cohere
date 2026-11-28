@@ -1,5 +1,7 @@
 package micromark
 
+import "testing"
+
 // gfmAutolinkLiteralFixtures avoid the constructs still pending: no `~` (strikethrough), no `[^`
 // (footnotes), no `|` rows (tables), no `[ ]` after a list marker (task list items), no `[a]: b`
 // (definitions), no `$` (math), no `[[` (wiki links), no `{{`/`{%` (liquid), and no `<` that would open
@@ -157,4 +159,9 @@ var gfmAutolinkLiteralFixtures = []string{
 	"a@b.c d",
 	"a@b.c.d.e.f",
 	"a_@b.c",
+}
+
+func TestGfmAutolinkLiteralEvents(test *testing.T) {
+	test.Parallel()
+	compareEvents(test, gfmAutolinkLiteralFixtures)
 }

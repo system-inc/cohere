@@ -1,0 +1,9 @@
+{
+ "digest": "61573b94b6f4507420b448b348c232f988c86f60dc9b23d089ce3b179b2afc98",
+ "answers": {
+  "0bdb8b6d766d93447b49174b7a4ba6e5e21b1221a6942ee8207e2b61b03cce84": {"error": "formatting Probe.graphql: SyntaxError: Syntax Error: Expected Name, found \")\". (1:11)\n> 1 | query { a() }\n    |           ^\n  2 |"},
+  "39c8ea4562a08ce21b03299440f074187e0f8914fad7d4ff02651ee2c962bbbc": {"error": "formatting Probe.graphql: SyntaxError: Syntax Error: Expected Name, found \"}\". (1:13)\n> 1 | type T { a: }\n    |             ^\n  2 |"},
+  "70e2799a0e29725e6e432e4bbb7f34aa2116131be067c64a032cbba402661879": {"error": "formatting Probe.graphql: SyntaxError: Syntax Error: Unexpected description, descriptions are not supported on shorthand queries. (1:1)\n> 1 | \"description\" { a }\n    | ^\n  2 |"},
+  "cdc16b2c3dd118038c97ebfa494118b4ed962af0431d3254d3891befb60ad68a": {"error": "formatting Probe.graphql: SyntaxError: Syntax Error: Expected Name, found \"}\". (1:9)\n> 1 | query { }\n    |         ^\n  2 |"}
+ }
+}

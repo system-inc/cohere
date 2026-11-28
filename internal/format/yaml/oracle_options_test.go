@@ -1,52 +1,30 @@
 package yaml
 
 import (
-	"errors"
 	"fmt"
+	"maps"
 	"strings"
-	"sync"
 	"testing"
 
-	"github.com/dop251/goja"
 	"github.com/system-inc/cohere/internal/format/differential"
 	"github.com/system-inc/cohere/internal/format/doc"
 	"github.com/system-inc/cohere/internal/format/format_options"
 	"github.com/system-inc/cohere/internal/format/oracle_testing"
-	"github.com/system-inc/cohere/internal/format/prettier"
 	"github.com/system-inc/cohere/internal/format/printing"
 )
 
-// The oracle for what prettier.Formatter cannot be asked: proseWrap, which format_options.Options does not carry
-// and every repository leaves at "preserve", and a file path the formatter does not route (.prettierrc). These
-// run the same embedded bundles in their own runtime, with the option given.
-
-// Its answers are recorded (see oracle_testing), so the runtime is built only when they are recorded again.
+// The oracle for what the fork's formatter could not be asked through Options: proseWrap, which
+// format_options.Options does not carry and every repository leaves at "preserve", and a file path the
+// formatter does not route (.prettierrc). Its answers are the fork bundle's prettier.format on the text at the
+// file path with the parser, the proseWrap and the options' printWidth, tabWidth, useTabs, singleQuote,
+// bracketSpacing, trailingComma and endOfLine, recorded (see oracle_testing).
 type optionsOracle struct {
-	golden    *oracle_testing.Golden
-	once      sync.Once
-	runtime   *goja.Runtime
-	loadError error
+	golden *oracle_testing.Golden
 }
 
 func newOptionsOracle(test *testing.T) *optionsOracle {
 	test.Helper()
 	return &optionsOracle{golden: oracle_testing.Open(test, test.Name())}
-}
-
-func (oracle *optionsOracle) load() {
-	bundles, bundlesError := prettier.Bundles()
-	if bundlesError != nil {
-		oracle.loadError = bundlesError
-		return
-	}
-	runtime := goja.New()
-	for _, name := range prettier.BundleFiles {
-		if _, runStringError := runtime.RunString(string(bundles.Files[name])); runStringError != nil {
-			oracle.loadError = fmt.Errorf("evaluating %s: %w", name, runStringError)
-			return
-		}
-	}
-	oracle.runtime = runtime
 }
 
 func (oracle *optionsOracle) format(
@@ -56,61 +34,9 @@ func (oracle *optionsOracle) format(
 	options format_options.Options,
 	proseWrap string,
 ) (string, error) {
-	key := oracle_testing.Key("options", text, filePath, parser, fmt.Sprintf("%+v", options), proseWrap)
-	return oracle.golden.Answer(key, func() (string, error) {
-		oracle.once.Do(oracle.load)
-		if oracle.loadError != nil {
-			return "", oracle.loadError
-		}
-		return oracle.formatLive(text, filePath, parser, options, proseWrap)
-	})
-}
-
-func (oracle *optionsOracle) formatLive(
-	text string,
-	filePath string,
-	parser string,
-	options format_options.Options,
-	proseWrap string,
-) (string, error) {
-	setGlobalsError := errors.Join(
-		oracle.runtime.Set("__source", text),
-		oracle.runtime.Set("__filePath", filePath),
-		oracle.runtime.Set("__parser", parser),
-		oracle.runtime.Set("__proseWrap", proseWrap),
-		oracle.runtime.Set("__printWidth", options.PrintWidth),
-		oracle.runtime.Set("__tabWidth", options.TabWidth),
-		oracle.runtime.Set("__useTabs", options.UseTabs),
-		oracle.runtime.Set("__singleQuote", options.SingleQuote),
-		oracle.runtime.Set("__bracketSpacing", options.BracketSpacing),
-		oracle.runtime.Set("__trailingComma", options.TrailingComma),
-		oracle.runtime.Set("__endOfLine", options.EndOfLine),
+	return oracle.golden.Answer(
+		oracle_testing.Key("options", text, filePath, parser, fmt.Sprintf("%+v", options), proseWrap),
 	)
-	if setGlobalsError != nil {
-		return "", fmt.Errorf("setting the format's options in the oracle runtime: %w", setGlobalsError)
-	}
-	value, runStringError := oracle.runtime.RunString(`prettier.format(__source, {
-		filepath: __filePath, parser: __parser, plugins: prettierPlugins, proseWrap: __proseWrap,
-		printWidth: __printWidth, tabWidth: __tabWidth, useTabs: __useTabs, singleQuote: __singleQuote,
-		bracketSpacing: __bracketSpacing, trailingComma: __trailingComma, endOfLine: __endOfLine,
-	})`)
-	if runStringError != nil {
-		return "", runStringError
-	}
-	// prettier.format returns a promise; each RunString drains goja's job queue, so pump until settled.
-	promise, isPromise := value.Export().(*goja.Promise)
-	if !isPromise {
-		return value.String(), nil
-	}
-	for pump := 0; pump < 100000 && promise.State() == goja.PromiseStatePending; pump++ {
-		if _, runStringError := oracle.runtime.RunString("0"); runStringError != nil {
-			return "", runStringError
-		}
-	}
-	if promise.State() != goja.PromiseStateFulfilled {
-		return "", fmt.Errorf("%v", promise.Result())
-	}
-	return promise.Result().String(), nil
 }
 
 // proseWrapFixtures are the inputs whose words the always and never branches join and split: multi-line
@@ -147,11 +73,23 @@ var proseWrapFixtures = []string{
 	"a: plain\u00a0 b\n  c",
 }
 
+// unsettledProseWrapFixtures are unsettledFixtures and the inputs whose fork output only a proseWrap other than
+// preserve leaves unsettled, held to the fork's recorded second pass as unsettledFixtures are.
+var unsettledProseWrapFixtures = func() map[string]bool {
+	union := maps.Clone(unsettledFixtures)
+	// Under proseWrap never, the trailing lines a `>+` scalar keeps print once more, so each pass adds one.
+	union["a: >+\n  x\n\n"] = true
+	union["a:\n  - |-\n    x\n  - >+\n    y\n\nb: c"] = true
+	return union
+}()
+
 func TestProseWrapMatchesOracle(test *testing.T) {
 	test.Parallel()
 	oracle := newOptionsOracle(test)
+	forkAgain := &optionsOracle{golden: oracle_testing.Open(test, test.Name()+"SecondPass")}
 	inputs := append(append([]string{}, proseWrapFixtures...), formatFixtures...)
 	failures, compared := 0, 0
+	unsettled := map[string]bool{}
 	for _, proseWrap := range []string{"always", "never"} {
 		for variantIndex, options := range formatVariants[:3] {
 			for _, input := range inputs {
@@ -173,10 +111,25 @@ func TestProseWrapMatchesOracle(test *testing.T) {
 						input,
 						differential.FirstDifference(expected, fullStack),
 					)
+				} else if wrong, unsettledAsListed := secondPass(
+					unsettledProseWrapFixtures,
+					input,
+					expected,
+					options,
+					proseWrap,
+					func() (string, error) {
+						return forkAgain.format(expected, "fixture.yaml", "yaml", options, proseWrap)
+					},
+				); wrong != "" {
+					failures++
+					test.Errorf("%s, variant %d, %q: %s", proseWrap, variantIndex, input, wrong)
+				} else if unsettledAsListed {
+					unsettled[input] = true
 				}
 			}
 		}
 	}
+	requireUnsettled(test, unsettledProseWrapFixtures, inputs, unsettled)
 	test.Logf("%d proseWrap comparisons: %d differ", compared, failures)
 }
 
