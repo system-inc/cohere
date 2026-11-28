@@ -375,13 +375,13 @@ func TestTheShardTableReads(test *testing.T) {
 	}
 }
 
-// The gate runs each package of its shard table it is handed as a job of its own, beside the module's run, each in
-// the shards its row asks for (#d80tydg): here two, handed after a plain package and out of the table's order, the
-// first asking 3 shards with a pin, the second 2. Every shard of both runs at once, each package's shards cover its
-// listing exactly once, the pin is alone in its shard, each package's output is printed in the table's order with its
-// own step, and every shard's wall is said, in its marker and in the timing report. A dealing that drops one listed
-// name of one package refuses the verdict, naming that test and that package and no other. And a pin naming no test
-// its package lists refuses the gate, in words naming the pin and the package.
+// The gate runs each package of its shard table it is handed as a job of its own, beside the module's run when asked
+// to (boxBesideVariable), each in the shards its row asks for (#d80tydg): here two, handed after a plain package and
+// out of the table's order, the first asking 3 shards with a pin, the second 2. Every shard of both runs at once, each
+// package's shards cover its listing exactly once, the pin is alone in its shard, each package's output is printed in
+// the table's order with its own step, and every shard's wall is said, in its marker and in the timing report. A
+// dealing that drops one listed name of one package refuses the verdict, naming that test and that package and no
+// other. And a pin naming no test its package lists refuses the gate, in words naming the pin and the package.
 func TestTheGateShardsEachPackageOfItsTableAsAJobOfItsOwn(test *testing.T) {
 	test.Parallel()
 	needs.Tool(test, "bash", "the gate is a bash script")
@@ -416,7 +416,8 @@ func TestTheGateShardsEachPackageOfItsTableAsAJobOfItsOwn(test *testing.T) {
 			calls := filepath.Join(test.TempDir(), "calls")
 			environment := append(own_go_cache.Environment(withoutModuleCache(os.Environ()), test.TempDir()),
 				"TMPDIR="+test.TempDir(), "SHARD_CALLS="+calls, "SHARD_STARTED="+test.TempDir(),
-				fmt.Sprintf("SHARD_EXPECTED=%d", row.shards), "GIT_CONFIG_GLOBAL="+os.DevNull, "GIT_CONFIG_NOSYSTEM=1")
+				fmt.Sprintf("SHARD_EXPECTED=%d", row.shards), "GIT_CONFIG_GLOBAL="+os.DevNull, "GIT_CONFIG_NOSYSTEM=1",
+				boxBesideVariable+"=on")
 			// The table is the script's sixth argument, read in place of the gate's own line, and the script is read
 			// from its input, as a gate box reads it.
 			gateScript, replaceError := replacedOnce(sharedBoxGate, boxShardTableLine, `shardTable="$table"`)

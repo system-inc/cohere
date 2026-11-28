@@ -159,9 +159,16 @@ found=$(cd "$goroot" && find . -type f -print0 | LC_ALL=C sort -z | xargs -0 sha
 [ "$found" = "$digest" ] || refuse "the Go toolchain at $goroot digests to $found, not the pinned $digest"
 `
 
-// boxSeriesMarker opens the line a box's run prints when its core budget runs its test jobs one after another rather
-// than beside each other (#df7s7ej), the reason after it.
+// boxSeriesMarker opens the line a box's run prints when it runs its test jobs one after another rather than beside
+// each other (#df7s7ej), the reason after it.
 const boxSeriesMarker = "cohere-dev-gate: series "
+
+// boxBesideVariable, set to on, runs a gate box's test jobs beside each other, unless she holds a core budget. Unset,
+// they run one after another, as they did before #df7s7ej: on Shackler the jobs at once took 24m19s and 24m17s against
+// 22m52s in series, since she was CPU-bound with 51 and 59 packages rerunning, and the load turned timing tests red
+// (J-bacpn4p and #62's run, Nov 28). system_cohere ruled series until the rerun set is small, then beside tried again
+// with numbers.
+const boxBesideVariable = "COHERE_DEV_GATE_BESIDE"
 
 // boxCoreBudgetVariable carries a gate box's core budget (macBoxCoreBudgets) to her script, unset for a box with none.
 const boxCoreBudgetVariable = "COHERE_DEV_GATE_CORES"
@@ -273,18 +280,22 @@ for package in "$@"; do
 done
 # The tests, each sharded package's shards, the -race run and its narrowed runs each run beside the others, a
 # background job apiece writing its JSON to a file of its own and its end, its failure and its seconds, to another, so
-# the stage takes about as long as its longest job (#df7s7ej). A box with a core budget runs them one after another:
-# each job sizes its go to the whole budget, so several at once would hold several budgets' threads, and a budgeted box
-# shares herself with other work (the Go Square's must on #df7s7ej). Each job's output is printed whole once all have
+# the stage takes about as long as its longest job (#df7s7ej), once the box asks for it (boxBesideVariable). Unasked,
+# they run one after another. A box with a core budget runs them one after another even when asked: each job sizes
+# its go to the whole budget, so several at once would hold several budgets' threads, and a budgeted box shares
+# herself with other work (the Go Square's must on #df7s7ej). Each job's output is printed whole once all have
 # ended: the module's run, each sharded package's in the table's order, then the race marker and the -race runs. A
 # -race run beside a module run that failed is never printed, as it never ran then, so the verdict is what it was.
 beside=$(mktemp -d "${TMPDIR:-/tmp}/cohere-gate-beside.XXXXXX")
 besideStarted=$(date +%s)
-besideAtOnce=1
+besideAtOnce=""
 if [ -n "${` + boxCoreBudgetVariable + `:-}" ]; then
-  besideAtOnce=""
   echo "` + boxSeriesMarker + `a core budget of ${` + boxCoreBudgetVariable + `} cores runs the test jobs" \
     "one after another"
+elif [ "${` + boxBesideVariable + `:-}" = on ]; then
+  besideAtOnce=1
+else
+  echo "` + boxSeriesMarker + `the test jobs run one after another, since ` + boxBesideVariable + ` is not on"
 fi
 besideJobs=""
 # besideJob keeps a job's pid to wait for, and on a budgeted box waits for it before the next starts.
