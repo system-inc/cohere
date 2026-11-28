@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/go_language/cgo_testing"
+	"github.com/system-inc/cohere/internal/testing/build_inputs"
 )
 
 // missingRequirementFiles is a module root that imports a module its go.mod replaces with a directory beside it but
@@ -59,7 +60,8 @@ func readModuleFiles(test *testing.T, root string) []byte {
 func listedAsTheUserWould(test *testing.T, root string, environment []string) []byte {
 	test.Helper()
 	command := exec.Command("go", "list", "-e", "-deps", "-json", "./...")
-	command.Dir = root
+	// The module the test wrote lies outside ours, so its go command reads nothing Go's test cache could miss.
+	command.Dir = build_inputs.OutsideModule(test, root)
 	command.Env = append(append(os.Environ(), environment...), "PWD="+root)
 	if output, runError := command.CombinedOutput(); runError != nil {
 		test.Fatalf("go list under the user's flags: %v: %s", runError, output)
