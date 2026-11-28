@@ -77,6 +77,11 @@ type cacheReading struct {
 // directory, or with none kept the runner's declared layer, `GOCACHE` (runnerDeclaredCache). An empty cache, the
 // cache not yet made, reads as nothing in it.
 func (job *integrateJobRun) readCache() cacheReading {
+	// The shared folder is walked by the runner's trim at the job's start, which says its size (sayCache), and never
+	// again here: up to 512 GiB walked twice a job would cost more than it says.
+	if job.cache == "" && runnerSharedCache() != "" {
+		return cacheReading{}
+	}
 	started := time.Now()
 	cache := filepath.Join(job.cache, "gocache")
 	if job.cache == "" && runnerDeclaredCache() {
@@ -109,6 +114,14 @@ func (job *integrateJobRun) readCache() cacheReading {
 // neither a kept cache nor the runner's, the script's empty per-job cache is made and removed inside its run, so the
 // line says so, and never on the runner's: J-k20kexn's fill ran on the runner's cache and said the empty one.
 func (job *integrateJobRun) sayCache(before cacheReading, after cacheReading) {
+	if shared := runnerSharedCache(); job.cache == "" && shared != "" {
+		job.say(
+			"build cache the runner's shared Go cache, %s, read and written in place by every integrate job",
+			shared,
+		)
+		job.say("build cache at start %s", sharedCacheSize())
+		return
+	}
 	if job.cache == "" && !runnerDeclaredCache() {
 		job.say("build cache an empty per-job cache, made and removed inside the run, so every package compiled " +
 			"and nothing is measured of it")
@@ -218,4 +231,22 @@ func testEnvironment(output []byte) []string {
 		}
 	}
 	return lines
+}
+
+// sharedCacheSize is what the runner's trim at the job's start said of the shared Go cache folder: its size as the
+// walk found it, its size after the trim and the entries the trim removed, or that it wasn't read, when the walk
+// stopped at its bound and the runner set none of them, or set one that is no whole count.
+func sharedCacheSize() string {
+	figures := []int64{}
+	for _, variable := range []string{runnerSharedCacheBytesBeforeVariable, runnerSharedCacheBytesVariable,
+		runnerSharedCacheRemovedVariable} {
+		value := strings.TrimSpace(os.Getenv(variable))
+		figure, parseError := strconv.ParseInt(value, 10, 64)
+		if value == "" || parseError != nil || figure < 0 {
+			return fmt.Sprintf("not read: the runner's trim set %s=%q", variable, value)
+		}
+		figures = append(figures, figure)
+	}
+	return fmt.Sprintf("%d bytes found, %d bytes after the runner's trim, %d entries removed (the runner's walk)",
+		figures[0], figures[1], figures[2])
 }

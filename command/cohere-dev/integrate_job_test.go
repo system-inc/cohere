@@ -942,7 +942,9 @@ func TestAnIntegrateJobRefusesAMergeOntoAnotherMain(test *testing.T) {
 // Loom's runner sets no COHERE_INTEGRATE_CACHE, and an integrate job keyed on the kept cache alone went to a proxy it
 // can't reach. The runner's declared Go cache, its layer as `GOCACHE` and its `GOCACHEPROG` (#e94a6r4), is what an
 // integrate job with no kept cache tests on, with no -count=1 and its layer left in place, and anywhere else the two
-// are never read: a gate box's job runs on an empty cache of its own with no cache program.
+// are never read: a gate box's job runs on an empty cache of its own with no cache program. So is the one folder the
+// runner shares across every integrate job (#ntrewm3), `GOCACHE` with runnerSharedCacheVariable naming the same path,
+// read in place and kept; a shared name that isn't `GOCACHE`, or one outside an integrate job, is never read.
 func TestTheIntegrateJobsCacheIsKeptAndDropsCountOne(test *testing.T) {
 	test.Parallel()
 	needs.Tool(test, "bash", "the gate is a bash script")
@@ -963,12 +965,17 @@ func TestTheIntegrateJobsCacheIsKeptAndDropsCountOne(test *testing.T) {
 	for _, row := range []struct {
 		name                       string
 		kept, integrateJob, runner bool
+		// shared is what runnerSharedCacheVariable names: the cache's own path, another or none.
+		shared string
 	}{
 		{name: "unset"},
 		{name: "set", kept: true, integrateJob: true},
 		{name: "an integrate job with no kept cache", integrateJob: true},
 		{name: "an integrate job on the runner's declared cache", integrateJob: true, runner: true},
 		{name: "a gate box whose account names a cache program", runner: true},
+		{name: "an integrate job on the runner's shared cache", integrateJob: true, shared: "the cache"},
+		{name: "an integrate job whose shared name isn't its cache", integrateJob: true, shared: "elsewhere"},
+		{name: "a gate box whose account names a shared cache", shared: "the cache"},
 	} {
 		kept := row.kept
 		test.Run(row.name, func(test *testing.T) {
@@ -998,6 +1005,12 @@ func TestTheIntegrateJobsCacheIsKeptAndDropsCountOne(test *testing.T) {
 				"GOMODCACHE="+laid, "GOPROXY=https://proxy.example.com")
 			if row.runner {
 				gate.Env = append(gate.Env, "GOCACHEPROG=loom-job-runner gocacheprog shared layer")
+			}
+			switch row.shared {
+			case "the cache":
+				gate.Env = append(gate.Env, runnerSharedCacheVariable+"="+layer)
+			case "elsewhere":
+				gate.Env = append(gate.Env, runnerSharedCacheVariable+"="+test.TempDir())
 			}
 			output, gateError := gate.CombinedOutput()
 			if gateError != nil {
@@ -1041,6 +1054,15 @@ func TestTheIntegrateJobsCacheIsKeptAndDropsCountOne(test *testing.T) {
 				}
 				if information, statError := os.Stat(layer); statError != nil || !information.IsDir() {
 					test.Errorf("the gate removed the runner's layer %s: %v", layer, statError)
+				}
+				return
+			}
+			if row.shared == "the cache" && row.integrateJob {
+				if strings.Contains(asked[2], "-count") || !strings.Contains(asked[2], "| cache "+layer+" empty yes ") {
+					test.Errorf("the tests ran %q, want no -count on the runner's shared cache %s", asked[2], layer)
+				}
+				if information, statError := os.Stat(layer); statError != nil || !information.IsDir() {
+					test.Errorf("the gate removed the runner's shared cache %s: %v", layer, statError)
 				}
 				return
 			}
@@ -1356,7 +1378,9 @@ func TestAnIntegrateJobsAccountLinesParse(test *testing.T) {
 
 // On the runner's declared Go cache (#e94a6r4), with no kept one, the account says it was the runner's, its layer and
 // its program, and the layer's size before and after with the entries it gained, never the empty per-job sentence:
-// J-k20kexn's fill ran on the runner's cache and its account said the cache was empty and removed.
+// J-k20kexn's fill ran on the runner's cache and its account said the cache was empty and removed. A runner that also
+// names the layer as its shared cache, which no runner should, still has its tests run on the program's layer by the
+// gate script, so the account says that too, never the shared cache (the Go Square's should on #ntrewm3).
 func TestAnIntegrateJobsAccountNamesTheRunnersCache(test *testing.T) {
 	test.Parallel()
 	fixture := newIntegrateJobFixture(test)
@@ -1366,7 +1390,7 @@ func TestAnIntegrateJobsAccountNamesTheRunnersCache(test *testing.T) {
 	fixture.reply("tests.grows", filepath.Join(layer, "new-entry"))
 	program := "loom-job-runner gocacheprog shared layer"
 	ran := fixture.integrateJob(fixture.merged(), append(own_go_cache.Environment(nil, layer),
-		"GOCACHEPROG="+program)...)
+		"GOCACHEPROG="+program, runnerSharedCacheVariable+"="+layer)...)
 	if ran.exit != 0 {
 		test.Fatalf("the integrate job exited %d:\n%s", ran.exit, ran.errors)
 	}
@@ -1382,6 +1406,9 @@ func TestAnIntegrateJobsAccountNamesTheRunnersCache(test *testing.T) {
 	if strings.Contains(ran.errors, "an empty per-job cache") {
 		test.Errorf("the account on the runner's cache says the empty per-job one:\n%s", ran.errors)
 	}
+	if strings.Contains(ran.errors, "the runner's shared Go cache") {
+		test.Errorf("the account on the program's layer says the shared cache:\n%s", ran.errors)
+	}
 }
 
 // The account's test environment lines are the run's boxEnvironmentMarker lines without the marker, in order, and no
@@ -1395,6 +1422,53 @@ func TestTheTestEnvironmentIsTheRunsEnvironmentLines(test *testing.T) {
 	want := []string{"HOME /var/lib/loomjob/integrate/home", "LOOM_JOB_ID sha256 4f2a9c81d0e3"}
 	if got := testEnvironment(output); !slices.Equal(got, want) {
 		test.Errorf("the test environment reads %q, want %q", got, want)
+	}
+}
+
+// On the one Go cache the runner shares across every integrate job (#ntrewm3), `GOCACHE` with no program and the same
+// path in runnerSharedCacheVariable, the account names it and says its size as the runner's trim at the start read it,
+// found, after the trim and the entries removed, and never walks the folder itself, so no before and after line. A
+// walk the runner stopped at its bound sets none of the three, and the account says the size wasn't read.
+func TestAnIntegrateJobsAccountNamesTheSharedCache(test *testing.T) {
+	test.Parallel()
+	for _, row := range []struct {
+		name     string
+		figures  []string
+		wantSize string
+	}{
+		{"its size read", []string{runnerSharedCacheBytesBeforeVariable + "=549755813888",
+			runnerSharedCacheBytesVariable + "=412316860416", runnerSharedCacheRemovedVariable + "=81234"},
+			"549755813888 bytes found, 412316860416 bytes after the runner's trim, 81234 entries removed"},
+		{"its walk stopped at its bound", nil,
+			"not read: the runner's trim set " + runnerSharedCacheBytesBeforeVariable + `=""`},
+	} {
+		test.Run(row.name, func(test *testing.T) {
+			test.Parallel()
+			fixture := newIntegrateJobFixture(test)
+			fixture.reply("measure.run", shacklerSays([]int64{9900, 9700, 9800}))
+			shared := test.TempDir()
+			writeFixtureFile(test, filepath.Join(shared, "kept-entry"), "entry\n")
+			environment := append(own_go_cache.Environment(nil, shared), runnerSharedCacheVariable+"="+shared)
+			ran := fixture.integrateJob(fixture.merged(), append(environment, row.figures...)...)
+			if ran.exit != 0 {
+				test.Fatalf("the integrate job exited %d:\n%s", ran.exit, ran.errors)
+			}
+			for _, want := range []string{
+				integrateJobMarker + "build cache the runner's shared Go cache, " + shared + ", read and written in " +
+					"place by every integrate job\n",
+				integrateJobMarker + "build cache at start " + row.wantSize,
+				"the runner's shared Go cache",
+			} {
+				if !strings.Contains(ran.errors, want) {
+					test.Errorf("the account doesn't say %q:\n%s", want, ran.errors)
+				}
+			}
+			for _, refused := range []string{"an empty per-job cache", "build cache before ", "build cache gained "} {
+				if strings.Contains(ran.errors, refused) {
+					test.Errorf("the account on the shared cache says %q:\n%s", refused, ran.errors)
+				}
+			}
+		})
 	}
 }
 
