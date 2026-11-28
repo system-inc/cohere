@@ -386,8 +386,8 @@ const PatternTimedOutNotePrefix = "pattern timed out: "
 // GetTokenPosOfNode is a plain trivia skip, the scanner's answer, except for four shapes it reads on purpose
 // another way: a missing node, whose position it returns unskipped; JSDoc and JSX text, where it stops at a
 // comment; and a node inside JSDoc. Those keep the scanner. TestTokenRangeStartsWhereTheScannerDoes holds the
-// two to the scanner's start on every node of the fixtures and of the four consumers, and found exactly those
-// shapes when the scanner was dropped for every node (14,522 of 6,024,171).
+// two to the scanner's start on every node of fixtures that reach every kind of node the module does, and found
+// exactly those shapes when the scanner was dropped for every node (14,522 of 6,024,171).
 //
 // A range never starts past its end. A missing node, which is what the compiler calls any zero-width one, has
 // no token of its own: an empty JSX attribute list, or a name the parser invented in recovery. Scanning from it
