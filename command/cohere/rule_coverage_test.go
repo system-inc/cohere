@@ -64,6 +64,7 @@ func countedLineTerms(test *testing.T, output string) (int, map[string]int) {
 // line, because that line is what a reader checks.
 // Not parallel: it renders through writeLintReport, which sets the package-level activeSummary
 func TestCoverageCountsAddUpToTheRuleTotal(test *testing.T) {
+	restorePackageStateAfter(test)
 	rules := []rule.Entry{}
 	coverage := program.Coverage{
 		RulesOffered:      map[string]int{},
@@ -179,6 +180,7 @@ func TestSwiftCoverageRefusesPartsLargerThanTheWhole(test *testing.T) {
 // config happened to print for one of them, which is why this asserts the categories themselves.
 // Not parallel: it renders through writeLintReport, which sets the package-level activeSummary
 func TestCoverageSeparatesUnwiredFromOfferedAndSilent(test *testing.T) {
+	restorePackageStateAfter(test)
 	rules := rule_testing.EntriesOf(test, []rule.Rule[rule.NoOptions]{
 		{Name: "satisfied-rule", NoListener: rule.NoListenerDeclinesIrrelevantFiles},
 		{Name: "unwired-rule"},
@@ -207,6 +209,7 @@ func TestCoverageSeparatesUnwiredFromOfferedAndSilent(test *testing.T) {
 // away.
 // Not parallel: it renders through writeLintReport, which sets the package-level activeSummary
 func TestARuleThatRanIsCountedAndNotNamedByDefault(test *testing.T) {
+	restorePackageStateAfter(test)
 	rules := rule_testing.EntriesOf(test, []rule.Rule[rule.NoOptions]{
 		{Name: "quiet-rule"},
 		{Name: "working-rule"},
@@ -236,6 +239,7 @@ func TestARuleThatRanIsCountedAndNotNamedByDefault(test *testing.T) {
 // whose second fact now rides beside the name.
 // Not parallel: it renders through writeLintReport, which sets the package-level activeSummary
 func TestCoverageDetailsNameEachRuleOnce(test *testing.T) {
+	restorePackageStateAfter(test)
 	rules := rule_testing.EntriesOf(test, []rule.Rule[rule.NoOptions]{
 		{Name: "off-everywhere"},
 		{Name: "nobody-configured"},
@@ -306,6 +310,7 @@ func TestCoverageDetailsNameEachRuleOnce(test *testing.T) {
 // stays where it was; a rule that found something keeps that category and says where it did not run.
 // Not parallel: it renders through writeLintReport, which sets the package-level activeSummary
 func TestARuleOffByAnOverrideForMostFilesIsCountedApart(test *testing.T) {
+	restorePackageStateAfter(test)
 	rules := rule_testing.EntriesOf(test, []rule.Rule[rule.NoOptions]{
 		{Name: "eqeqeq"},
 		{Name: "no-var"},
@@ -346,6 +351,7 @@ func TestARuleOffByAnOverrideForMostFilesIsCountedApart(test *testing.T) {
 // Not parallel: its subtests render through writeLintReport and the Swift record stream, which set the package-level
 // activeSummary
 func TestActionableCoverageAlwaysPrintsByDefault(test *testing.T) {
+	restorePackageStateAfter(test)
 	cleanCoverage := func() program.Coverage {
 		return program.Coverage{
 			RulesOffered:   map[string]int{"quiet-rule": 10},
@@ -569,6 +575,7 @@ func TestActionableCoverageAlwaysPrintsByDefault(test *testing.T) {
 // later printer that adds a per-rule line to every run has to change this test to do it.
 // Not parallel: it renders through writeLintReport, which sets the package-level activeSummary
 func TestACleanRunPrintsTwoCoverageLines(test *testing.T) {
+	restorePackageStateAfter(test)
 	rules := rule_testing.EntriesOf(test, []rule.Rule[rule.NoOptions]{
 		{Name: "quiet-rule"},
 		{Name: "off-rule"},
@@ -597,6 +604,7 @@ func TestACleanRunPrintsTwoCoverageLines(test *testing.T) {
 // departure line at all.
 // Not parallel: it renders through writeLintReport, which sets the package-level activeSummary
 func TestADepartureFromAHouseRulingPrintsByDefault(test *testing.T) {
+	restorePackageStateAfter(test)
 	root := "/repository"
 	withDeparture := &configuration.Configuration{
 		Rules: map[string]configuration.RuleSetting{"guard-for-in": {Severity: configuration.SeverityError}},
@@ -626,6 +634,7 @@ func TestADepartureFromAHouseRulingPrintsByDefault(test *testing.T) {
 // no reason, and printing every one would bury the few that carry one.
 // Not parallel: it renders through writeLintReport, which sets the package-level activeSummary
 func TestAnOverrideWithAReasonPrintsByDefault(test *testing.T) {
+	restorePackageStateAfter(test)
 	root := "/repository"
 	lintConfiguration := &configuration.Configuration{
 		Root: root,
@@ -663,6 +672,7 @@ func TestAnOverrideWithAReasonPrintsByDefault(test *testing.T) {
 // tiers, where it is the project's choice (#bfxz13m): a default run counts it, and `--coverage` names it.
 // Not parallel: it renders through writeLintReport, which sets the package-level activeSummary
 func TestAnOffPrintsItsReasonAndAnUnreasonedOffIsCountedByDefault(test *testing.T) {
+	restorePackageStateAfter(test)
 	root := "/repository"
 	rules := rule_testing.EntriesOf(test, []rule.Rule[rule.NoOptions]{
 		{Name: "prefer-arrow-callback"},
@@ -713,6 +723,7 @@ func TestAnOffPrintsItsReasonAndAnUnreasonedOffIsCountedByDefault(test *testing.
 // A default run counts and names nothing of it: it is a fact to read, not an action.
 // Not parallel: it renders through writeLintReport, which sets the package-level activeSummary
 func TestCoverageListsWhatRulesNoted(test *testing.T) {
+	restorePackageStateAfter(test)
 	coverage := program.Coverage{
 		RulesOffered:   map[string]int{"nexus/correctness-no-caller-data-mutation": 2},
 		RulesListening: map[string]int{"nexus/correctness-no-caller-data-mutation": 2},
@@ -750,6 +761,7 @@ func TestCoverageListsWhatRulesNoted(test *testing.T) {
 // run and no other line would show it (#pa7k7zv). A rule's other notes stay under notes.
 // Not parallel: it renders through writeLintReport, which sets the package-level activeSummary
 func TestCoverageNamesWhatRulesSkipped(test *testing.T) {
+	restorePackageStateAfter(test)
 	ruleName := "@typescript-eslint/no-useless-default-assignment"
 	skip := rule.SkippedNotePrefix + "strictNullChecks is off"
 	result := program.Result{
@@ -801,8 +813,7 @@ func TestCoverageNamesWhatRulesSkipped(test *testing.T) {
 // file stay notes (#s4dy4e0).
 // Not parallel: it renders through writeLintReport, which sets the package-level activeSummary
 func TestAPatternThatTimedOutIsNamedAsAGap(test *testing.T) {
-	previous := activeRunCache
-	defer func() { activeRunCache = previous }()
+	restorePackageStateAfter(test)
 	activeRunCache = &runCacheSession{}
 	ruleName := "no-restricted-exports"
 	timedOut := rule.PatternTimedOutNotePrefix + "/(a|aa)+$/u"
@@ -848,6 +859,7 @@ func TestAPatternThatTimedOutIsNamedAsAGap(test *testing.T) {
 // for the rest, so it still prints as having checked nothing there
 // Not parallel: it renders through writeLintReport, which sets the package-level activeSummary
 func TestARuleThatSkippedSomeFilesStillNeedsActionForTheRest(test *testing.T) {
+	restorePackageStateAfter(test)
 	ruleName := "@typescript-eslint/no-useless-default-assignment"
 	result := program.Result{
 		Coverage: program.Coverage{RulesOffered: map[string]int{ruleName: 3}},

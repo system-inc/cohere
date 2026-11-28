@@ -70,6 +70,7 @@ func TestTheVerdictDescriptorIsNotInheritedByAChild(test *testing.T) {
 // refusal mean something.
 // Not parallel: it sets the verdict variable with test.Setenv and assigns the package-level verdictFile
 func TestAVerdictDescriptorThatIsNotAPipeIsLeftAlone(test *testing.T) {
+	restorePackageStateAfter(test)
 	logPath := test.TempDir() + "/log"
 	log, createError := os.Create(logPath)
 	if createError != nil {

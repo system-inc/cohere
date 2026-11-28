@@ -122,6 +122,7 @@ func forbidLines(test *testing.T, output string, unwanted ...string) {
 // Not parallel: its subtests render check runs through contractRun, whose record acceptors set the package-level
 // activeSummary
 func TestSwiftRunRendersEachContractFixture(test *testing.T) {
+	restorePackageStateAfter(test)
 	// Not parallel: it renders a check run through contractRun, whose record acceptors set the package-level
 	// activeSummary
 	test.Run("Clean", func(test *testing.T) {
@@ -357,6 +358,7 @@ func TestSwiftRunRendersEachContractFixture(test *testing.T) {
 // Not parallel: its subtests render check runs through contractRun, whose record acceptors set the package-level
 // activeSummary
 func TestSwiftRunRefusesBrokenStreams(test *testing.T) {
+	restorePackageStateAfter(test)
 	findings := contractFixture(test, "Findings.jsonl")
 	clean := contractFixture(test, "Clean.jsonl")
 	bail := contractFixture(test, "TypesBail.jsonl")
@@ -560,6 +562,7 @@ func TestSwiftRunRefusesBrokenStreams(test *testing.T) {
 // counted line, and a reason with few still names each file.
 // Not parallel: it renders a check run through contractRun, whose record acceptors set the package-level activeSummary
 func TestSwiftRunGroupsExcludedFiles(test *testing.T) {
+	restorePackageStateAfter(test)
 	clean := contractFixture(test, "Clean.jsonl")
 	vendored := []string{}
 	for index := range excludedNamedLimit + 1 {
@@ -636,6 +639,7 @@ func projectRecordAt(test *testing.T, record string, root string, excluded []exc
 // Not parallel: it renders check runs through contractRun, whose record acceptors set the package-level
 // activeSummary, which it reads back
 func TestSwiftRunLeavesYieldedFilesOutAndCountsTheRestAsAGap(test *testing.T) {
+	restorePackageStateAfter(test)
 	resolvedRoot, resolveSymlinksError := filepath.EvalSymlinks(test.TempDir())
 	if resolveSymlinksError != nil {
 		test.Fatal(resolveSymlinksError)
@@ -758,6 +762,7 @@ func TestSwiftRunLeavesYieldedFilesOutAndCountsTheRestAsAGap(test *testing.T) {
 // TestSwiftRunLeavesYieldedFilesOutAndCountsTheRestAsAGap.
 // Not parallel: it renders a check run through contractRun and reads back the package-level activeSummary
 func TestSwiftRunFindsNoGapInTheCleanFixture(test *testing.T) {
+	restorePackageStateAfter(test)
 	activeSummary = runSummary{}
 	output, exitCode, renderRecordsError := renderRecords(
 		test,
@@ -784,6 +789,7 @@ func TestSwiftRunFindsNoGapInTheCleanFixture(test *testing.T) {
 // Not parallel: it renders a check run through contractRun, whose record acceptors set the package-level
 // activeSummary, which it reads back
 func TestSwiftRunNamesEveryFileOfTheGap(test *testing.T) {
+	restorePackageStateAfter(test)
 	excluded := []excludedFile{{"/project/App/Main.swift", "no target of this package compiles it"}}
 	wantGap := []uncheckedContractFile{}
 	for index := range excludedNamedLimit + 1 {
@@ -860,6 +866,7 @@ func TestSwiftRunNamesEveryFileOfTheGap(test *testing.T) {
 // it can see gaps no record carries, such as a file it could not read.
 // Not parallel: it renders a check run through contractRun, whose record acceptors set the package-level activeSummary
 func TestSwiftRunBelievesABinaryThatFellShort(test *testing.T) {
+	restorePackageStateAfter(test)
 	clean := contractFixture(test, "Clean.jsonl")
 	last := len(clean) - 1
 	clean[last] = strings.Replace(
@@ -1064,6 +1071,7 @@ func TestSwiftContractArgumentsRefuseWhatNothingHonors(test *testing.T) {
 // Not parallel: it assigns the package-level activeSummary and reads back what the Swift record acceptors set
 // there
 func TestSwiftRunListsTheFilesItRewrote(test *testing.T) {
+	restorePackageStateAfter(test)
 	activeSummary = runSummary{}
 	if _, _, renderRecordsError := renderRecords(
 		test,
@@ -1103,8 +1111,7 @@ func TestSwiftRunListsTheFilesItRewrote(test *testing.T) {
 // shows a gap.
 // Not parallel: it swaps the package-level activeOutput and activeSummary, which the record acceptors set
 func TestSwiftRunNamesTheFilesItDidNotWrite(test *testing.T) {
-	saved, savedSummary := activeOutput, activeSummary
-	defer func() { activeOutput, activeSummary = saved, savedSummary }()
+	restorePackageStateAfter(test)
 	lines := contractFixture(test, "NotWritten.jsonl")
 	render := func(mode outputMode) string {
 		test.Helper()
@@ -1157,6 +1164,7 @@ func TestSwiftRunNamesTheFilesItDidNotWrite(test *testing.T) {
 // Not parallel: it renders a check run through contractRun, whose record acceptors set the package-level
 // activeSummary
 func TestContractRunRendersAGoStreamInGoWords(test *testing.T) {
+	restorePackageStateAfter(test)
 	activeSummary = runSummary{}
 	output, exitCode, renderRecordsInError := renderRecordsIn(test, goLanguage("module"), contractModeCheck,
 		contractFixture(test, "GoClean.jsonl"), 0, nil)
@@ -1190,6 +1198,7 @@ func TestContractRunRendersAGoStreamInGoWords(test *testing.T) {
 // Not parallel: it renders a check run through contractRun, whose record acceptors set the package-level
 // activeSummary, which it reads back
 func TestAGoRunNamesAFileOnlyAnotherPlatformBuilds(test *testing.T) {
+	restorePackageStateAfter(test)
 	// The child's words on a Mac (internal/go_language/load/excluded.go).
 	const constraintsReason = "excluded by build constraints on darwin/arm64"
 	const cgoReason = `imports "C", and cgo is off for darwin/arm64`
@@ -1328,8 +1337,7 @@ func summaryJsonOf(test *testing.T, output string) string {
 // what was withheld is not the project's to fix.
 // Not parallel: it swaps the package-level activeOutput and activeSummary, which the record acceptors set
 func TestContractRunSaysWhatAGoRunWithheldForCgo(test *testing.T) {
-	saved, savedSummary := activeOutput, activeSummary
-	defer func() { activeOutput, activeSummary = saved, savedSummary }()
+	restorePackageStateAfter(test)
 	withheld := goStreamWithheld(test,
 		`"withheldInDependencyCgo":[{"package":"net","file":"/goroot/src/net/cgo_unix.go","errors":1}],`+
 			`"withheldDependencyCgoDeclarations":14`)
@@ -1380,8 +1388,7 @@ func TestContractRunSaysWhatAGoRunWithheldForCgo(test *testing.T) {
 // footer, and neither field in `--json`'s gaps.
 // Not parallel: it swaps the package-level activeOutput and activeSummary, which the record acceptors set
 func TestContractRunSaysNothingWhenAGoRunWithheldNothing(test *testing.T) {
-	saved, savedSummary := activeOutput, activeSummary
-	defer func() { activeOutput, activeSummary = saved, savedSummary }()
+	restorePackageStateAfter(test)
 	nothing := goStreamWithheld(test, `"withheldInDependencyCgo":[],"withheldDependencyCgoDeclarations":0`)
 
 	verbose, _ := renderGoStreamAs(test, outputVerbose, nothing)
@@ -1400,8 +1407,7 @@ func TestContractRunSaysNothingWhenAGoRunWithheldNothing(test *testing.T) {
 // nothing.
 // Not parallel: it swaps the package-level activeOutput and activeSummary, which the record acceptors set
 func TestContractRunNamesEachGoWorkSumGoListMayHaveRewritten(test *testing.T) {
-	saved, savedSummary := activeOutput, activeSummary
-	defer func() { activeOutput, activeSummary = saved, savedSummary }()
+	restorePackageStateAfter(test)
 	unguarded := contractFixture(test, "GoClean.jsonl")
 	summaryIndex := slices.IndexFunc(unguarded, func(line string) bool {
 		return strings.HasPrefix(line, `{"kind":"summary"`)
@@ -1464,8 +1470,7 @@ func renderSwiftStreamAs(test *testing.T, mode outputMode, lines []string) (stri
 // view. A miss is said as plainly, and a run with no seed field says nothing of one.
 // Not parallel: it swaps the package-level activeOutput and activeSummary, which the record acceptors set
 func TestContractRunNamesTheSdkIndexSeed(test *testing.T) {
-	saved, savedSummary := activeOutput, activeSummary
-	defer func() { activeOutput, activeSummary = saved, savedSummary }()
+	restorePackageStateAfter(test)
 	hit := swiftStreamSeeded(test, `"sdkIndexSeed":{"key":"81593ad4","hit":true}`)
 
 	verbose, summary := renderSwiftStreamAs(test, outputVerbose, hit)
@@ -1546,8 +1551,7 @@ func TestWithheldCgoSentenceCountsEachPartItHas(test *testing.T) {
 // Not parallel: it swaps the package-level activeOutput and activeSummary, and acceptFinding counts into
 // activeSummary
 func TestContractRunLabelsAGoCompilerFindingGo(test *testing.T) {
-	saved, savedSummary := activeOutput, activeSummary
-	defer func() { activeOutput, activeSummary = saved, savedSummary }()
+	restorePackageStateAfter(test)
 	activeOutput, activeSummary = outputSettings{Mode: outputHuman}, runSummary{}
 
 	var out bytes.Buffer
@@ -1606,8 +1610,7 @@ func TestContractRunVersionInGoWords(test *testing.T) {
 // Every Swift summary once said the cache was on under `--no-cache`, because only the TypeScript pipeline set it.
 // Not parallel: it sets the package-level cacheOff and activeOutput, which every run reads.
 func TestASwiftRunUnderNoCacheSaysItsCacheWasOff(test *testing.T) {
-	savedCacheOff, savedOutput := cacheOff, activeOutput
-	defer func() { cacheOff, activeOutput = savedCacheOff, savedOutput }()
+	restorePackageStateAfter(test)
 	for _, off := range []bool{true, false} {
 		cacheOff = off
 		activeOutput = outputSettings{Mode: outputJson}

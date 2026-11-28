@@ -27,8 +27,7 @@ func goStreamWithMemory(test *testing.T, records ...string) []string {
 // Not parallel: it renders through contractRun, whose record acceptors set the package-level activeOutput and
 // activeSummary.
 func TestAGoRunThatRaisedItsMemorySaysSo(test *testing.T) {
-	savedOutput, savedSummary := activeOutput, activeSummary
-	defer func() { activeOutput, activeSummary = savedOutput, savedSummary }()
+	restorePackageStateAfter(test)
 
 	verbose, summary := renderGoStreamAs(test, outputVerbose, goStreamWithMemory(test, raisedMemory))
 	if !strings.Contains(verbose, "  memory: raised to 9.7 GB after the load\n") {
@@ -56,8 +55,7 @@ func TestAGoRunThatRaisedItsMemorySaysSo(test *testing.T) {
 
 // Not parallel: it renders through contractRun, whose record acceptors set the package-level activeSummary.
 func TestAMemoryRecordOutOfItsPlaceIsRefused(test *testing.T) {
-	savedOutput, savedSummary := activeOutput, activeSummary
-	defer func() { activeOutput, activeSummary = savedOutput, savedSummary }()
+	restorePackageStateAfter(test)
 	inputs := `{"kind":"inputs","files":["/project/go.mod"],"directories":["/project"],"absent":[]}`
 	clean := contractFixture(test, "GoClean.jsonl")
 	for _, testCase := range []struct {

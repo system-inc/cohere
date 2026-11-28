@@ -10,6 +10,7 @@ import (
 // read `1 type error (2 checked) • ⚠ 2 files nothing checked` (#1hva1ya). Checked is what a phase examined.
 // Not parallel: it renders a check run through contractRun, whose record acceptors set the package-level activeSummary.
 func TestAFooterCountsOnlyTheFilesAPhaseExamined(test *testing.T) {
+	restorePackageStateAfter(test)
 	records := contractFixture(test, "TypesBail.jsonl")
 	for index, record := range records {
 		if strings.Contains(record, `"kind":"types"`) {

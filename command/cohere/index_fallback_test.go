@@ -12,8 +12,7 @@ import (
 // and one that read it says nothing (#14skmqy).
 // Not parallel: noteFormatWalkGaps writes the package-level activeSummary, which it reads back.
 func TestAWalkThatReadNoIndexSaysWhy(test *testing.T) {
-	savedSummary := activeSummary
-	defer func() { activeSummary = savedSummary }()
+	restorePackageStateAfter(test)
 	fallback := "/project/.git/index is a split index, whose entries live partly in a shared index this reader " +
 		"does not merge"
 	walked := format_files.Enumeration{Root: "/project", Walked: 3, IndexFallback: fallback}

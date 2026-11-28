@@ -75,6 +75,7 @@ func TestAPlainCohereAtALinkedRootChecksWhatItsRealPathDoes(test *testing.T) {
 //
 // Not parallel: it drives check runs through contractRun, whose record acceptors set the package-level activeSummary.
 func TestACensusThatMissedTheLoadIsNeverComplete(test *testing.T) {
+	restorePackageStateAfter(test)
 	stream := func(complete bool, exitCode int) string {
 		return "cat <<'RECORDS'\n" + strings.Join([]string{
 			`{"kind":"provenance","contract":4,"program":"cohere-go","version":"0.1.0","commit":"dev",` +
