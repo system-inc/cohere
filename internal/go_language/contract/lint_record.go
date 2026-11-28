@@ -444,7 +444,10 @@ type DependenceCounts struct {
 // written beside its entry counts there too. Each is written only when not 0. DependenceRecords, additive within
 // contract 3 and cohere-go's alone, is written only by a run under `--build-dependence` with a store
 // (#6a3kjvz). Packs, additive within contract 3, is what every extra build did with its packs, summed (#b2t9xmf),
-// absent in a run with no extra build.
+// absent in a run with no extra build. HostReadCold, additive within contract 3 and cohere-go's alone, is why the
+// host's build read its findings store cold (#s8e6z0n): every package of it a miss, checked from source and kept for
+// the extra builds, and no entry the store held written again, so a warm store stays exactly as it was. Its one reason
+// is HostReadColdBuildPacksMissing. Absent when the host read its store as always.
 type LintCache struct {
 	On                 bool   `json:"on"`
 	Hit                int    `json:"hit"`
@@ -466,7 +469,19 @@ type LintCache struct {
 
 	DependenceRecords *DependenceRecords `json:"dependenceRecords,omitempty"`
 	Packs             *BuildPacks        `json:"packs,omitempty"`
+
+	HostReadCold HostReadColdReason `json:"hostReadCold,omitempty"`
 }
+
+// HostReadColdReason is why the host's build read its findings store cold (LintCache.HostReadCold), in the contract's
+// camelCase.
+type HostReadColdReason string
+
+// HostReadColdBuildPacksMissing is the run checking at least one extra build, each restoring from the host's run,
+// whose every pack of the findings store was missing, and every marker that the build had run, which another
+// executable's sweep of the packs never removes: a build with none reads nothing of its own store, so it restores
+// from what the host keeps, and a host that restores from its store keeps nearly nothing (#s8e6z0n).
+const HostReadColdBuildPacksMissing HostReadColdReason = "buildPacksMissing"
 
 // BuildPacks counts what extra builds did with their packs (#b2t9xmf): each build keeps one pack of each store it reads
 // records from, its findings cache's and the system cache's, a file holding every record it read or wrote there in its

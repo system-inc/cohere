@@ -121,6 +121,14 @@ func (store *Store) ReadPack(place PackPlace) (Pack, string) {
 // stampSize is one shard's stamp in a pack's bytes: the shard, then its stamp.
 const stampSize = 1 + 8
 
+// HasPack reports whether a pack is at place, whole or not, by a stat alone, so a caller learns it without reading the
+// pack: false exactly where ReadPack would answer PackMissing, and true for a pack it would refuse, damaged or
+// unreadable, since a refused pack is there (#s8e6z0n).
+func (store *Store) HasPack(place PackPlace) bool {
+	_, statError := os.Stat(store.packPath(place))
+	return !errors.Is(statError, fs.ErrNotExist)
+}
+
 // decodePack is what body holds, a pack's contents after its sum, or why it was refused.
 func decodePack(body []byte) (Pack, string) {
 	if !bytes.HasPrefix(body, []byte(packMagic)) {

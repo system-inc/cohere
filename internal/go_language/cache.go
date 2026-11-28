@@ -58,7 +58,8 @@ var errorOverlaid = errors.New("the go flags name an overlay (-overlay), whose f
 // is nil only for a host whose census judged no file, which asked go env nothing; then it is read here, recorded in
 // children, the run's account of the go commands it starts (see load.Children). The project's store holds stamps, the
 // run's shard stamps, as the system cache's does, so a write by any session of the run marks the shard it changes moved
-// for every build's pack (cache.Open).
+// for every build's pack (cache.Open). identify is cohere-go's identity (pipeline.executableIdentity), asked only of a
+// run that keeps a cache.
 func lintCache(
 	request invocation,
 	workspace project.Workspace,
@@ -68,6 +69,7 @@ func lintCache(
 	children *load.Children,
 	system *systemCache,
 	stamps *cache.ShardStamps,
+	identify func() (string, error),
 ) (*check.Caching, error) {
 	source := request.standardLibrary
 	noCache := request.switches["no-cache"]
@@ -92,7 +94,7 @@ func lintCache(
 	if noCache && !keepsSystem {
 		return nil, nil
 	}
-	identity, identityError := cache.ExecutableIdentity()
+	identity, identityError := identify()
 	if identityError != nil {
 		return nil, fmt.Errorf("identifying cohere-go: %w", identityError)
 	}
@@ -116,18 +118,26 @@ func lintCache(
 		return &check.Caching{StandardLibrary: standardLibrary, CgoToolchain: cgoToolchain(values)}, nil
 	}
 	return &check.Caching{
-		Store:       cache.Open(workspace.Root, stamps),
-		ExtraInputs: newStaticcheckConfigurationInputs().inputs,
-		Context: cache.Context{
-			FormatVersion:      check.CacheFormatVersion,
-			ExecutableIdentity: identity,
-			Build:              cacheBuild(values),
-			RuleSet:            cacheRuleSet(enabled),
-		},
+		Store:           cache.Open(workspace.Root, stamps),
+		ExtraInputs:     newStaticcheckConfigurationInputs().inputs,
+		Context:         projectCacheContext(identity, values, enabled),
 		StandardLibrary: standardLibrary,
 		CgoToolchain:    cgoToolchain(values),
 		AnswersInPart:   request.answersInPart,
 	}, nil
+}
+
+// projectCacheContext is what every key of the project's store shares but the loader, for a build whose go env
+// answered values, under the run's enabled rules and cohere-go's identity: the Context lintCache gives a build's
+// session, and the one the host's run names each extra build's pack by before that session is made
+// (hostReadColdReason), so the two never drift.
+func projectCacheContext(identity string, values map[string]string, enabled []rule.Rule) cache.Context {
+	return cache.Context{
+		FormatVersion:      check.CacheFormatVersion,
+		ExecutableIdentity: identity,
+		Build:              cacheBuild(values),
+		RuleSet:            cacheRuleSet(enabled),
+	}
 }
 
 // overlaidGoFlags reports whether goFlags, `GOFLAGS` as go env reports it, from the environment or go's own env file,

@@ -216,6 +216,10 @@ func writeLateFold(root string) error {
 // the findings cache writes and one under `--no-cache` never does.
 var writtenThroughCount = regexp.MustCompile(`,"writtenThrough":[0-9]+`)
 
+// hostReadColdField is the cache record's reason the host read its store cold, which only a run with a store has
+// (#s8e6z0n).
+var hostReadColdField = regexp.MustCompile(`,"hostReadCold":"[A-Za-z]+"`)
+
 // Every end-to-end case writes, under `--no-cache`, exactly what it writes with the lint phase after the load, and
 // what its expected stream holds but for the cache being off: a run that lints beside its load, one whose wrap or
 // rename writes and so drops or takes that pass, and one whose rules never run.
@@ -240,9 +244,10 @@ func TestEveryCaseReadsTheSameWithTheLintBesideTheLoad(test *testing.T) {
 			}
 			// The expected stream is of a run with the cache, which a run that renamed has turned off already, and
 			// whose extra builds wrote through to their stores what a run without one never writes, and kept a pack
-			// of the store a run without one has none of (#b2t9xmf), so the packs are left out of both.
-			cacheOff := withoutJsonObject(writtenThroughCount.ReplaceAllString(
-				strings.ReplaceAll(string(expected), `"cache":{"on":true`, `"cache":{"on":false`), ""), "packs")
+			// of the store a run without one has none of (#b2t9xmf), so the packs are left out of both, and whose
+			// host read a store cold that a run without one never reads (#s8e6z0n).
+			cacheOff := withoutJsonObject(hostReadColdField.ReplaceAllString(writtenThroughCount.ReplaceAllString(
+				strings.ReplaceAll(string(expected), `"cache":{"on":true`, `"cache":{"on":false`), ""), ""), "packs")
 			expectedLines := strings.Split(cacheOff, "\n")
 			actualLines := strings.Split(withoutJsonObject(overlapped.stream, "packs"), "\n")
 			for index := range max(len(expectedLines), len(actualLines)) {

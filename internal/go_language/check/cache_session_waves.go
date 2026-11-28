@@ -37,8 +37,11 @@ func (session *CacheSession) firstWave(
 	withheld map[*packages.Package]load.PackageWithheld,
 ) (*checker.Graph, error) {
 	// Waves are the project's store's, beside its second keys: a session without it, which keys the standard library
-	// alone for the system cache, analyzes in one, beside the load as a run without a store does.
-	if session.known == nil || session.keys == nil || session.caching.Store == nil {
+	// alone for the system cache, analyzes in one, beside the load as a run without a store does. So does one reading
+	// that store cold (ReadColdWhen): every second key would miss there, so a first wave would only split the
+	// analysis in two, and its dependencies, analyzed apart for facts alone, would be kept for no build.
+	if session.known == nil || session.keys == nil || session.caching.Store == nil ||
+		session.readsColdFrom(session.caching.Store) {
 		return nil, nil
 	}
 	missBelow := map[*packages.Package]bool{}
