@@ -1,4 +1,8 @@
-package estree_test
+// Package value_gate holds estree's one check that loads Go through the loader, which walks every directory of
+// cohere's module to name what ./... could reach, so go's test cache keys its result on each directory's listing
+// and an edit anywhere in cohere reruns it. It lives apart from estree's own tests, which read only their
+// fixtures, so that such an edit reruns this gate alone and estree replays from the cache (#0zdyk51).
+package value_gate
 
 import (
 	"fmt"
@@ -38,7 +42,8 @@ var testingPrinters = []string{"Error", "Errorf", "Fatal", "Fatalf", "Log", "Log
 func TestNoValueIsConvertedToAnEmptyInterface(test *testing.T) {
 	test.Parallel()
 
-	loaded := loadForGate(test, "..", "./...")
+	// This package sits two directories below internal/format, every package of which the gate reads.
+	loaded := loadForGate(test, filepath.Join("..", ".."), "./...")
 	loadedEstree, declared := false, false
 	files := 0
 	for _, loadedPackage := range loaded {

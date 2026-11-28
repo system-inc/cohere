@@ -1,30 +1,29 @@
 package native
 
 import (
-	"io/fs"
 	"os"
-	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/edit"
 	"github.com/system-inc/cohere/internal/format/estree"
 	"github.com/system-inc/cohere/internal/format/format_options"
+	"github.com/system-inc/cohere/internal/testing/typescript_fixtures"
 )
 
 // The formatter prints a TypeScript file from the fix pass's guard's tree rather than parsing it again
 // (#dk2502g). estree's TestTheGuardsTreeIsTheTreeTheFormatterWouldParse proves the two trees convert to one
 // ESTree; this proves what a run relies on, the printed bytes, so anything the printer reads off the tree
 // besides the ESTree (node flags, the script kind it was parsed with) is covered too. Asked for by
-// @system_cohere_lint_fix in review. Every TypeScript file of this repository's fixtures is formatted twice, with
+// @system_cohere_lint_fix in review. Every .ts and .tsx file of this repository's fixtures, the extensions with a
+// printer that takes a tree, read by the directories that hold them (typescript_fixtures), is formatted twice, with
 // the tree the formatter hands its transform and with none, and the outputs, or the errors, must be equal. A tree
 // of other bytes is offered too, and must be refused, printing what no tree prints.
 func TestFormattingFromTheGuardsTreePrintsWhatParsingAgainPrints(test *testing.T) {
 	test.Parallel()
 	formatter := Formatter{Options: format_options.Default()}
 	compared := 0
-	for _, fileName := range typeScriptFilesUnder(moduleRootOf(test)) {
+	for _, fileName := range typescript_fixtures.Files(test, ".ts", ".tsx") {
 		contents, readError := os.ReadFile(fileName)
 		if readError != nil {
 			test.Fatal(readError)
@@ -71,56 +70,4 @@ func errorText(sourceError error) string {
 		return ""
 	}
 	return sourceError.Error()
-}
-
-// moduleRootOf is the module's root, where the fixtures are.
-func moduleRootOf(test *testing.T) string {
-	test.Helper()
-	directory, workingDirectoryError := os.Getwd()
-	if workingDirectoryError != nil {
-		test.Fatal(workingDirectoryError)
-	}
-	for {
-		if _, statError := os.Stat(filepath.Join(directory, "go.mod")); statError == nil {
-			return directory
-		}
-		parent := filepath.Dir(directory)
-		if parent == directory {
-			test.Fatal("no go.mod above the test's directory")
-		}
-		directory = parent
-	}
-}
-
-// typeScriptFilesUnder is every .ts and .tsx file under root, the extensions with a printer that takes a tree,
-// outside dependency, build and cache directories and the TypeScript checkout.
-func typeScriptFilesUnder(root string) []string {
-	skipped := map[string]bool{
-		"node_modules": true,
-		".git":         true,
-		".cache":       true,
-		".next":        true,
-		"dist":         true,
-		"TypeScript":   true,
-	}
-	var files []string
-	// Ignored: the walk skips every path it cannot read and returns only nil or SkipDir, so WalkDir has no error
-	// left to report, and a root that is missing contributes no files, which the caller's count catches.
-	filepath.WalkDir(root, func(path string, entry fs.DirEntry, pathError error) error {
-		if pathError != nil {
-			return nil
-		}
-		if entry.IsDir() {
-			if path != root && skipped[entry.Name()] {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		extension := strings.ToLower(filepath.Ext(path))
-		if (extension == ".ts" || extension == ".tsx") && entry.Type()&fs.ModeSymlink == 0 {
-			files = append(files, path)
-		}
-		return nil
-	})
-	return files
 }

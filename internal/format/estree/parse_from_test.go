@@ -2,7 +2,6 @@ package estree
 
 import (
 	"encoding/json"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,6 +10,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/edit"
 	"github.com/system-inc/cohere/internal/json_value"
+	"github.com/system-inc/cohere/internal/testing/typescript_fixtures"
 )
 
 // parseFromCorpusVariable names more roots for the proof below, separated by the path list separator: a real
@@ -18,18 +18,21 @@ import (
 const parseFromCorpusVariable = "COHERE_PARSE_FROM_CORPUS"
 
 // The formatter takes the fix pass's guard's tree rather than parsing every TypeScript file a second time
-// (#dk2502g). This proves the two are one tree, on every TypeScript file of the fixtures and of any tree the
-// variable names: the guard's tree, captured from the transform the formatter really calls, converts to an ESTree
-// equal, property for property and comment for comment, to the one a fresh parse converts to, and it is the
-// tree ParseTypeScriptFrom takes rather than one it refuses and parses again. The mutant is a tree of other
-// bytes: converted, it must differ, so the comparison could have failed, and ParseTypeScriptFrom must refuse it.
+// (#dk2502g). This proves the two are one tree, on every TypeScript file of the fixtures, read by the
+// directories that hold them (typescript_fixtures), and of any tree the variable names: the guard's tree,
+// captured from the transform the formatter really calls, converts to an ESTree equal, property for property
+// and comment for comment, to the one a fresh parse converts to, and it is the tree ParseTypeScriptFrom takes
+// rather than one it refuses and parses again. The mutant is a tree of other bytes: converted, it must differ,
+// so the comparison could have failed, and ParseTypeScriptFrom must refuse it.
 func TestTheGuardsTreeIsTheTreeTheFormatterWouldParse(test *testing.T) {
 	test.Parallel()
-	roots := []string{moduleRoot(test)}
+	extensions := []string{".ts", ".tsx", ".mts", ".cts"}
+	files := typescript_fixtures.Files(test, extensions...)
 	if extra := os.Getenv(parseFromCorpusVariable); extra != "" {
-		roots = append(roots, filepath.SplitList(extra)...)
+		for _, root := range filepath.SplitList(extra) {
+			files = append(files, typescript_fixtures.Under(root, extensions...)...)
+		}
 	}
-	files := typeScriptFiles(roots)
 	if len(files) < 50 {
 		test.Fatalf("the corpus holds %d files, too few for agreement to mean anything", len(files))
 	}
@@ -136,58 +139,4 @@ func convertedDump(test *testing.T, fileName string, sourceFile *ast.SourceFile)
 		test.Fatalf("%s: %v", fileName, encodeError)
 	}
 	return string(encoded)
-}
-
-// moduleRoot is the module's root, where the fixtures are.
-func moduleRoot(test *testing.T) string {
-	test.Helper()
-	directory, workingDirectoryError := os.Getwd()
-	if workingDirectoryError != nil {
-		test.Fatal(workingDirectoryError)
-	}
-	for {
-		if _, statError := os.Stat(filepath.Join(directory, "go.mod")); statError == nil {
-			return directory
-		}
-		parent := filepath.Dir(directory)
-		if parent == directory {
-			test.Fatal("no go.mod above the test's directory")
-		}
-		directory = parent
-	}
-}
-
-// typeScriptFiles is every .ts, .tsx, .mts and .cts file under roots, outside dependency, build and cache
-// directories and the TypeScript checkout.
-func typeScriptFiles(roots []string) []string {
-	extensions := map[string]bool{".ts": true, ".tsx": true, ".mts": true, ".cts": true}
-	skipped := map[string]bool{
-		"node_modules": true,
-		".git":         true,
-		".cache":       true,
-		".next":        true,
-		"dist":         true,
-		"TypeScript":   true,
-	}
-	var files []string
-	for _, root := range roots {
-		// Ignored: the walk function returns nil for a path it cannot read, skipping it, so WalkDir has no
-		// error to return.
-		filepath.WalkDir(root, func(path string, entry fs.DirEntry, pathError error) error {
-			if pathError != nil {
-				return nil
-			}
-			if entry.IsDir() {
-				if path != root && skipped[entry.Name()] {
-					return filepath.SkipDir
-				}
-				return nil
-			}
-			if extensions[strings.ToLower(filepath.Ext(path))] && entry.Type()&fs.ModeSymlink == 0 {
-				files = append(files, path)
-			}
-			return nil
-		})
-	}
-	return files
 }
