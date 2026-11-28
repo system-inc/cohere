@@ -6,6 +6,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -24,6 +25,31 @@ var realSwiftBinary struct {
 	resolveError error
 }
 
+// swiftTestCacheDirectory is where the tests keep the cohere-swift they build: the person's user cache directory,
+// read before TestMain moved the home, under `cohere/test-swift`, or when there is none or it can't be made, the user
+// cache directory of the home TestMain gave this test binary, which it removes once the tests have run.
+//
+// Never the module's `.cache/cohere`, where a development run keeps its own (dispatch.DefaultPaths): a `.cache` the
+// tests made at the module's root changed the root's listing, which Go's test cache keys every test that reads it
+// on, so about 50 packages reran on the next landing (#d49qcjg). Kept outside the module, nothing checks the file
+// again, and nothing has to: the binary's name carries the hash of the sources, the toolchain and the platform it was
+// built from (dispatch.SwiftBinaryPath), so an edit is a new name and a stale binary is never served.
+func swiftTestCacheDirectory() (string, error) {
+	if filepath.IsAbs(usersCacheDirectory) {
+		directory := filepath.Join(usersCacheDirectory, "cohere", "test-swift")
+		// Not returned: a user cache that can't be written is the case the fallback below is for.
+		if createDirectoryError := os.MkdirAll(directory, 0o755); createDirectoryError == nil {
+			return directory, nil
+		}
+	}
+	ownCache, userCacheDirectoryError := os.UserCacheDir()
+	if userCacheDirectoryError != nil {
+		return "", fmt.Errorf("finding a cache directory for cohere-swift outside the module: %w",
+			userCacheDirectoryError)
+	}
+	return filepath.Join(ownCache, "cohere", "test-swift"), nil
+}
+
 // builtSwiftBinary is the path of the child a development cohere would run, built from this checkout's sources.
 func builtSwiftBinary(test *testing.T) string {
 	test.Helper()
@@ -33,13 +59,18 @@ func builtSwiftBinary(test *testing.T) string {
 			realSwiftBinary.resolveError = findModuleDirectoryError
 			return
 		}
+		cacheDirectory, swiftTestCacheDirectoryError := swiftTestCacheDirectory()
+		if swiftTestCacheDirectoryError != nil {
+			realSwiftBinary.resolveError = swiftTestCacheDirectoryError
+			return
+		}
 		versionOutput, swiftVersionOutputError := dispatch.SwiftVersionOutput()
 		if swiftVersionOutputError != nil {
 			realSwiftBinary.resolveError = swiftVersionOutputError
 			return
 		}
 		realSwiftBinary.path, _, realSwiftBinary.resolveError = dispatch.ResolveSwiftBinary(
-			dispatch.DefaultPaths(moduleDirectory),
+			dispatch.Paths{ModuleDirectory: moduleDirectory, CacheDirectory: cacheDirectory},
 			"",
 			contractVersion,
 			versionOutput,
