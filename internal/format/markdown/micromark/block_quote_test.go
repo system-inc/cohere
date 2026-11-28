@@ -1,5 +1,7 @@
 package micromark
 
+import "testing"
+
 // blockQuoteFixtures hold no list, fenced code, html, setext, definition, table, emphasis, code text,
 // link, autolink, math, liquid or wiki-link syntax: those constructs are not ported yet, so a fixture
 // leaning on them would differ for reasons that are not blockQuote's. CommonMark examples 235 (a list) and
@@ -126,4 +128,9 @@ var blockQuoteFixtures = []string{
 	"a\n    > b",
 	"> a\n\n    code",
 	"> é\n> 𝔸\n𝔸",
+}
+
+func TestBlockQuoteEvents(test *testing.T) {
+	test.Parallel()
+	compareEvents(test, blockQuoteFixtures)
 }

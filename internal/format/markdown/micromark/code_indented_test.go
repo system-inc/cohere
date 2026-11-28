@@ -1,5 +1,7 @@
 package micromark
 
+import "testing"
+
 // codeIndentedFixtures hold no container, setext, fenced code or html syntax: those constructs are not
 // ported yet, so a fixture leaning on them would differ for reasons that are not codeIndented's. The
 // lazy-line branch of furtherStart is only reachable inside a block quote or list item.
@@ -57,4 +59,9 @@ var codeIndentedFixtures = []string{
 	"    # a",
 	"    ***",
 	"    a\\\n    b",
+}
+
+func TestCodeIndentedEvents(test *testing.T) {
+	test.Parallel()
+	compareEvents(test, codeIndentedFixtures)
 }

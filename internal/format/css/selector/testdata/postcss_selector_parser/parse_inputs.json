@@ -1,0 +1,682 @@
+{
+    "about": "The inline inputs of TestParseAgreesWithPostcssSelectorParser (oracle_test.go). postcss-selector-parser 2.2.3's answers for them are recorded in parse_answers.json, and for the selectors of the vendored css fixtures in ../../../testdata/prettier/css in vendored_answers_<n>.json, by record-postcss-selector-parser.mjs, attached to #yah3d69; a changed or added input is recorded again there. malformed says the library refuses the selector.",
+    "inputs": [
+        {
+            "name": "empty",
+            "text": ""
+        },
+        {
+            "name": "only whitespace",
+            "text": "   "
+        },
+        {
+            "name": "tag",
+            "text": "div"
+        },
+        {
+            "name": "class",
+            "text": ".a"
+        },
+        {
+            "name": "id",
+            "text": "#id"
+        },
+        {
+            "name": "universal",
+            "text": "*"
+        },
+        {
+            "name": "nesting",
+            "text": "&"
+        },
+        {
+            "name": "nesting compound",
+            "text": "&.active > &:hover"
+        },
+        {
+            "name": "compound",
+            "text": "a.b#c.d"
+        },
+        {
+            "name": "string",
+            "text": "a 'b' \"c\""
+        },
+        {
+            "name": "at-word",
+            "text": "@media a"
+        },
+        {
+            "name": "at-word then word",
+            "text": "@b.c"
+        },
+        {
+            "name": "comment",
+            "text": "a /* c */ b"
+        },
+        {
+            "name": "leading comment",
+            "text": "/* c */ a"
+        },
+        {
+            "name": "comment glued",
+            "text": "a/**/b"
+        },
+        {
+            "name": "multi-line comment",
+            "text": "a /*\n multi\n line */ > b"
+        },
+        {
+            "name": "keyframe selectors",
+            "text": "0%, 50.5%, to"
+        },
+        {
+            "name": "descendant",
+            "text": "a b"
+        },
+        {
+            "name": "child",
+            "text": "a > b"
+        },
+        {
+            "name": "adjacent glued",
+            "text": "a+b"
+        },
+        {
+            "name": "sibling",
+            "text": "a ~ b"
+        },
+        {
+            "name": "wide spacing",
+            "text": "a   >   b"
+        },
+        {
+            "name": "newline and tab",
+            "text": "a\n>\tb"
+        },
+        {
+            "name": "space before only",
+            "text": "a >b"
+        },
+        {
+            "name": "space after only",
+            "text": "a> b"
+        },
+        {
+            "name": "doubled combinator",
+            "text": "a>>b"
+        },
+        {
+            "name": "column combinator",
+            "text": "a || b"
+        },
+        {
+            "name": "leading combinator",
+            "text": "> a"
+        },
+        {
+            "name": "newline descendant",
+            "text": "a\n  b"
+        },
+        {
+            "name": "crlf",
+            "text": "a,\r\nb \r\n c"
+        },
+        {
+            "name": "form feed",
+            "text": "a\fb"
+        },
+        {
+            "name": "leading and trailing spaces",
+            "text": "  a  "
+        },
+        {
+            "name": "spaces around commas",
+            "text": " a , b ,c"
+        },
+        {
+            "name": "trailing comma",
+            "text": "a,b,"
+        },
+        {
+            "name": "trailing comma after space",
+            "text": "a ,"
+        },
+        {
+            "name": "empty middle selector",
+            "text": "a, ,b"
+        },
+        {
+            "name": "leading comma",
+            "text": ",a"
+        },
+        {
+            "name": "double comma",
+            "text": "a,,b"
+        },
+        {
+            "name": "attribute",
+            "text": "[a]"
+        },
+        {
+            "name": "attribute equals",
+            "text": "[a=b]"
+        },
+        {
+            "name": "attribute single quoted",
+            "text": "[a='b']"
+        },
+        {
+            "name": "attribute double quoted",
+            "text": "[a=\"b\"]"
+        },
+        {
+            "name": "attribute operators",
+            "text": "[a~=b][a|=b][a^=b][a$=b][a*=b]"
+        },
+        {
+            "name": "attribute insensitive",
+            "text": "[a=b i]"
+        },
+        {
+            "name": "attribute quoted insensitive",
+            "text": "[a='b' i]"
+        },
+        {
+            "name": "attribute insensitive tab and trailing space",
+            "text": "[a=b\ti ]"
+        },
+        {
+            "name": "attribute uppercase I",
+            "text": "[a=\"b\"  I]"
+        },
+        {
+            "name": "attribute spaces",
+            "text": "[ a = b ]"
+        },
+        {
+            "name": "attribute padded name",
+            "text": "[ a ]"
+        },
+        {
+            "name": "attribute namespace",
+            "text": "[ns|a=b]"
+        },
+        {
+            "name": "attribute empty namespace",
+            "text": "[|a]"
+        },
+        {
+            "name": "attribute any namespace",
+            "text": "[*|a]"
+        },
+        {
+            "name": "attribute empty value",
+            "text": "[a=\"\"]"
+        },
+        {
+            "name": "attribute no value",
+            "text": "[a=]"
+        },
+        {
+            "name": "attribute double equals",
+            "text": "[a==b]"
+        },
+        {
+            "name": "attribute bracket in string",
+            "text": "[a='b]c']"
+        },
+        {
+            "name": "attribute value with spaces",
+            "text": "[data-foo=\"bar baz\" i]"
+        },
+        {
+            "name": "attribute lone quote value",
+            "text": "[a=b\"c\"]"
+        },
+        {
+            "name": "attribute only i",
+            "text": "[a= i]"
+        },
+        {
+            "name": "attribute on a tag",
+            "text": "input[type=\"checkbox\"]:checked + label"
+        },
+        {
+            "name": "empty attribute",
+            "text": "[]"
+        },
+        {
+            "name": "pseudo class",
+            "text": ":hover"
+        },
+        {
+            "name": "pseudo element",
+            "text": "::before"
+        },
+        {
+            "name": "tag pseudo",
+            "text": "a:hover::before"
+        },
+        {
+            "name": "triple colon",
+            "text": ":::a"
+        },
+        {
+            "name": "not",
+            "text": ":not(.a)"
+        },
+        {
+            "name": "not list",
+            "text": ":not(.a, .b)"
+        },
+        {
+            "name": "is",
+            "text": ":is(a, b)"
+        },
+        {
+            "name": "where tailwind dark",
+            "text": ":where(.dark, .dark *)"
+        },
+        {
+            "name": "nth-child",
+            "text": ":nth-child(2n + 1)"
+        },
+        {
+            "name": "nth-child of",
+            "text": ":nth-child(2n + 1 of .x)"
+        },
+        {
+            "name": "nth-child padded",
+            "text": ":nth-child( 2n+1 )"
+        },
+        {
+            "name": "nth-child negative",
+            "text": "li:nth-last-child(-n+3)"
+        },
+        {
+            "name": "pseudo then class",
+            "text": ":hover.foo"
+        },
+        {
+            "name": "nested pseudos",
+            "text": ":is(:not(a))"
+        },
+        {
+            "name": "deeply nested pseudos",
+            "text": ":is(:not(:has(> img, + a)), b) c"
+        },
+        {
+            "name": "attribute and pseudos",
+            "text": "a:not([href]):hover"
+        },
+        {
+            "name": "host",
+            "text": ":host(.x) ::slotted(span)"
+        },
+        {
+            "name": "part and lang",
+            "text": "::part(foo):lang(en):dir(rtl)"
+        },
+        {
+            "name": "has relative",
+            "text": "a:has(> img)"
+        },
+        {
+            "name": "empty pseudo arguments",
+            "text": ":not()"
+        },
+        {
+            "name": "space-only pseudo arguments",
+            "text": ":not( )"
+        },
+        {
+            "name": "pseudo argument comma",
+            "text": ":not(,)"
+        },
+        {
+            "name": "pseudo trailing comma inside",
+            "text": "a, :not(b,)"
+        },
+        {
+            "name": "custom selector name",
+            "text": ":--heading"
+        },
+        {
+            "name": "pseudo multi-line",
+            "text": ":is(\n  a,\n  b\n)"
+        },
+        {
+            "name": "pseudo with comment",
+            "text": ":not(/* x */ a)"
+        },
+        {
+            "name": "pseudo with string",
+            "text": ":contains('a b')"
+        },
+        {
+            "name": "tag parentheses",
+            "text": "a(b)"
+        },
+        {
+            "name": "nested parentheses",
+            "text": ":not(a(b))"
+        },
+        {
+            "name": "attribute parentheses",
+            "text": "[a](x)"
+        },
+        {
+            "name": "nesting parentheses",
+            "text": "&(x (y))"
+        },
+        {
+            "name": "namespace tag",
+            "text": "ns|a"
+        },
+        {
+            "name": "empty namespace",
+            "text": "|a"
+        },
+        {
+            "name": "any namespace",
+            "text": "*|a"
+        },
+        {
+            "name": "namespace universal",
+            "text": "ns|*"
+        },
+        {
+            "name": "any namespace universal",
+            "text": "*|*"
+        },
+        {
+            "name": "chained namespaces",
+            "text": "a|b|c"
+        },
+        {
+            "name": "namespace with class",
+            "text": "ns|a.b"
+        },
+        {
+            "name": "namespace after combinator",
+            "text": "a > ns|b"
+        },
+        {
+            "name": "bar combinator with spaces",
+            "text": "a | b"
+        },
+        {
+            "name": "bar after space",
+            "text": "a |b"
+        },
+        {
+            "name": "tailwind hover",
+            "text": ".hover\\:bg-red:hover"
+        },
+        {
+            "name": "escape then class",
+            "text": ".a\\:b.c"
+        },
+        {
+            "name": "tailwind fraction",
+            "text": ".md\\:w-1\\/2"
+        },
+        {
+            "name": "escaped digit id",
+            "text": "#\\31 23"
+        },
+        {
+            "name": "escaped digit class",
+            "text": ".\\31 0"
+        },
+        {
+            "name": "escaped space",
+            "text": ".a\\ b"
+        },
+        {
+            "name": "escaped at",
+            "text": "\\@media"
+        },
+        {
+            "name": "tailwind arbitrary value",
+            "text": ".w-\\[10px\\]"
+        },
+        {
+            "name": "tailwind group hover",
+            "text": ".group:hover .group-hover\\:opacity-100"
+        },
+        {
+            "name": "escaped backslash",
+            "text": ".a\\\\b"
+        },
+        {
+            "name": "tailwind arbitrary variant",
+            "text": ".\\[\\&_svg\\]\\:size-4"
+        },
+        {
+            "name": "escaped trailing backslash",
+            "text": "a\\"
+        },
+        {
+            "name": "escape before slash",
+            "text": "a\\/b"
+        },
+        {
+            "name": "escape before newline",
+            "text": "a\\\nb"
+        },
+        {
+            "name": "leading escape then space",
+            "text": "\\ b"
+        },
+        {
+            "name": "escaped dot inside word",
+            "text": ".a\\.b.c#d"
+        },
+        {
+            "name": "escaped space then universal",
+            "text": ".\\ *"
+        },
+        {
+            "name": "escaped space in a pseudo",
+            "text": ":a\\ ,b"
+        },
+        {
+            "name": "escaped space at the end",
+            "text": "a.b\\ "
+        },
+        {
+            "name": "escaped space then word",
+            "text": "a\\ b c"
+        },
+        {
+            "name": "important bang",
+            "text": "a!b"
+        },
+        {
+            "name": "braces in a word",
+            "text": "a{b}"
+        },
+        {
+            "name": "interpolation",
+            "text": "#{$a}"
+        },
+        {
+            "name": "interpolation in a class",
+            "text": ".a#{b}#c"
+        },
+        {
+            "name": "accented class",
+            "text": ".café > .ü"
+        },
+        {
+            "name": "emoji classes",
+            "text": ".😀 > .ü, #😀"
+        },
+        {
+            "name": "non-ASCII attribute",
+            "text": "[title=\"日本\"] a"
+        },
+        {
+            "name": "emoji then compound",
+            "text": ".a😀.b#c"
+        },
+        {
+            "name": "emoji then escape merge",
+            "text": ".😀\\:x.y"
+        },
+        {
+            "name": "non-ASCII comment",
+            "text": "a /* é😀 */ b"
+        },
+        {
+            "name": "non-breaking space before i",
+            "text": "[a=b\u00a0i]"
+        },
+        {
+            "name": "escaped emoji in a word",
+            "text": ".a\\😀b:hover"
+        },
+        {
+            "name": "escaped emoji in an attribute",
+            "text": "[a=\\😀]"
+        },
+        {
+            "name": "escaped emoji in word parentheses",
+            "text": "a(\\😀)"
+        },
+        {
+            "name": "escaped emoji before a namespace bar",
+            "text": "\\😀|a"
+        },
+        {
+            "name": "quoted value ending in an emoji",
+            "text": "[a=\"x\"😀]"
+        },
+        {
+            "malformed": true,
+            "name": "unclosed double quote",
+            "text": "\"unclosed"
+        },
+        {
+            "malformed": true,
+            "name": "unclosed single quote",
+            "text": "a 'x"
+        },
+        {
+            "malformed": true,
+            "name": "escaped closing quote",
+            "text": "a 'x\\'"
+        },
+        {
+            "malformed": true,
+            "name": "unclosed comment",
+            "text": "a /* x"
+        },
+        {
+            "malformed": true,
+            "name": "unclosed attribute",
+            "text": "[a"
+        },
+        {
+            "malformed": true,
+            "name": "unclosed attribute with value",
+            "text": "[a=b"
+        },
+        {
+            "malformed": true,
+            "name": "closing bracket",
+            "text": "a]"
+        },
+        {
+            "malformed": true,
+            "name": "closing parenthesis",
+            "text": ")"
+        },
+        {
+            "malformed": true,
+            "name": "closing parenthesis after tag",
+            "text": "a)"
+        },
+        {
+            "malformed": true,
+            "name": "extra closing parenthesis",
+            "text": ":not(a))"
+        },
+        {
+            "malformed": true,
+            "name": "unclosed pseudo",
+            "text": ":not(a"
+        },
+        {
+            "malformed": true,
+            "name": "unclosed word parentheses",
+            "text": "a(b"
+        },
+        {
+            "malformed": true,
+            "name": "semicolon",
+            "text": "a;b"
+        },
+        {
+            "malformed": true,
+            "name": "lone colon",
+            "text": ":"
+        },
+        {
+            "malformed": true,
+            "name": "trailing colon",
+            "text": "a:"
+        },
+        {
+            "malformed": true,
+            "name": "misplaced parenthesis",
+            "text": ":hover.foo("
+        },
+        {
+            "malformed": true,
+            "name": "colon then parenthesis",
+            "text": "::(a)"
+        },
+        {
+            "malformed": true,
+            "name": "colon then attribute",
+            "text": "a:[x]"
+        },
+        {
+            "malformed": true,
+            "name": "colon then at-word",
+            "text": "a:@b"
+        },
+        {
+            "malformed": true,
+            "name": "colon then space",
+            "text": "a: b"
+        },
+        {
+            "malformed": true,
+            "name": "trailing namespace bar",
+            "text": ".a|"
+        },
+        {
+            "malformed": true,
+            "name": "lone bar",
+            "text": "|"
+        },
+        {
+            "malformed": true,
+            "name": "leading parentheses",
+            "text": "(a)"
+        },
+        {
+            "malformed": true,
+            "name": "empty nested parentheses",
+            "text": ":not(())"
+        },
+        {
+            "malformed": true,
+            "name": "bracket only in a string",
+            "text": "[a=\"]\""
+        }
+    ]
+}

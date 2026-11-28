@@ -1,0 +1,31 @@
+{
+ "digest": "61573b94b6f4507420b448b348c232f988c86f60dc9b23d089ce3b179b2afc98",
+ "answers": {
+  "0c8aa328cdf49360bbd4cec79cca7f3f3ec2b8e0ce46590d16ccd7d6941e5868": {"output": "---\ntitle: Title\ndescription: Description\n---\n\na {\n  color: red;\n}\n"},
+  "161e77ac9315e3c985a70e786713fec28a9ad20e190f1ff73bd02913b9c4aa94": {"output": "---\ntitle: Title\ndescription: Description\n---\n\na {\n    color: red;\n}\n"},
+  "1dcb23ce9990568a53d0c268ac95316992ee8a8107a66a5e156f8055486f897d": {"output": "---\nfoo: bar\n---\n\na {\n  color: blue;\n}\n\n--- .b {\n  color: red;\n}\n"},
+  "243e219dac505c27703b814e1029a1782abd8080271584b94ce268677ba06a2b": {"output": "---\ntitle: Title\ndescription: Description\n---\n\n/* comment */\n.something {\n}\n"},
+  "24da3005a48d6f5c40a7fb8154698b0fa4774077e5c65d53abd1c041b677b11d": {"output": "---\n# comment 1\n# comment 2\n# comment 3\n---\n\na {\n    color: red;\n}\n"},
+  "2c297b5c69d0cc16daac0fbf8fa5f4f13c1a1d63c93858c1bc78986b252daa04": {"output": "---\n---\n\na {\n    color: red;\n}\n"},
+  "51509bb72f606492e742443968c9f2acf21797ba8cb7757c095d6845fd1dbd7b": {"output": "---\ntitle: Title\ndescription: Description\n---\n\n/* comment */\n.something {\n}\n"},
+  "5d30d8c97474333496e4e20fa823c4a21599b627164a8495cf0e48adca17d0b1": {"output": "---\nhello: world\na:\n    - 123\n    - 666\n---\n\n.class {\n}\n"},
+  "620aa26bb70ee3edfd1bb53c5e8ec6853de5e05a6ff82c3ce6c5212e3698f5f4": {"output": "---\n---\n\n/* comment */\n.something {\n}\n"},
+  "6323b03a2ab82bf12fd57c49256ce2354b3e88b7b65b03c15baa5a6c1d305a6f": {"output": "---\nhello: world\n---\n\n/* prettier-ignore */\n.foo {}\n"},
+  "67fc9e9a5565af6d23a5ec8bc2b9e30f314178f5cd8d936e684b12fa98dfe1ce": {"output": "---\ntitle: Title\ndescription: Description\n# This is a comment\n---\n\na {\n  color: red;\n}\n"},
+  "8151c88d3b126bd7fdfbae95aeb1d15c3bf10f9ffa79d9d71e7cb4fca6bacf51": {"output": "---\ntitle: Title\ndescription: Description\n# This is a comment\n---\n\na {\n    color: red;\n}\n"},
+  "8da587fe26a7c511db6308f99d2d262c4b9cd434b309846e90b577250d243783": {"output": "---\n---\n\na {\n  color: red;\n}\n"},
+  "911d43274b264520a9edf48bfa3db32ce0a1e7055f5164dadc87beba0e07d981": {"output": "---mycustomparser\ntitle: Title\ndescription: Description\n---\n\n/* comment */\n.something {\n}\n"},
+  "9191d0e1f3d68125ea2381825e7782afb42c5fb658d75e468b0318c63e79d995": {"output": "---\n---\n\na {\n    color: red;\n}\n"},
+  "9a1fd6a7ff5f781ffcf67a1d7568f24eec44423f51afcee4e5903425cb8e760e": {"output": "---\nhello: world\na:\n  - 123\n  - 666\n---\n\n.class {\n}\n"},
+  "a1947329a8670fd3c74c3042f21f6dab59b734e8a94611df3e6389700a5d5617": {"output": "---mycustomparser\ntitle: Title\ndescription: Description\n---\n\n/* comment */\n.something {\n}\n"},
+  "b2e16e1b142201acd8302cf8102f31c819c2abf09963397f2f81a3c007f66bfb": {"output": "---\nhello: world\n---\n\n/* prettier-ignore */\n.foo {}\n"},
+  "b4e769d40037c5257be1e0354c4a8b78baf1d2881631fcf905958db994fe5926": {"output": "---\n# comment 1\n# comment 2\n# comment 3\n---\n\na {\n  color: red;\n}\n"},
+  "b9418937c9b0ab8cbc293d1ec4cafe09708edfd2da403db12dba8d86a9439f96": {"output": "---\n---\n\na {\n  color: red;\n}\n"},
+  "b9bf82a4c6be20be2169cf7466fd7b5d41e0aa30a0134c29b1f5a1ecd2135ba1": {"output": "---yaml\ntitle: Hello\nslug: home\n---\n\na {\n}\n"},
+  "d2ba473d28b04cf8a94efd0e93ba2821bf3f3c05d010d1203205ad93984fcdf8": {"output": "---yaml\ntitle: Hello\nslug: home\n---\n\na {\n}\n"},
+  "d6a5aae4fa9b72301d73c0aef2c51e8e3277a248df319ce08e32ac7a9bcde700": {"output": "---\n---\n\n/* comment */\n.something {\n}\n"},
+  "d9d0d77e75690e8b65041f5be717aee05d28cd2ff84c4b8d7d00f4a33b6fa4e7": {"output": "---\nfoo: bar\n---\n\na {\n    color: blue;\n}\n\n--- .b {\n    color: red;\n}\n"},
+  "dfe9ed4e7083e658a35aa58fdb813c29ead1c120f1eea64deff793e44a159726": {"output": "---\ntitle: Title\ndescription: Description\n---\n\na {\n  color: red;\n}\n"},
+  "e5e0e8eac5c17a20df1fa46c97a98f4b6516cee252657e71173b2b0871205c1e": {"output": "---\ntitle: Title\ndescription: Description\n---\n\na {\n    color: red;\n}\n"}
+ }
+}

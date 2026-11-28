@@ -1,0 +1,21 @@
+{
+ "digest": "61573b94b6f4507420b448b348c232f988c86f60dc9b23d089ce3b179b2afc98",
+ "answers": {
+  "0de74523490e671d18a1543ab386ffb810690bae78e922f93e086f72db6faef7": {"error": "formatting fixture.yaml: SyntaxError: All mapping items must start at the same column (3:1)\n  1 | a:\n  2 |     b: |2\n> 3 |      x\n    | ^\n  4 |     y\n  5 |"},
+  "1c75e45a4566d99fdc6412ec24927abeac65017dd91502b777438a7b0a4f35fb": {"error": "formatting fixture.yaml: SyntaxError: Unexpected , in flow map (2:9)\n  1 | a: {\n> 2 |         ,\n    |         ^\n  3 |         # c\n  4 |     }\n  5 |"},
+  "2e2f6bb02413cc0739d1daf68efc611bc7aad017a9196ab4eca484deca6663d8": {"error": "formatting fixture.yaml: SyntaxError: All mapping items must start at the same column (3:1)\n  1 | a:\n  2 |     b: |2\n> 3 |      x\n    | ^\n  4 |     y\n  5 |"},
+  "3b88fb07c8a50e155f02c7dcf125c2c17676359e5b2f0cb66298f7631d5a4896": {"error": "formatting fixture.yaml: SyntaxError: Unexpected , in flow map (2:5)\n  1 | a: {\n> 2 |     ,\n    |     ^\n  3 |     # c\n  4 |   }\n  5 |"},
+  "52c5bde881bfa0f496d54e6ca64520b09c8234fb31a9b62fb585cbc596edb73a": {"error": "formatting fixture.yaml: SyntaxError: All mapping items must start at the same column (4:1)\n  2 |     # prettier-ignore\n  3 |     b:   {c:   d}\n> 4 |   e:   {f:   g}\n    | ^\n  5 |"},
+  "5a0b1a6025699048ceff768a07caf1c7939e852eb1abe017ccf7a7ea211dd4ee": {"error": "formatting fixture.yaml: SyntaxError: Unexpected , in flow map (2:9)\n  1 | a: {\n> 2 |         ,\n    |         ^\n  3 |         # c\n  4 |     }\n  5 |"},
+  "7110ec1a455a9e2df051847e09ede689e2e97065434a51b9b4147c11c97151ec": {"error": "formatting fixture.yaml: SyntaxError: Unexpected , in flow sequence (2:9)\n  1 | a: [\n> 2 |         ,\n    |         ^\n  3 |         # c\n  4 |     ]\n  5 |"},
+  "85a999a8184a973b6bf8851a64d34496d7441d3171c1c16bbdf70841bf97ed70": {"output": "a: [\r\n\r\n        # c\r\n    ]\r\n"},
+  "90b602a2b54f92c78eea6c45980f7e2875531067a7c611e4a5bd3e7a3a9c4194": {"error": "formatting fixture.yaml: SyntaxError: Unexpected , in flow sequence (2:9)\n  1 | a: [\n> 2 |         ,\n    |         ^\n  3 |         # c\n  4 |     ]\n  5 |"},
+  "961fe1769ffef455e5fb32de517e4220cd9fb991333326114493a191be9d46d5": {"error": "formatting fixture.yaml: SyntaxError: All mapping items must start at the same column (4:1)\n  2 |     # prettier-ignore\n  3 |     b:   {c:   d}\n> 4 |   e:   {f:   g}\n    | ^\n  5 |"},
+  "9a32d5644418eeff91ca958d992de1cb3e68b3e45656b08a2d37e4af510a1a33": {"output": "a:\n  b: |2\n     x\n    y\n"},
+  "b7949ec6f22396df6ae17eb7c7d691c22bf2f5c28cde92e286f72c19f994b5c0": {"output": "a: {\r\n\r\n        # c\r\n    }\r\n"},
+  "cf159fcd7b877802d424f82fbb6a2d32a8c06bea2aaf11a8ee2538ffb7ec1f2b": {"output": "a:\n  # prettier-ignore\n  b:   {c:   d}\n  e:   {f:   g}\n"},
+  "d0ba21620fd0545827cd880847a0af8124f34e2036374c0f278bbac80f1df6ef": {"error": "formatting fixture.yaml: SyntaxError: Unexpected , in flow sequence (2:5)\n  1 | a: [\n> 2 |     ,\n    |     ^\n  3 |     # c\n  4 |   ]\n  5 |"},
+  "d4009973c456ac25964b011b0796ccaa8eb8b8158b48ae56b940928613daef38": {"error": "formatting fixture.yaml: SyntaxError: All mapping items must start at the same column (4:1)\n  2 |     # prettier-ignore\n  3 |     b:   {c:   d}\n> 4 |   e:   {f:   g}\n    | ^\n  5 |"},
+  "ffff977e03f6479670b3fae5211de1021807bcc28ff03f2b061a40271ba18047": {"error": "formatting fixture.yaml: SyntaxError: All mapping items must start at the same column (3:1)\n  1 | a:\n  2 |     b: |2\n> 3 |      x\n    | ^\n  4 |     y\n  5 |"}
+ }
+}

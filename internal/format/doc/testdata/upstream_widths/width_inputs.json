@@ -1,0 +1,9 @@
+{
+    "about": "The inputs of TestStringWidthAgreesWithUpstreamUnderNode (width_node_test.go): the strings where the Prettier fork's getStringWidth answers differently under node than its standalone bundle does under goja, so TestStringWidthAgreesWithUpstream's goja recording leaves them out. Node's answers for them are recorded in width_answers.json by record-string-widths.mjs, attached to #bahm7k3; a changed or added input is recorded again there.",
+    "inputs": [
+        {
+            "name": "ZWJ family",
+            "text": "family 👨\u200d👩\u200d👧"
+        }
+    ]
+}

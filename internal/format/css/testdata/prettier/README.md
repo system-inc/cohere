@@ -10,5 +10,5 @@ kept. Only the stylesheets are here; the fork's snapshots and jsfmt specs are no
 answers in `../oracle` stand in for them. Nothing here is built into cohere's binary; it is test input for
 TestPrettierFixturesMatchTheFork and TestPrettierSCSSFixturesMatchTheFork.
 
-To refresh to another fork commit, copy the same files byte for byte from that commit (`git archive`), then
-record the oracle again with `COHERE_UPDATE_ORACLE=1`.
+The oracle answers were recorded through the fork's bundles, which have since left cohere (#mjecaaw), so
+these fixtures and their answers are fixed at that commit: a refreshed fixture would have no answer to compare.

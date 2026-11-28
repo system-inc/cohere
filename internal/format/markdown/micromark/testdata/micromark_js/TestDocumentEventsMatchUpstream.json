@@ -1,0 +1,9 @@
+{"source":"micromark 4.0.2 (node_modules/micromark/index.js), micromark-extension-gfm 3.0.0, micromark-extension-math 3.1.0, @braindb/micromark-extension-wiki-link 0.1.0, the fork's src/language-markdown/parse/micromark/micromark-extension-{liquid,html-text}.js (prettier 3.9.6), from the Prettier fork's node_modules and src, run by node v24.14.1","recorded":"2026-11-26","mode":"Events",
+"answers":[
+{"sha256":"46fd45a33ac43460ba16e8bc9d2066b0126b5edc2fd4f295124e8388e1f84029","events":"30481ad8504b0caf:9774"},
+{"sha256":"50b1b79debd53aea8c9a3b0256649724fc3460d39ed4ad12b546129c4fc9f59d","events":"62dd10f515d73532:16438"},
+{"sha256":"d7ee3419ea5d4af36f62ff0d58af7e3ba20dda7f2d7cd120667c331039c7f6f9","events":"ab711ab0f2117fd4:22801"},
+{"sha256":"cf915170b89220931233652146cd3c17c8ac6c590086113c773c6c1141d65c1e","events":"4f1e364e0c8811ea:27487"},
+{"sha256":"cb02588d5898c701ce6eae1dde56b4e22159b1b67474e45c2fa5cb933db064bd","events":"4ee88d53fcabdb33:37519"},
+{"sha256":"d82775eb30ea78313fda81b6c592c51c830c2dfa4a614f99e61462bac86556a2","events":"b602c6f18aad3cb6:51748"}
+]}

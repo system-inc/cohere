@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/format/format_options"
-	"github.com/system-inc/cohere/internal/format/prettier"
+	"github.com/system-inc/cohere/internal/format/oracle_testing"
 )
 
 // The corpus differential (internal/format/differential, env-gated) is the acceptance test. These run in
@@ -174,11 +174,10 @@ func TestFormatMatchesTheFork(test *testing.T) {
 	test.Parallel()
 	sameLine := format_options.Default()
 	sameLine.BracketSameLine = true
+	// The oracle's answers, recorded (see oracle_testing), so no JavaScript runs here.
+	golden := oracle_testing.Open(test, test.Name())
 	for _, options := range []format_options.Options{format_options.Default(), sameLine} {
-		oracle, newPrettierError := prettier.New(options)
-		if newPrettierError != nil {
-			test.Fatal(newPrettierError)
-		}
+		oracle := golden.Formatter(options)
 		for _, testCase := range formatCases {
 			expected, formatError := oracle.Format(testCase.fileName, testCase.source)
 			if formatError != nil {

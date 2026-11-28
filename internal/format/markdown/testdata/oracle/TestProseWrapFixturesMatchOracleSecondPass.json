@@ -1,0 +1,14 @@
+{
+ "digest": "61573b94b6f4507420b448b348c232f988c86f60dc9b23d089ce3b179b2afc98",
+ "answers": {
+  "118c31b98f91234c2f16e2ce44f726ffd03f36775da643c35d6e3c36a40ab1fe": {"output": "> <!-- prettier-ignore -->\n> - a\n>   - b\n>\n>\n>\n> c\n"},
+  "2cafc205f213a6c15066cc6eed7e6482231b3e16ba06a24a8b52891599b19b29": {"output": "> <!-- prettier-ignore -->\n> - a\n>   - b\n>\n> c\n"},
+  "3a792f782dcedb48683efbaa094d59c4a3c48a4ddb905afe6e5fd5ad462c94cf": {"output": "> <!-- prettier-ignore -->\n> - a\n>   - b\n>\n> c\n"},
+  "7d368957e1dee6084c0c8037726f26a0b82cd4445fa8c36a95329eb933602f37": {"output": "> <!-- prettier-ignore -->\n> - a\n>   - b\n>\n> c\n"},
+  "ad73b9f5aff3b49981a30e358882e7077aa106ad792a9c33a946c61ce92b1e2f": {"output": "> <!-- prettier-ignore -->\n> - a\n>   - b\n>\n>\n>\n> c\n"},
+  "c0fda1918a62e2dd0d057ebab0357723730e00c3f7f81430ff09fdc8028a7518": {"output": "> <!-- prettier-ignore -->\n> - a\n>   - b\n>\n> c\n"},
+  "d77ce0d4d5774c37719bb90bdd67c862f54232e4008eb52004b67605bda16743": {"output": "> <!-- prettier-ignore -->\n> - a\n>   - b\n>\n> c\n"},
+  "fba9c2b35544aa88916ef8f38c811e7a3733c231911cde67ca96b231e2107409": {"output": "> <!-- prettier-ignore -->\n> - a\n>   - b\n>\n> c\n"},
+  "ffc7646cd6dd51504c3e5213d7650fd6601e0b4851103d1e9fc8d27397ae5074": {"output": "> <!-- prettier-ignore -->\n> - a\n>   - b\n>\n>\n>\n> c\n"}
+ }
+}

@@ -1,5 +1,7 @@
 package micromark
 
+import "testing"
+
 // listFixtures hold no block quote, fenced code, html, definition, setext, emphasis, code text, link,
 // autolink, math, liquid, wiki-link or GFM (table, strikethrough, footnote, task list item, autolink
 // literal) syntax: those constructs are still pending stubs, so a fixture leaning on them would differ for
@@ -206,4 +208,9 @@ var listFixtures = []string{
 	"é\n- a",
 	"- a\u00a0b",
 	"-\u00a0a",
+}
+
+func TestListEvents(test *testing.T) {
+	test.Parallel()
+	compareEvents(test, listFixtures)
 }

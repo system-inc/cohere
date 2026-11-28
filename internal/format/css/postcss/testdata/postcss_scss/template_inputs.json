@@ -1,0 +1,535 @@
+{
+    "about": "The css-in-js inputs of TestParseScssAgreesWithPostcssScss and TestParseScssNeverPanics: every template Prettier's embed would hand the scss parser from the fork's tests/format/js/multiparser-css and template-literals tests at 54c8b90ae, each named by its file and index, from naming the file, malformed where postcss-scss refuses it. Written by record-postcss-scss.mjs's templates command (attached to #yah3d69), not by hand. Prettier is MIT licensed; its LICENSE is in ../../../testdata/prettier/LICENSE.",
+    "inputs": [
+        {
+            "name": "tests/format/js/multiparser-css/colons-after-substitutions.js #0",
+            "text": "\n  flex: none;\n  transition:    fill 0.25s;\n  width: 48px;\n  height: 48px;\n\n  @prettier-placeholder-0-id:hover {\n    fill:   rebeccapurple;\n  }\n\n  @prettier-placeholder-1-id :hover {\n    fill: yellow;\n  }\n\n  @prettier-placeholder-2-id::before {}\n",
+            "from": "tests/format/js/multiparser-css/colons-after-substitutions.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/colons-after-substitutions2.js #0",
+            "text": "\n  height: 48px;\n\n  @prettier-placeholder-0-id:nth-child(2) {\n    fill: rebeccapurple;\n  }\n",
+            "from": "tests/format/js/multiparser-css/colons-after-substitutions2.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/colons-after-substitutions2.js #1",
+            "text": "\n  height: 48px;\n\n  @prettier-placeholder-0-id:empty:before{\n    fill: rebeccapurple;\n  }\n",
+            "from": "tests/format/js/multiparser-css/colons-after-substitutions2.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/colons-after-substitutions2.js #2",
+            "text": "\n  height: 48px;\n\n  @prettier-placeholder-0-id:not(:first-child) {\n    fill: rebeccapurple;\n  }\n",
+            "from": "tests/format/js/multiparser-css/colons-after-substitutions2.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/issue-11400.js #0",
+            "text": "foo:bar {}",
+            "from": "tests/format/js/multiparser-css/issue-11400.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/issue-11400.js #1",
+            "text": "foo:@prettier-placeholder-0-id {}",
+            "from": "tests/format/js/multiparser-css/issue-11400.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/issue-11400.js #2",
+            "text": "foo:@prettier-placeholder-0-id:@prettier-placeholder-1-id {}",
+            "from": "tests/format/js/multiparser-css/issue-11400.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/issue-11400.js #3",
+            "text": "foo:bar { color: @prettier-placeholder-0-id }",
+            "from": "tests/format/js/multiparser-css/issue-11400.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/issue-11797.js #0",
+            "text": "\n  font-size: 12px;\n  transform: @prettier-placeholder-0-id(@prettier-placeholder-1-idpx);\n",
+            "from": "tests/format/js/multiparser-css/issue-11797.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/issue-11797.js #1",
+            "text": "\n  transform: @prettier-placeholder-0-id(30px);\n",
+            "from": "tests/format/js/multiparser-css/issue-11797.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/issue-11797.js #2",
+            "text": "\n  transform: @prettier-placeholder-0-id (30px);\n",
+            "from": "tests/format/js/multiparser-css/issue-11797.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/issue-16692.js #0",
+            "text": "\n    border:    1px     @prettier-placeholder-0-id      red;\n",
+            "from": "tests/format/js/multiparser-css/issue-16692.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/issue-16692.js #1",
+            "text": "\n font-size:      var(--font-size-h@prettier-placeholder-0-id);\n",
+            "from": "tests/format/js/multiparser-css/issue-16692.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/issue-16692.js #2",
+            "text": "\n    grid-area:       area-@prettier-placeholder-0-id;\n",
+            "from": "tests/format/js/multiparser-css/issue-16692.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/issue-16692.js #3",
+            "text": "\n    grid-area:       var(--@prettier-placeholder-0-id);\n",
+            "from": "tests/format/js/multiparser-css/issue-16692.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/issue-16692.js #4",
+            "text": "\n font-size:      var(--font-size-h @prettier-placeholder-0-id);\n",
+            "from": "tests/format/js/multiparser-css/issue-16692.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/issue-2636.js #0",
+            "text": "\n  @prettier-placeholder-0-id\n  @prettier-placeholder-1-id\n  @prettier-placeholder-2-id\n  @prettier-placeholder-3-id\n  @prettier-placeholder-4-id\n  @prettier-placeholder-5-id\n  @prettier-placeholder-6-id\n  @prettier-placeholder-7-id\n  @prettier-placeholder-8-id\n",
+            "from": "tests/format/js/multiparser-css/issue-2636.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/issue-2636.js #1",
+            "text": "\n  @prettier-placeholder-0-id @prettier-placeholder-1-id @prettier-placeholder-2-id @prettier-placeholder-3-id @prettier-placeholder-4-id @prettier-placeholder-5-id @prettier-placeholder-6-id @prettier-placeholder-7-id @prettier-placeholder-8-id\n",
+            "from": "tests/format/js/multiparser-css/issue-2636.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/issue-2883.js #0",
+            "text": "\n&.foo .@prettier-placeholder-0-id::before,&.foo[value=\"hello\"] .@prettier-placeholder-1-id::before {\n\tposition: absolute;\n}\n",
+            "from": "tests/format/js/multiparser-css/issue-2883.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/issue-2883.js #1",
+            "text": "\na.@prettier-placeholder-0-id:focus,a.@prettier-placeholder-1-id:hover {\n  color: red;\n}\n",
+            "from": "tests/format/js/multiparser-css/issue-2883.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/issue-2883.js #2",
+            "text": "\nbutton.@prettier-placeholder-0-id.@prettier-placeholder-1-id {\n  color: #fff;\n}\n",
+            "from": "tests/format/js/multiparser-css/issue-2883.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/issue-5697.js #0",
+            "text": "\n  font-size: 2.5em;\n  font-weight: @prettier-placeholder-0-id;\n  font-family: @prettier-placeholder-1-id;\n  letter-spacing: @prettier-placeholder-2-id;\n  color: @prettier-placeholder-3-id;\n  @prettier-placeholder-4-id\n  @media (max-width: @prettier-placeholder-5-idpx) {\n    font-size: 2em;\n  }\n",
+            "from": "tests/format/js/multiparser-css/issue-5697.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/issue-5961.js #0",
+            "text": "\n  @media (min-width: 1px) {\n    @prettier-placeholder-0-id:nth-child(odd) {}\n  }\n",
+            "from": "tests/format/js/multiparser-css/issue-5961.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/issue-5961.js #1",
+            "text": "\n  @media (min-width: @prettier-placeholder-0-id) {\n    @prettier-placeholder-1-id {\n      margin-bottom: 90px;\n    }\n\n    @prettier-placeholder-2-id:nth-child(odd) {\n      @prettier-placeholder-3-id {\n        grid-row: 1;\n        grid-column: 3 / span 3;\n      }\n      @prettier-placeholder-4-id {\n        grid-row: 1;\n        grid-column: 7 / span 6;\n      }\n    }\n\n    @prettier-placeholder-5-id:nth-child(even) {\n      @prettier-placeholder-6-id {\n        grid-row: 1;\n        grid-column: 3 / span 6;\n      }\n      @prettier-placeholder-7-id {\n        grid-row: 1;\n        grid-column: 10 / span 3;\n      }\n    }\n  }\n",
+            "from": "tests/format/js/multiparser-css/issue-5961.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/issue-6259.js #0",
+            "text": "\n  margin: 0;\n\n  .input {\n    margin: 0;\n  }\n\n  @prettier-placeholder-0-id:not(:first-child) {\n    margin: 0;\n  }\n\n  & > :not(.@prettier-placeholder-1-id):not(@prettier-placeholder-2-id) {\n    display: flex;\n  }\n",
+            "from": "tests/format/js/multiparser-css/issue-6259.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/issue-8352.js #0",
+            "text": "\n  margin-right: -4px;\n\n  @prettier-placeholder-0-id.isExpanded & {\n    transform: rotate(-180deg);\n  }\n",
+            "from": "tests/format/js/multiparser-css/issue-8352.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/issue-8352.js #1",
+            "text": "\n  margin-right: -4px;\n\n  @prettier-placeholder-0-id.camelCase + @prettier-placeholder-1-id.camelCase & {\n    transform: rotate(-180deg);\n  }\n",
+            "from": "tests/format/js/multiparser-css/issue-8352.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/issue-9072.js #0",
+            "text": "\n  width:@prettier-placeholder-0-id@prettier-placeholder-1-id;\n  border:@prettier-placeholder-2-id @prettier-placeholder-3-id solid @prettier-placeholder-4-id;\n",
+            "from": "tests/format/js/multiparser-css/issue-9072.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/issue-9072.js #1",
+            "text": "\n  width: @prettier-placeholder-0-id@prettier-placeholder-1-id;\n  border: @prettier-placeholder-2-id @prettier-placeholder-3-id solid @prettier-placeholder-4-id;\n",
+            "from": "tests/format/js/multiparser-css/issue-9072.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/issue-9072.js #2",
+            "text": "\n  foo: @prettier-placeholder-0-id@prettier-placeholder-1-id       @prettier-placeholder-2-id;\n",
+            "from": "tests/format/js/multiparser-css/issue-9072.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/styled-components-multiple-expressions.js #0",
+            "text": "\n  @prettier-placeholder-0-id\n  & > @prettier-placeholder-1-id:not(:first-child) {\nmargin-left:5px;\n}\n",
+            "from": "tests/format/js/multiparser-css/styled-components-multiple-expressions.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/styled-components-multiple-expressions.js #1",
+            "text": "\n  @prettier-placeholder-0-id\n  & > @prettier-placeholder-1-id@prettier-placeholder-2-id:not(:first-child) {\nmargin-left:5px;\n}\n",
+            "from": "tests/format/js/multiparser-css/styled-components-multiple-expressions.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/styled-components-multiple-expressions.js #2",
+            "text": "@prettier-placeholder-0-id-idle { }",
+            "from": "tests/format/js/multiparser-css/styled-components-multiple-expressions.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/styled-components-multiple-expressions.js #3",
+            "text": "@prettier-placeholder-0-id-0-idle { }",
+            "from": "tests/format/js/multiparser-css/styled-components-multiple-expressions.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/styled-components-multiple-expressions.js #4",
+            "text": "\nfont-family: \"@prettier-placeholder-0-id\", \"@prettier-placeholder-1-id\";\n",
+            "from": "tests/format/js/multiparser-css/styled-components-multiple-expressions.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/styled-components.js #0",
+            "text": "",
+            "from": "tests/format/js/multiparser-css/styled-components.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/styled-components.js #1",
+            "text": " ",
+            "from": "tests/format/js/multiparser-css/styled-components.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/styled-components.js #2",
+            "text": "position: relative;",
+            "from": "tests/format/js/multiparser-css/styled-components.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/styled-components.js #3",
+            "text": "\n\t  color:   palevioletred ;\n\n\tfont-size : 1em   ;\n",
+            "from": "tests/format/js/multiparser-css/styled-components.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/styled-components.js #4",
+            "text": "\n\tcolor  : tomato  ;\n\nborder-color : tomato\n    ;\n\n",
+            "from": "tests/format/js/multiparser-css/styled-components.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/styled-components.js #5",
+            "text": "\nborder-color : black;\n",
+            "from": "tests/format/js/multiparser-css/styled-components.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/styled-components.js #6",
+            "text": "\n       color : papayawhip ; background-color: firebrick",
+            "from": "tests/format/js/multiparser-css/styled-components.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/styled-components.js #7",
+            "text": "\nborder : rebeccapurple",
+            "from": "tests/format/js/multiparser-css/styled-components.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/styled-components.js #8",
+            "text": "\nborder : rebeccapurple",
+            "from": "tests/format/js/multiparser-css/styled-components.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/styled-components.js #9",
+            "text": "\n  color: @prettier-placeholder-0-id;\n  /* prettier-ignore */\n  @prettier-placeholder-1-id;\n",
+            "from": "tests/format/js/multiparser-css/styled-components.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/styled-components.js #10",
+            "text": "\n  color: @prettier-placeholder-0-id;\n  /* prettier-ignore */\n  @prettier-placeholder-1-id\n",
+            "from": "tests/format/js/multiparser-css/styled-components.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/styled-components.js #11",
+            "text": "\n   /* prettier-ignore */\n  color: @prettier-placeholder-0-id;\n  @prettier-placeholder-1-id;\n",
+            "from": "tests/format/js/multiparser-css/styled-components.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/styled-components.js #12",
+            "text": "\n  color: @prettier-placeholder-0-id;\n  /* prettier-ignore */\n  @prettier-placeholder-1-id;\n  /* prettier-ignore */\n  @prettier-placeholder-2-id;\n",
+            "from": "tests/format/js/multiparser-css/styled-components.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/styled-components.js #13",
+            "text": "\n  /* prettier-ignore */\n  color: @prettier-placeholder-0-id;\n  /* prettier-ignore */\n  @prettier-placeholder-1-id;\n  /* prettier-ignore */\n  @prettier-placeholder-2-id;\n  /* prettier-ignore */\n",
+            "from": "tests/format/js/multiparser-css/styled-components.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/styled-components.js #14",
+            "text": "\n @prettier-placeholder-0-id @prettier-placeholder-1-id\n  html {\n    margin: 0;\n  }\n",
+            "from": "tests/format/js/multiparser-css/styled-components.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/styled-components.js #15",
+            "text": "\n  @prettier-placeholder-0-id\n  baz\n",
+            "from": "tests/format/js/multiparser-css/styled-components.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/styled-components.js #16",
+            "text": "\n  foo\n  @prettier-placeholder-0-id\n  baz\n",
+            "from": "tests/format/js/multiparser-css/styled-components.js",
+            "malformed": true
+        },
+        {
+            "name": "tests/format/js/multiparser-css/styled-components.js #17",
+            "text": "\n  foo\n  @prettier-placeholder-0-id\n  @prettier-placeholder-1-id\n",
+            "from": "tests/format/js/multiparser-css/styled-components.js",
+            "malformed": true
+        },
+        {
+            "name": "tests/format/js/multiparser-css/styled-components.js #18",
+            "text": "\n  @prettier-placeholder-0-id\n  @prettier-placeholder-1-id\n",
+            "from": "tests/format/js/multiparser-css/styled-components.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/styled-components.js #19",
+            "text": "\n  @prettier-placeholder-0-id bar\n",
+            "from": "tests/format/js/multiparser-css/styled-components.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/styled-components.js #20",
+            "text": "\n  @prettier-placeholder-0-id @prettier-placeholder-1-id\n  baz: @prettier-placeholder-2-id\n",
+            "from": "tests/format/js/multiparser-css/styled-components.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/styled-components.js #21",
+            "text": "\n@prettier-placeholder-0-id;\n@prettier-placeholder-1-id;\n",
+            "from": "tests/format/js/multiparser-css/styled-components.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/styled-components.js #22",
+            "text": "\n@prettier-placeholder-0-id: @prettier-placeholder-1-id;\n",
+            "from": "tests/format/js/multiparser-css/styled-components.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/styled-components.js #23",
+            "text": "\n@prettier-placeholder-0-id: @prettier-placeholder-1-id\n",
+            "from": "tests/format/js/multiparser-css/styled-components.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/styled-components.js #24",
+            "text": "\n@prettier-placeholder-0-id:\n@prettier-placeholder-1-id\n",
+            "from": "tests/format/js/multiparser-css/styled-components.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/styled-components.js #25",
+            "text": "\n@prettier-placeholder-0-id:\n@prettier-placeholder-1-id;\n",
+            "from": "tests/format/js/multiparser-css/styled-components.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/styled-components.js #26",
+            "text": "\n  @prettier-placeholder-0-id\n  text-decoration: none;\n\n  @prettier-placeholder-1-id {\n    margin: 0;\n  }\n",
+            "from": "tests/format/js/multiparser-css/styled-components.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/styled-components.js #27",
+            "text": "\n  @prettier-placeholder-0-id\n  /* a comment */\n\n  .aRule {\n    color: red\n  }\n",
+            "from": "tests/format/js/multiparser-css/styled-components.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/styled-components.js #28",
+            "text": "\n  @prettier-placeholder-0-id\n\n  /* a comment */\n\n  .aRule {\n    color: red\n  }\n",
+            "from": "tests/format/js/multiparser-css/styled-components.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/styled-components.js #29",
+            "text": "\n  @prettier-placeholder-0-id\n  @prettier-placeholder-1-id\n",
+            "from": "tests/format/js/multiparser-css/styled-components.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/styled-components.js #30",
+            "text": "\n  @prettier-placeholder-0-id;\n  @prettier-placeholder-1-id;\n",
+            "from": "tests/format/js/multiparser-css/styled-components.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/styled-components.js #31",
+            "text": "\n  color: @prettier-placeholder-0-id;\n  @prettier-placeholder-1-id: @prettier-placeholder-2-id;\n",
+            "from": "tests/format/js/multiparser-css/styled-components.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/styled-components.js #32",
+            "text": "\n  display: flex;\n  @prettier-placeholder-0-id\n",
+            "from": "tests/format/js/multiparser-css/styled-components.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/styled-components.js #33",
+            "text": "\n  color: red\n",
+            "from": "tests/format/js/multiparser-css/styled-components.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/styled-components.js #34",
+            "text": "\n  color: red;\n",
+            "from": "tests/format/js/multiparser-css/styled-components.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/styled-components.js #35",
+            "text": "\n  /* A comment to avoid the prettier issue: https://github.com/prettier/prettier/issues/2291 */\n  position: relative;\n",
+            "from": "tests/format/js/multiparser-css/styled-components.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/styled-components.js #36",
+            "text": "\n  border-radius: 50%;\n  border: 5px solid rgba(var(--green-rgb), 0);\n  display: inline-block;\n  height: 40px;\n  width: 40px;\n\n  @prettier-placeholder-0-id\n\n  div {\n    background-color: var(--purpleTT);\n    border-radius: 50%;\n    border: 4px solid rgba(var(--purple-rgb), 0.2);\n    color: var(--purpleTT);\n    display: inline-flex;\n\n    @prettier-placeholder-1-id\n\n    @prettier-placeholder-2-id\n  }\n",
+            "from": "tests/format/js/multiparser-css/styled-components.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/styled-components.js #37",
+            "text": "\n      border-color: rgba(var(--green-rgb), 0.15);\n    ",
+            "from": "tests/format/js/multiparser-css/styled-components.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/styled-components.js #38",
+            "text": "\n        background-color: var(--green);\n        border-width: 7px;\n      ",
+            "from": "tests/format/js/multiparser-css/styled-components.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/styled-components.js #39",
+            "text": "\n        border-color: var(--green);\n      ",
+            "from": "tests/format/js/multiparser-css/styled-components.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/styled-components.js #40",
+            "text": "\n  display: inline-block;\n  color: #fff;\n  @prettier-placeholder-0-id\n   height: 30px;\n",
+            "from": "tests/format/js/multiparser-css/styled-components.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/styled-components.js #41",
+            "text": "\n    display: none;\n  ",
+            "from": "tests/format/js/multiparser-css/styled-components.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/styled-components.js #42",
+            "text": "\n  max-width: 980px;\n  @prettier-placeholder-0-id\n\n  &.bottom {\n    margin-top: 3rem;\n  }\n",
+            "from": "tests/format/js/multiparser-css/styled-components.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/styled-components.js #43",
+            "text": "\n    && {\n      font-size: 0.8rem;\n    }\n  ",
+            "from": "tests/format/js/multiparser-css/styled-components.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/styled-components.js #44",
+            "text": "\n  // prettier-ignore\n  @media (aaaaaaaaaaaaa) {\n\tz-index: @prettier-placeholder-0-id;\n  }\n",
+            "from": "tests/format/js/multiparser-css/styled-components.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/styled-components.js #45",
+            "text": "\n  @prettier-placeholder-0-id\n  @prettier-placeholder-1-id\n  @prettier-placeholder-2-id\n",
+            "from": "tests/format/js/multiparser-css/styled-components.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/url.js #0",
+            "text": "color:red;background: url(http://example.com?q=@prettier-placeholder-0-id)",
+            "from": "tests/format/js/multiparser-css/url.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/var.js #0",
+            "text": "\n  background: var(--@prettier-placeholder-0-id); /* ... */\n  border: 1px solid var(--@prettier-placeholder-1-id); /* ... */\n",
+            "from": "tests/format/js/multiparser-css/var.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/var.js #1",
+            "text": "\n  min-width: 200px;\n  background-color: var(--@prettier-placeholder-0-id);\n  color: #fff;\n",
+            "from": "tests/format/js/multiparser-css/var.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/var.js #2",
+            "text": "\nprop: var(--global--color--@prettier-placeholder-0-id);\n",
+            "from": "tests/format/js/multiparser-css/var.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/var.js #3",
+            "text": "\n        background-color: var(--global--color--@prettier-placeholder-0-id);\n\n        &:hover {\n          background-color: var(--global--color--@prettier-placeholder-1-id__one);\n        }\n      ",
+            "from": "tests/format/js/multiparser-css/var.js"
+        },
+        {
+            "name": "tests/format/js/multiparser-css/var.js #4",
+            "text": "\n  grid-area:  area-@prettier-placeholder-0-id;\n",
+            "from": "tests/format/js/multiparser-css/var.js"
+        },
+        {
+            "name": "tests/format/js/template-literals/css-prop.js #0",
+            "text": "\n    color: blue;\n    font-size: 17 px;\n\n    &:hover {\n      color: green;\n    }\n\n    & .some-class {\n      font-size: 20px;\n    }\n  ",
+            "from": "tests/format/js/template-literals/css-prop.js"
+        },
+        {
+            "name": "tests/format/js/template-literals/css-prop.js #1",
+            "text": "color: white; background: black",
+            "from": "tests/format/js/template-literals/css-prop.js"
+        },
+        {
+            "name": "tests/format/js/template-literals/expression-break.js #0",
+            "text": "\n  <div>@prettier-placeholder-0-id</div>\n",
+            "from": "tests/format/js/template-literals/expression-break.js",
+            "malformed": true
+        },
+        {
+            "name": "tests/format/js/template-literals/expression-break.js #1",
+            "text": "\n  <div>@prettier-placeholder-0-id</div>\n",
+            "from": "tests/format/js/template-literals/expression-break.js",
+            "malformed": true
+        },
+        {
+            "name": "tests/format/js/template-literals/styled-components-with-expressions.js #0",
+            "text": "\n/* Comment */\n\tdisplay: @prettier-placeholder-0-id;\n",
+            "from": "tests/format/js/template-literals/styled-components-with-expressions.js"
+        },
+        {
+            "name": "tests/format/js/template-literals/styled-components-with-expressions.js #1",
+            "text": "\n\tdisplay: @prettier-placeholder-0-id;\n\tborder: @prettier-placeholder-1-idpx;\n\tmargin: 10px @prettier-placeholder-2-idpx ;\n",
+            "from": "tests/format/js/template-literals/styled-components-with-expressions.js"
+        },
+        {
+            "name": "tests/format/js/template-literals/styled-components-with-expressions.js #2",
+            "text": "\nmargin: 0.5rem;\n\t\tpadding: 1rem;\n\tbackground: papayawhip    ;\n\n\t> * {\n\tflex: 1;\n\n\t&:not(:first-child) {\n\t\t\t@prettier-placeholder-0-id: 1rem;\n\t\t}\n\t}\n",
+            "from": "tests/format/js/template-literals/styled-components-with-expressions.js"
+        },
+        {
+            "name": "tests/format/js/template-literals/styled-components-with-expressions.js #3",
+            "text": "\n.top-bar {background:black;\nmargin: 0;\n    position: fixed;\n\ttop: 0;left:0;\n\twidth: 100%;\n    text-align: center     ;\n\tpadding: 15px  0  0  1em;\n\t\tz-index: 9999;\n}\n\n.top-bar .logo {\n  height: 30px;\n  margin: auto; \n    position: absolute;\n\tleft: 0;right: 0;\n}\n",
+            "from": "tests/format/js/template-literals/styled-components-with-expressions.js"
+        },
+        {
+            "name": "tests/format/js/template-literals/styled-jsx-with-expressions.js #0",
+            "text": "\n  div {\n  display: @prettier-placeholder-0-id;\n    color: @prettier-placeholder-1-id;\n    @prettier-placeholder-2-id;\n    @prettier-placeholder-3-id;\n    background: red;\n  animation: @prettier-placeholder-4-id 10s ease-out;\n  }\n  @media (@prettier-placeholder-5-id) {\n   div.@prettier-placeholder-6-id {\n    color: red;\n   }\n  @prettier-placeholder-7-id {\n    color: red;\n  }\n  }\n  @media (min-width: @prettier-placeholder-8-id) {\n   div.@prettier-placeholder-9-id {\n    color: red;\n   }\n  all@prettier-placeholder-10-id {\n    color: red;\n  }\n  }\n  @font-face {\n    @prettier-placeholder-11-id\n  }\n",
+            "from": "tests/format/js/template-literals/styled-jsx-with-expressions.js"
+        },
+        {
+            "name": "tests/format/js/template-literals/styled-jsx-with-expressions.js #1",
+            "text": "\n  div {\n  animation: linear @prettier-placeholder-0-ids ease-out;\n  }\n",
+            "from": "tests/format/js/template-literals/styled-jsx-with-expressions.js"
+        },
+        {
+            "name": "tests/format/js/template-literals/styled-jsx-with-expressions.js #2",
+            "text": "\n  div {\n  animation: 3s ease-in 1s @prettier-placeholder-0-id reverse both paused slidein;\n  }\n",
+            "from": "tests/format/js/template-literals/styled-jsx-with-expressions.js"
+        },
+        {
+            "name": "tests/format/js/template-literals/styled-jsx.js #0",
+            "text": "\n\t/* a comment */\n\tdiv :global(.react-select) {\n\t\tcolor: red; display: none\n\t}\n",
+            "from": "tests/format/js/template-literals/styled-jsx.js"
+        },
+        {
+            "name": "tests/format/js/template-literals/styled-jsx.js #1",
+            "text": "\n\t/* a comment */\ndiv :global(.react-select) {\ncolor: red; display: none\n}",
+            "from": "tests/format/js/template-literals/styled-jsx.js"
+        },
+        {
+            "name": "tests/format/js/template-literals/styled-jsx.js #2",
+            "text": "div{color:red}",
+            "from": "tests/format/js/template-literals/styled-jsx.js"
+        },
+        {
+            "name": "tests/format/js/template-literals/styled-jsx.js #3",
+            "text": "This is invalid css. \n      Shouldn't fail.\n            Shouldn't be formatted.",
+            "from": "tests/format/js/template-literals/styled-jsx.js",
+            "malformed": true
+        },
+        {
+            "name": "tests/format/js/template-literals/styled-jsx.js #4",
+            "text": "\n.top-bar {background:black;\nmargin: 0;\n    position: fixed;\n\ttop: 0;left:0;\n\twidth: 100%;\n    text-align: center     ;\n\tpadding: 15px  0  0  1em;\n\t\tz-index: 9999;\n}\n\n.top-bar .logo {\n  height: 30px;\n  margin: auto; \n    position: absolute;\n\tleft: 0;right: 0;\n}\n",
+            "from": "tests/format/js/template-literals/styled-jsx.js"
+        },
+        {
+            "name": "tests/format/js/template-literals/styled-jsx.js #5",
+            "text": "\n.top-bar {background:black;\nmargin: 0;\n    position: fixed;\n\ttop: 0;left:0;\n\twidth: 100%;\n    text-align: center     ;\n\tpadding: 15px  0  0  1em;\n\t\tz-index: 9999;\n}\n\n.top-bar .logo {\n  height: 30px;\n  margin: auto; \n    position: absolute;\n\tleft: 0;right: 0;\n}\n",
+            "from": "tests/format/js/template-literals/styled-jsx.js"
+        },
+        {
+            "name": "tests/format/js/template-literals/styled-jsx.js #6",
+            "text": "\n.top-bar {background:black;\nmargin: 0;\n    position: fixed;\n\ttop: 0;left:0;\n\twidth: 100%;\n    text-align: center     ;\n\tpadding: 15px  0  0  1em;\n\t\tz-index: 9999;\n}\n\n.top-bar .logo {\n  height: 30px;\n  margin: auto; \n    position: absolute;\n\tleft: 0;right: 0;\n}\n",
+            "from": "tests/format/js/template-literals/styled-jsx.js"
+        }
+    ]
+}

@@ -1,13 +1,16 @@
 package printing
 
+// toyNode is a node of the toy language. Its JSON is the shape upstream's printAstToDoc reads (type, start,
+// end, and the fields the visitor keys name), which TestCoreAgreesWithUpstream's inputs are written in; the
+// comment state stays out, since attaching comments is what the test compares.
 type toyNode struct {
-	Kind     string
-	From     int
-	To       int
-	Value    string
-	Label    *toyNode
-	Children []*toyNode
-	CommentFields[*toyNode]
+	Kind                    string     `json:"type"`
+	From                    int        `json:"start"`
+	To                      int        `json:"end"`
+	Value                   string     `json:"value,omitempty"`
+	Label                   *toyNode   `json:"label,omitempty"`
+	Children                []*toyNode `json:"children,omitempty"`
+	CommentFields[*toyNode] `json:"-"`
 }
 
 func (node *toyNode) Type() string { return node.Kind }
