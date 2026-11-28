@@ -143,7 +143,7 @@ func ModulesPredictedShared(host *GoEnvironment, workspace string, environment [
 	if variables["GOFLAGS"] == "" {
 		return false
 	}
-	goFlags := append(strings.Fields(variables["GOFLAGS"]), "-pgo=off")
+	goFlags := withModulesReadOnly(append(strings.Fields(variables["GOFLAGS"]), "-pgo=off"))
 	return slices.Equal(flagsBuildListReads(goFlags), flagsBuildListReads(host.reported.goFlags)) &&
 		listerFlagsOnly(strings.Join(goFlags, " ")) == "" && listerFlagsOnly(host.value("GOFLAGS")) == ""
 }

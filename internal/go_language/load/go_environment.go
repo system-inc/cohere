@@ -112,7 +112,7 @@ func ReadGoEnvironmentTelling(
 	if contextError != nil {
 		return nil, contextError
 	}
-	reported.goFlags = append(reported.goFlags, "-pgo=off")
+	reported.goFlags = withModulesReadOnly(append(reported.goFlags, "-pgo=off"))
 	fullEnvironment := withGoFlags(given, reported.goFlags)
 	return &GoEnvironment{
 		workspace:       workspace,
@@ -194,6 +194,32 @@ func runGoEnvironment(
 		return nil, fmt.Errorf("reading the go environment with go env in %s: %w", workspace, decodeError)
 	}
 	return answer, nil
+}
+
+// withModulesReadOnly is goFlags, the flags a go command of a load runs with, with -mod=readonly last when their last
+// -mod is mod. A user's -mod=mod lets go list write a requirement go.mod lacks, and sums go.sum lacks, so a check
+// would edit tracked files without a word (#ycf4240). go keeps the last -mod, so the command runs at -mod=readonly,
+// go's default, under which go reports what is missing as the load's diagnostics and writes nothing. Every place a
+// load makes a go command's flags, or predicts them, makes them through here, so none of them can miss it.
+func withModulesReadOnly(goFlags []string) []string {
+	if goFlagsRewriteModules(strings.Join(goFlags, " ")) {
+		return append(goFlags, "-mod=readonly")
+	}
+	return goFlags
+}
+
+// goFlagsRewriteModules reports whether go commands under goFlags, `GOFLAGS` as go env reports it, run with -mod=mod,
+// under which go list may rewrite go.mod and go.sum, so the load's own go commands run at -mod=readonly instead
+// (withModulesReadOnly). go reads `GOFLAGS` as fields, each `-name=value`, one dash or two, and the last -mod is
+// the one it keeps.
+func goFlagsRewriteModules(goFlags string) bool {
+	mode := ""
+	for _, flag := range strings.Fields(goFlags) {
+		if value, found := strings.CutPrefix(strings.TrimLeft(flag, "-"), "mod="); found {
+			mode = value
+		}
+	}
+	return mode == "mod"
 }
 
 // withGoFlags is environment without any `GOFLAGS`, then `GOFLAGS` as flags, so the value is the one go reads

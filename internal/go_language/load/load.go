@@ -730,7 +730,8 @@ func analyzedOfGraph(built *graph) []*packages.Package {
 // the translation cached for the same bytes in another directory, whose `//line` paths name that directory's files,
 // gone once it is, and cgocall, which reads the raw file those paths name, fails. The value is never empty, since an
 // empty `GOFLAGS` would hand go the go env file's flags, -trimpath among them. The flags are go env's answer under the
-// environment as given, without the -pgo=off a load from source adds, as they always were.
+// environment as given, without the -pgo=off a load from source adds, as they always were, but for a user's -mod=mod,
+// which runs at -mod=readonly here too (withModulesReadOnly).
 func translatedEnvironment(goEnvironment *GoEnvironment) []string {
 	kept := []string{}
 	for _, flag := range strings.Fields(goEnvironment.answer["GOFLAGS"]) {
@@ -739,7 +740,7 @@ func translatedEnvironment(goEnvironment *GoEnvironment) []string {
 			kept = append(kept, flag)
 		}
 	}
-	return withGoFlags(goEnvironment.fullEnvironment, append(kept, "-trimpath=false"))
+	return withGoFlags(goEnvironment.fullEnvironment, withModulesReadOnly(append(kept, "-trimpath=false")))
 }
 
 // exists reports whether file can be read about.

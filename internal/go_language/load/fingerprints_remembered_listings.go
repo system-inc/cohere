@@ -45,10 +45,9 @@ func (fingerprints *Fingerprints) remember(
 	if !rememberable {
 		return
 	}
-	rewritesModules := goFlagsRewriteModules(goEnvironment.value("GOFLAGS"))
 	var rewritable []rewritableModuleFile
 	for _, file := range inputs.ModuleFiles {
-		if !rewritableByGo(file, rewritesModules) {
+		if !rewritableByGo(file) {
 			continue
 		}
 		digest, absent, readable := moduleFileDigest(file)

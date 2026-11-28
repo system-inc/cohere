@@ -463,20 +463,15 @@ type rewrittenModuleFile struct {
 	contents    string
 }
 
-// rewrittenModuleFiles are go.work.sum in a go.work root, which a build's go list rewrites when the workspace's guard
-// runs it in the tree, and go.mod under -mod=mod, which go list may rewrite there.
+// rewrittenModuleFiles are the module files a build's go list can rewrite: go.work.sum in a go.work root, when the
+// workspace's guard runs it in the tree. go.mod and go.sum it never writes, a user's -mod=mod included, since the
+// load runs its go commands at -mod=readonly then (#ycf4240).
 var rewrittenModuleFiles = []rewrittenModuleFile{
 	{
 		name:     "go.work.sum",
 		files:    map[string]string{"go.work": "go 1.27\n\nuse .\n", "go.work.sum": ""},
 		file:     "go.work.sum",
 		contents: "golang.org/x/text v0.3.0/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=\n",
-	},
-	{
-		name:        "go.mod under -mod=mod",
-		environment: []string{"GOWORK=off", "GOFLAGS=-mod=mod"},
-		file:        "go.mod",
-		contents:    targetedModuleFiles["go.mod"] + "\n// Rewritten while the builds ran.\n",
 	},
 }
 
@@ -536,26 +531,6 @@ func TestAModuleFileTheRunsGoCanRewriteIsReadAgainAtEveryAsk(test *testing.T) {
 					"alone", rewritten.file, freebsdKept, linuxKept)
 			}
 		})
-	}
-}
-
-// go commands run with -mod=mod only when the last -mod of `GOFLAGS` says so, one dash or two.
-func TestGoFlagsRewriteModulesUnderTheLastModAlone(test *testing.T) {
-	test.Parallel()
-	for goFlags, wanted := range map[string]bool{
-		"":                            false,
-		"-mod=mod":                    true,
-		"--mod=mod -p=4":              true,
-		"-mod=mod -mod=readonly":      false,
-		"-mod=readonly -mod=mod":      true,
-		"-mod=vendor":                 false,
-		"-modfile=other.mod":          false,
-		"-modcacherw -tags=mod":       false,
-		"-trimpath -mod=mod -pgo=off": true,
-	} {
-		if rewrites := goFlagsRewriteModules(goFlags); rewrites != wanted {
-			test.Errorf("GOFLAGS %q: rewrites modules %v, want %v", goFlags, rewrites, wanted)
-		}
 	}
 }
 
@@ -626,7 +601,7 @@ func TestADoubtIsADoubtForEveryBuildThatAsks(test *testing.T) {
 	}
 	missing := filepath.Join(directory, "missing")
 	for ask := range 2 {
-		if _, certain := listingFingerprint([]string{missing}, nil, nil, false, nil, fingerprints); certain {
+		if _, certain := listingFingerprint([]string{missing}, nil, nil, nil, fingerprints); certain {
 			test.Errorf("ask %d: a root that is not there read as walked whole", ask)
 		}
 	}
@@ -648,14 +623,13 @@ func TestAnUnreadableRewritableModuleFileIsADoubt(test *testing.T) {
 	fingerprints := NewFingerprints()
 	for ask := range 2 {
 		for name, through := range map[string]*Fingerprints{"the run's fingerprints": fingerprints, "none": nil} {
-			if _, certain := listingFingerprint([]string{directory}, nil, moduleFiles, false, nil,
-				through); certain {
+			if _, certain := listingFingerprint([]string{directory}, nil, moduleFiles, nil, through); certain {
 				test.Errorf("ask %d through %s: a listing naming an unreadable go.work.sum read as certain", ask, name)
 			}
 		}
 	}
 	listed := &listing{byPath: map[string]*listedPackage{}, roots: map[string]bool{}, testOnly: map[string]bool{}}
-	if kept, keepable := keepListing(directory, "", "", listed, false, nil, NewFingerprints()); keepable {
+	if kept, keepable := keepListing(directory, "", "", listed, nil, NewFingerprints()); keepable {
 		test.Errorf("a listing naming an unreadable go.work.sum was kept, over module files %v", kept.ModuleFiles)
 	}
 }

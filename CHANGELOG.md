@@ -262,6 +262,10 @@ check-ignore` decides from there: a `.gitignore` above the project applies, and 
 - Every library a run declares, a submodule or a nested repository, gets its own cohere cache at the run's start,
   where only one whose rules ignored `.cache` did, so each keeps its format record and a check formats only the
   library files that changed. The directory ignores itself, so the library's `git status` and the root's stay clean.
+- A check under a user's `GOFLAGS=-mod=mod` leaves go.mod and go.sum as they were (#ycf4240). Every go command a Go
+  load runs, the cgo tool's included, runs at `-mod=readonly` after the user's flags, so go reports a requirement or
+  sum the module lacks as a diagnostic, where it used to write it into the tree without a word. Run `go mod tidy` to
+  add them.
 
 ## 0.1.1 (2026-11-03)
 
