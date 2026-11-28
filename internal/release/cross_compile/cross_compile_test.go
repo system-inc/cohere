@@ -1,17 +1,12 @@
-// Package cross_compile proves cohere compiles for every platform a release ships. It reads the whole
-// program, so any edit reruns it, and it lives apart from internal/release/packaging so that the edit
-// reruns it alone and not packaging's Swift and staging tests too (#nxgt2ca).
 package cross_compile
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	release "github.com/system-inc/cohere/internal/release/packaging"
-	"github.com/system-inc/cohere/internal/testing/go_types"
 )
 
 // crossCompileVariable chooses how TestEveryReleaseTargetCompiles proves the targets. Unset, it
@@ -108,36 +103,7 @@ func TestEveryReleaseTargetCompiles(test *testing.T) {
 // target would compile it, and returns every error, or none. Nothing is compiled, so nothing is written
 // to the build cache.
 func typeCheckTarget(moduleDirectory string, target release.Target) []string {
-	return typeCheck(moduleDirectory, target, false, "./command/cohere")
-}
-
-// typeCheck type-checks the packages patterns name, and everything they import, from source as target
-// would compile them, their tests too when tests is set, and returns every error once, or none. It runs only
-// `go list -deps -json` and `go env`, which read and never build, so a runner of prebuilt tests can run it
-// (#qnnnkbf): go/packages asked go list for -compiled files and test variants, flags such a runner refuses.
-func typeCheck(moduleDirectory string, target release.Target, tests bool, patterns ...string) []string {
-	loaded, loadError := go_types.Load(go_types.Configuration{
-		Directory:   moduleDirectory,
-		Environment: []string{"GOOS=" + target.GoOperatingSystem, "GOARCH=" + target.GoArchitecture, "CGO_ENABLED=0"},
-		Tests:       tests,
-	}, patterns...)
-	if loadError != nil {
-		return []string{loadError.Error()}
-	}
-	if len(loaded.Source) == 0 {
-		return []string{fmt.Sprintf("nothing was loaded for %s, so nothing was checked", target)}
-	}
-	var problems []string
-	// With tests a package is checked again with its test files, and against its test variant, and an error
-	// in the code they share is reported by each, so each is kept once.
-	seen := map[string]bool{}
-	for _, problem := range loaded.ErrorsAnywhere() {
-		if !seen[problem.Error()] {
-			seen[problem.Error()] = true
-			problems = append(problems, problem.Error())
-		}
-	}
-	return problems
+	return TypeCheck(moduleDirectory, target, false, "./command/cohere")
 }
 
 // TestTypeCheckCatchesAPlatformOnlyBreak is the known-dirty control for the local path: the darwin-only
@@ -181,40 +147,10 @@ func TestTypeCheckCatchesAPlatformOnlyBreak(test *testing.T) {
 	}
 }
 
-// TestEveryPackagesTestsTypeCheckForWindows type-checks every package of the module for Windows, its tests
-// included, so a test that cannot build there fails here and not on a Windows machine someone finally runs
-// it on.
-//
-// Release targets prove only what ships: command/cohere's tests used a Unix-only stand-in binary for weeks
-// without anything noticing, since only three named Windows tests run in release.yml (#tejf9bc). Windows
-// alone, because it is the one shipped platform that is not Unix: a file a Unix build constraint keeps
-// out of linux builds would also be kept out of darwin's, which every test run here already compiles.
-func TestEveryPackagesTestsTypeCheckForWindows(test *testing.T) {
-	test.Parallel()
-
-	if testing.Short() {
-		test.Skip(
-			"NOT MEASURED: -short skips type-checking the module's tests for Windows, so a test that no longer builds there would pass here",
-		)
-	}
-	var windows release.Target
-	for _, target := range release.Targets {
-		if target.GoOperatingSystem == "windows" {
-			windows = target
-			break
-		}
-	}
-	if windows.GoOperatingSystem == "" {
-		test.Fatal("no release target is Windows, so there is nothing for this test to check against")
-	}
-	if problems := typeCheck(filepath.Join("..", "..", ".."), windows, true, "./..."); len(problems) > 0 {
-		test.Fatalf("the module's tests do not type-check for %s:\n%s", windows, strings.Join(problems, "\n"))
-	}
-}
-
-// TestTypeCheckOfTestsCatchesAUnixOnlyTestHelper is the known-dirty control for the test above: a test
-// that calls a helper only Unix defines type-checks for darwin and fails for windows, and only when tests
-// are checked.
+// TestTypeCheckOfTestsCatchesAUnixOnlyTestHelper is the known-dirty control for windows_tests'
+// TestEveryPackagesTestsTypeCheckForWindows: a test that calls a helper only Unix defines type-checks for
+// darwin and fails for windows, and only when tests are checked. It reads only its fixture, so it stays
+// here beside TypeCheck, whose tests mode it proves, and stays cached when the module changes.
 func TestTypeCheckOfTestsCatchesAUnixOnlyTestHelper(test *testing.T) {
 	test.Parallel()
 
@@ -234,14 +170,14 @@ func TestTypeCheckOfTestsCatchesAUnixOnlyTestHelper(test *testing.T) {
 
 	darwin := release.Target{GoOperatingSystem: "darwin", GoArchitecture: "arm64"}
 	windows := release.Target{GoOperatingSystem: "windows", GoArchitecture: "amd64"}
-	if problems := typeCheck(directory, darwin, true, "./..."); len(problems) > 0 {
+	if problems := TypeCheck(directory, darwin, true, "./..."); len(problems) > 0 {
 		test.Fatalf("the control does not type-check even for darwin, so it cannot show anything: %v", problems)
 	}
-	if problems := typeCheck(directory, windows, false, "./..."); len(problems) > 0 {
+	if problems := TypeCheck(directory, windows, false, "./..."); len(problems) > 0 {
 		test.Fatalf("the control's code alone failed for windows, so it does not isolate the tests: %v", problems)
 	}
 	if problems := strings.Join(
-		typeCheck(directory, windows, true, "./..."),
+		TypeCheck(directory, windows, true, "./..."),
 		"\n",
 	); !strings.Contains(problems, "stand") {
 		test.Errorf("the windows type-check of the tests did not report the Unix-only helper: %q", problems)

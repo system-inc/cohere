@@ -1,4 +1,4 @@
-package source_name_test
+package guard
 
 import (
 	"fmt"
@@ -67,8 +67,8 @@ func endsLikeTypeScript(literal string) bool {
 	return true
 }
 
-// stringLiteral is a basic string literal's value.
-func stringLiteral(expression ast.Expr) (string, bool) {
+// basicStringLiteral is a basic string literal's value, and whether the expression is one.
+func basicStringLiteral(expression ast.Expr) (string, bool) {
 	literal, isLiteral := expression.(*ast.BasicLit)
 	if !isLiteral || literal.Kind != token.STRING {
 		return "", false
@@ -109,7 +109,7 @@ func treated(expression ast.Expr) bool {
 	if selector, isSelector := expression.(*ast.SelectorExpr); isSelector && selector.Sel.Name == "AdamicExtension" {
 		return true
 	}
-	value, isLiteral := stringLiteral(expression)
+	value, isLiteral := basicStringLiteral(expression)
 	return isLiteral && value == ".a"
 }
 
@@ -132,7 +132,7 @@ func tsDecisionsIn(fileSet *token.FileSet, file *ast.File, relative string) []ts
 				"TrimSuffix",
 				"CutSuffix",
 			); isSuffixCall && len(call.Args) == 2 {
-				if literal, isLiteral := stringLiteral(
+				if literal, isLiteral := basicStringLiteral(
 					call.Args[1],
 				); isLiteral && endsLikeTypeScript(literal) && !treated(call.Args[0]) {
 					add(call, literal, "a suffix check on a name that is not source_name.TreatedAs")
@@ -155,7 +155,9 @@ func tsDecisionsIn(fileSet *token.FileSet, file *ast.File, relative string) []ts
 				"MustCompile",
 				"Compile",
 			); isRegexp && len(call.Args) == 1 {
-				if literal, isLiteral := stringLiteral(call.Args[0]); isLiteral && strings.Contains(literal, `\.ts`) {
+				if literal, isLiteral := basicStringLiteral(
+					call.Args[0],
+				); isLiteral && strings.Contains(literal, `\.ts`) {
 					add(
 						call,
 						literal,
@@ -168,7 +170,9 @@ func tsDecisionsIn(fileSet *token.FileSet, file *ast.File, relative string) []ts
 				return true
 			}
 			for _, pair := range [][2]ast.Expr{{typed.X, typed.Y}, {typed.Y, typed.X}} {
-				if literal, isLiteral := stringLiteral(pair[0]); isLiteral && literal == ".ts" && !treated(pair[1]) {
+				if literal, isLiteral := basicStringLiteral(
+					pair[0],
+				); isLiteral && literal == ".ts" && !treated(pair[1]) {
 					add(typed, literal, "an extension compared with `.ts` that is not source_name.TreatedAs's")
 				}
 			}
@@ -182,7 +186,7 @@ func tsDecisionsIn(fileSet *token.FileSet, file *ast.File, relative string) []ts
 					continue
 				}
 				for _, expression := range clause.List {
-					if literal, isLiteral := stringLiteral(expression); isLiteral && literal == ".ts" {
+					if literal, isLiteral := basicStringLiteral(expression); isLiteral && literal == ".ts" {
 						add(clause, literal, "a switch case on `.ts` over a value that is not source_name.TreatedAs's")
 					}
 				}
@@ -194,7 +198,7 @@ func tsDecisionsIn(fileSet *token.FileSet, file *ast.File, relative string) []ts
 				if keyValue, isKeyValue := element.(*ast.KeyValueExpr); isKeyValue {
 					value = keyValue.Key
 				}
-				if literal, isLiteral := stringLiteral(value); isLiteral && literal == ".ts" {
+				if literal, isLiteral := basicStringLiteral(value); isLiteral && literal == ".ts" {
 					namesTypeScript = true
 				}
 				if treated(value) {
@@ -210,7 +214,11 @@ func tsDecisionsIn(fileSet *token.FileSet, file *ast.File, relative string) []ts
 	return found
 }
 
-// tsDecisions loads every package of the module and finds every `.ts` decision outside this package.
+// tsDecisions loads every package of the module and finds every `.ts` decision outside source_name, which is the one
+// package allowed to decide on `.ts` directly, since it is where the answer lives.
+//
+// It reads the whole tree by design, so it reruns on every landing, as this package's other guards do. It moved here
+// from internal/types/source_name (#0zdyk51), where it made that package rerun on every landing too.
 func tsDecisions(test *testing.T) []tsDecision {
 	test.Helper()
 	moduleRoot, absolutePathError := filepath.Abs(filepath.Join("..", "..", ".."))

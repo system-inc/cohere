@@ -1,4 +1,4 @@
-package check
+package rules_reach_repository
 
 import (
 	"fmt"
@@ -36,7 +36,7 @@ var reachedGoLanguage = sync.OnceValues(func() (*typedReach, error) {
 		}
 	}
 	started := time.Now()
-	// The module root, three directories above the check package's own, holds the go.mod whose replaces name every
+	// The module root, three directories above this package's own, holds the go.mod whose replaces name every
 	// module cohere-go imports, so the load needs no workspace file. Each package is loaded alone, never its test
 	// variant, since the guard reads what a run executes.
 	loaded, loadError := load.PackagesCached(filepath.Join("..", "..", ".."), patterns, []string{"GOWORK=off"}, nil,

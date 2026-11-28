@@ -92,7 +92,7 @@ func fastTest(root string, base []string, arguments []string, limit *bound) int 
 	// Listing the module's packages takes a moment, and a person watches for the run to begin.
 	streams.Show(streams.Errors)
 
-	packages, modulePackagesError := modulePackagesIn(root, base)
+	packages, modulePackagesError := modulePackagesIn(root, base, []string{"./..."})
 	if modulePackagesError != nil {
 		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", modulePackagesError)
 		return 1
@@ -138,8 +138,10 @@ func fastTest(root string, base []string, arguments []string, limit *bound) int 
 	return code
 }
 
-// modulePackagesIn is every package of the module at root, or the working directory's when it is empty, named as
-// `go test` names it from the module root.
+// modulePackagesIn is every package patterns name in the module at root, or the working directory's when it is empty,
+// named as `go test` names it from the module root: the fast tier's `./...`, the whole module, or a test's own few, so
+// a test lists only the directories it judges, never every one in the tree, which go test's cache would key it on
+// (#0zdyk51).
 //
 // The root module's only: the fast tier is not the landing gate, so it leaves the other modules go.work
 // names (the shims, static_single_assignment) to the gate and to `cohere-dev test ./...` (workspace.go).
@@ -147,8 +149,10 @@ func fastTest(root string, base []string, arguments []string, limit *bound) int 
 // It is listed in the environment the run's tests get. It once listed in the caller's own, so in a worktree with
 // TypeScript a symlink, from a shell with no go flags, go list failed on VCS stamping and the fast tier
 // stopped there (2026-11-05). go's stderr goes in the error, which said only "exit status 1" without it.
-func modulePackagesIn(root string, environment []string) (map[string]bool, error) {
-	command := exec.Command("go", "list", "-f", "{{.ImportPath}} {{.Module.Path}}", "./...")
+func modulePackagesIn(root string, environment []string, patterns []string) (map[string]bool, error) {
+	// Tab-separated, since a directory's path may hold a space.
+	command := exec.Command("go", append([]string{"list", "-f",
+		"{{.ImportPath}}\t{{.Module.Path}}\t{{.Dir}}\t{{.Module.GoMod}}"}, patterns...)...)
 	command.Dir = root
 	command.Env = environment
 	output, outputError := command.Output()
@@ -163,17 +167,22 @@ func modulePackagesIn(root string, environment []string) (map[string]bool, error
 		return nil, fmt.Errorf("listing the module's packages: %w", outputError)
 	}
 	packages := map[string]bool{}
+	listed := []listed_directories.Package{}
 	for _, line := range strings.Split(strings.TrimSpace(string(output)), "\n") {
-		fields := strings.Fields(line)
-		if len(fields) != 2 {
+		fields := strings.Split(line, "\t")
+		if len(fields) != 4 {
 			continue
 		}
 		relative := strings.TrimPrefix(fields[0], fields[1])
 		packages["."+relative] = true
+		listed = append(listed, listed_directories.Package{ImportPath: fields[0], Directory: fields[2], Root: true,
+			MainModule: true, MainGoMod: fields[3]})
 	}
-	// What go list walked, read again in this process, so a test that lists the module has its result keyed on a
-	// package added or removed (#cmpsz8p).
-	listed_directories.Open(root, []string{"./..."}, nil)
+	// What go list read, read again in this process, so a test that lists packages has its result keyed on them: each
+	// listed package's directory and its module's go.mod, and for `./...` every directory the walk looked in, so a
+	// package added, emptied or removed is a changed input (#cmpsz8p). Handed no packages, Open keyed a pattern with no
+	// `/...` on nothing at all (the Go Square's must on #0zdyk51).
+	listed_directories.Open(root, patterns, listed)
 	return packages, nil
 }
 
