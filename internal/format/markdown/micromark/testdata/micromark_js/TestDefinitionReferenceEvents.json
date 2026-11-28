@@ -1,0 +1,15 @@
+{"source":"micromark 4.0.2 (node_modules/micromark/index.js), micromark-extension-gfm 3.0.0, micromark-extension-math 3.1.0, @braindb/micromark-extension-wiki-link 0.1.0, the fork's src/language-markdown/parse/micromark/micromark-extension-{liquid,html-text}.js (prettier 3.9.6), from the Prettier fork's node_modules and src, run by node v24.14.1","recorded":"2026-11-26","mode":"Events",
+"answers":[
+{"text":"[foo]: /url\n\n[foo]","events":"c034a7e1cb850c4e:1488"},
+{"text":"[foo]\n\n[foo]: /url","events":"9d5e24b8470ba156:1472"},
+{"text":"[a]: b\n\n[a][]","events":"102c40cfed329a73:1639"},
+{"text":"[a]: b\n\n[x][a]","events":"d78d8073b16b469e:1759"},
+{"text":"[a]: b\n\n![a]","events":"e10d23890420188e:1515"},
+{"text":"[a]: b\n\n![a][]","events":"a4e55998b895de57:1716"},
+{"text":"[a]: b\n\n![x][a]","events":"8fb46cc43c33da10:1836"},
+{"text":"[Foo  Bar]: b\n\n[foo bar]","events":"6a65c9f8b8d1c0f4:1544"},
+{"text":"[ÄÖ]: b\n\n[äö]","events":"97c3b7b4d62b6c4a:1444"},
+{"text":"[a]: b\n\n[a] [a]","events":"b210a950a66ffb5d:1821"},
+{"text":"[a]: b\n\n[c][]","events":"19bd7f1cdf3d3174:1306"},
+{"text":"> [a]: b\n\n[a]","events":"b5a233e05833cb91:1740"}
+]}

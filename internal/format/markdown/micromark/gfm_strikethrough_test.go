@@ -1,5 +1,7 @@
 package micromark
 
+import "testing"
+
 // gfmStrikethroughFixtures hold no definition, footnote (no `[^`), html text (no `<`), table (no `|`),
 // task list item, math (no `$`), liquid (no `{`) or wiki-link (no `[[`) syntax, and no URLs, `www.` or
 // emails: those constructs are still pending stubs, so a fixture leaning on them would differ for reasons
@@ -140,4 +142,9 @@ var gfmStrikethroughFixtures = []string{
 	"~a\n===",
 	"~~~\na\n~~~",
 	"a\n~~~b~~~",
+}
+
+func TestGfmStrikethroughEvents(test *testing.T) {
+	test.Parallel()
+	compareEvents(test, gfmStrikethroughFixtures)
 }

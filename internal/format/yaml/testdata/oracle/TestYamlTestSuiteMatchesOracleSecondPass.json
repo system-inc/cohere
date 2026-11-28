@@ -1,0 +1,9 @@
+{
+ "digest": "61573b94b6f4507420b448b348c232f988c86f60dc9b23d089ce3b179b2afc98",
+ "answers": {
+  "16daea04f64f3ecc466637d41ff5dbe7a075fc678c25e9eab5d6f132e5bc9d4d": {"error": "formatting fixture.yaml: SyntaxError: Map comment with trailing content (5:1)\n  3 | : - 2001-07-23\n  4 |\n> 5 | [New York Yankees, Atlanta Braves]:\n    | ^\n  6 |     [2001-07-02, 2001-08-12, 2001-08-14]\n  7 |"},
+  "3baf66f6ce4026e7a128e173e68c03d3d77c29686e031b4b289034cbc1845feb": {"error": "formatting fixture.yaml: SyntaxError: Map comment with trailing content (5:1)\n  3 | : - 2001-07-23\n  4 |\n> 5 | [New York Yankees, Atlanta Braves]:\n    | ^\n  6 |     [2001-07-02, 2001-08-12, 2001-08-14]\n  7 |"},
+  "7002fe8f06a224c5968fb66e9c3b9386067fee8b75aae96a04eaf7d6af844a39": {"error": "formatting fixture.yaml: SyntaxError: Map comment with trailing content (5:1)\n  3 | : - 2001-07-23\n  4 |\n> 5 | [New York Yankees, Atlanta Braves]: [2001-07-02, 2001-08-12, 2001-08-14]\n    | ^\n  6 |"},
+  "ca83c7084bf4dbf602143af19fbbc7b52351248b79ae2b044b64a707087cba14": {"error": "formatting fixture.yaml: SyntaxError: Map comment with trailing content (5:1)\n  3 | : - 2001-07-23\n  4 |\n> 5 | [New York Yankees, Atlanta Braves]:\n    | ^\n  6 |   [2001-07-02, 2001-08-12, 2001-08-14]\n  7 |"}
+ }
+}

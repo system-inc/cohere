@@ -1,0 +1,11 @@
+{
+ "digest": "61573b94b6f4507420b448b348c232f988c86f60dc9b23d089ce3b179b2afc98",
+ "answers": {
+  "0f7a7a4106d7249b6edee009a4de63abb0efbce3ddfe221bb3c2c0488ab16f08": {"output": "@if $a==1 {\n    a {\n        x: y;\n    }\n} @else  {\n    b {\n        x: y;\n    }\n}\n"},
+  "13d0869f0d7db82743bd848120e6839d598f4e60414b05af17bd3890d5fb64df": {"output": "a {\n    // comment\n    color: red;\n}\n"},
+  "227b2c6725c6a5167537a76a48eb12a7042e9c15624739246e1146d930c8788f": {"error": "formatting Probe.css: SyntaxError: CssSyntaxError: Unknown word comment (2:4)\n  1 | a{\n> 2 | // comment\n    |    ^\n  3 | color:red;\n  4 | }"},
+  "4a2265b555737e8f6a2eaad2cf5fe15baf066651e2198f33e556f0c20339083a": {"output": "$map: (\n    key1: value1,\n    key2: value2,\n);\n"},
+  "a5efbd9bb70924cc8f4ed327bab0c81b5eded91aba79b018011d33ec0beb8a95": {"output": "@if $a==1 {\n    a {\n        x: y;\n    }\n} @else {\n    b {\n        x: y;\n    }\n}\n"},
+  "d1f3ea011478b48cc083c99ee4c1753a278118e415b03db63e2fe08602c48696": {"output": "$map: (key1: value1, key2: value2);\n"}
+ }
+}

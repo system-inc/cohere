@@ -1,31 +1,25 @@
 package markdown
 
 import (
-	"errors"
 	"fmt"
 	"strings"
-	"sync"
 	"testing"
 
-	"github.com/dop251/goja"
 	"github.com/system-inc/cohere/internal/format/differential"
 	"github.com/system-inc/cohere/internal/format/format_options"
 	"github.com/system-inc/cohere/internal/format/oracle_testing"
-	"github.com/system-inc/cohere/internal/format/prettier"
 )
 
 // The proseWrap oracle. Every corpus prints with proseWrap "preserve", where a line break returns before
 // whitespace.js reaches its CJK and Korean rules, and format_options.Options does not carry the option. So
-// these fixtures run the same bundles in their own runtime with proseWrap "always" and "never", against
-// the port with the same setting.
+// these fixtures hold the port, with proseWrap "always" and "never", to what the fork's bundles printed
+// with the same setting.
 
-// proseWrapOracle formats markdown with the embedded bundles and a proseWrap of its own. Its answers are
-// recorded (see oracle_testing), so the runtime is built only when they are recorded again.
+// proseWrapOracle answers as the fork formatted markdown with a proseWrap of its own: its bundle's
+// prettier.format on the text at fixture.md with parser "markdown", the proseWrap and the options' printWidth,
+// tabWidth, useTabs and singleQuote. Its answers are recorded (see oracle_testing).
 type proseWrapOracle struct {
-	golden    *oracle_testing.Golden
-	once      sync.Once
-	runtime   *goja.Runtime
-	loadError error
+	golden *oracle_testing.Golden
 }
 
 func newProseWrapOracle(test *testing.T) *proseWrapOracle {
@@ -33,72 +27,12 @@ func newProseWrapOracle(test *testing.T) *proseWrapOracle {
 	return &proseWrapOracle{golden: oracle_testing.Open(test, test.Name())}
 }
 
-func (oracle *proseWrapOracle) load() {
-	bundles, bundlesError := prettier.Bundles()
-	if bundlesError != nil {
-		oracle.loadError = bundlesError
-		return
-	}
-	runtime := goja.New()
-	for _, name := range prettier.BundleFiles {
-		if _, runStringError := runtime.RunString(string(bundles.Files[name])); runStringError != nil {
-			oracle.loadError = fmt.Errorf("evaluating %s: %w", name, runStringError)
-			return
-		}
-	}
-	oracle.runtime = runtime
-}
-
-// format is the recorded answer for text, keyed by everything formatLive passes the bundles: the text, the
-// file path, the parser, the options and the proseWrap.
+// format is the recorded answer for text, keyed by everything the fork was passed: the text, the file path,
+// the parser, the options and the proseWrap.
 func (oracle *proseWrapOracle) format(text string, options format_options.Options, proseWrap string) (string, error) {
-	key := oracle_testing.Key("proseWrap", text, "fixture.md", "markdown", fmt.Sprintf("%+v", options), proseWrap)
-	return oracle.golden.Answer(key, func() (string, error) {
-		oracle.once.Do(oracle.load)
-		if oracle.loadError != nil {
-			return "", oracle.loadError
-		}
-		return oracle.formatLive(text, options, proseWrap)
-	})
-}
-
-func (oracle *proseWrapOracle) formatLive(
-	text string,
-	options format_options.Options,
-	proseWrap string,
-) (string, error) {
-	setError := errors.Join(
-		oracle.runtime.Set("__source", text),
-		oracle.runtime.Set("__proseWrap", proseWrap),
-		oracle.runtime.Set("__printWidth", options.PrintWidth),
-		oracle.runtime.Set("__tabWidth", options.TabWidth),
-		oracle.runtime.Set("__useTabs", options.UseTabs),
-		oracle.runtime.Set("__singleQuote", options.SingleQuote),
+	return oracle.golden.Answer(
+		oracle_testing.Key("proseWrap", text, "fixture.md", "markdown", fmt.Sprintf("%+v", options), proseWrap),
 	)
-	if setError != nil {
-		return "", fmt.Errorf("setting the oracle's inputs: %w", setError)
-	}
-	value, runStringError := oracle.runtime.RunString(`prettier.format(__source, {
-		filepath: "fixture.md", parser: "markdown", plugins: prettierPlugins, proseWrap: __proseWrap,
-		printWidth: __printWidth, tabWidth: __tabWidth, useTabs: __useTabs, singleQuote: __singleQuote,
-	})`)
-	if runStringError != nil {
-		return "", runStringError
-	}
-	// prettier.format returns a promise; each RunString drains goja's job queue, so pump until settled.
-	promise, isPromise := value.Export().(*goja.Promise)
-	if !isPromise {
-		return value.String(), nil
-	}
-	for pump := 0; pump < 100000 && promise.State() == goja.PromiseStatePending; pump++ {
-		if _, runStringError := oracle.runtime.RunString("0"); runStringError != nil {
-			return "", runStringError
-		}
-	}
-	if promise.State() != goja.PromiseStateFulfilled {
-		return "", fmt.Errorf("prettier.format did not fulfil: %v", promise.Result())
-	}
-	return promise.Result().String(), nil
 }
 
 // proseWrapFixtures are prose the always and never branches print differently from preserve: long
@@ -116,9 +50,20 @@ var proseWrapFixtures = []string{
 	"*a*\nb", "a\n*b*", "**中文**\nabc", "`a`\n中文", "a[^1]\nb\n\n[^1]: c\nd", "[^1]: a\n  b",
 }
 
+// unsettledProseWrapFixtures are the inputs whose fork output the fork itself rewrites, so the port, which prints as
+// the fork does, rewrites it on a second pass too. Their second pass is held to the fork's own, recorded beside the
+// first in <test>SecondPass.json, so a change to it in either direction fails, settling included. One whose
+// recorded second pass settles everywhere fails too, so the list only shrinks.
+var unsettledProseWrapFixtures = map[string]bool{
+	// Under proseWrap always, the blank quoted line after the ignored list prints twice, so each pass adds one.
+	"> <!-- prettier-ignore -->\n> - a\n>   - b\n>\n> c": true,
+}
+
 func TestProseWrapFixturesMatchOracle(test *testing.T) {
 	test.Parallel()
 	oracle := newProseWrapOracle(test)
+	forkAgain := &proseWrapOracle{golden: oracle_testing.Open(test, test.Name()+"SecondPass")}
+	unsettled := map[string]bool{}
 	for _, proseWrap := range []string{"always", "never", "preserve"} {
 		for variantIndex, options := range formatVariants {
 			for _, input := range append(append([]string{}, proseWrapFixtures...), formatFixtures...) {
@@ -142,8 +87,30 @@ func TestProseWrapFixturesMatchOracle(test *testing.T) {
 						input,
 						differential.FirstDifference(expected, actual),
 					)
+					continue
+				}
+				// Formatted output formats to itself, or every run rewrites what the last one wrote.
+				again, againError := formatWithProseWrap(expected, options, proseWrap, nil)
+				if unsettledProseWrapFixtures[input] {
+					want, wantError := forkAgain.format(expected, options, proseWrap)
+					unsettled[input] = unsettled[input] || wantError != nil || want != expected
+					if (againError != nil) != (wantError != nil) || again != want {
+						test.Errorf("%s, variant %d, %q: formatted again, not as the fork formats it again (%v, the "+
+							"fork %v): %s", proseWrap, variantIndex, input, againError, wantError,
+							differential.FirstDifference(want, again))
+					}
+				} else if againError != nil || again != expected {
+					test.Errorf("%s, variant %d, %q: formatted again (%v): %s", proseWrap, variantIndex, input,
+						againError, differential.FirstDifference(expected, again))
 				}
 			}
+		}
+	}
+	// Only a clean run judges the list: an input whose first pass differed never reached its second.
+	for input := range unsettledProseWrapFixtures {
+		if !test.Failed() && !unsettled[input] {
+			test.Errorf("the fork formats %q to itself on a second pass, so take it out of unsettledProseWrapFixtures",
+				input)
 		}
 	}
 }

@@ -1,8 +1,8 @@
 // Package format_options is what a file formats with: the options, Prettier's names for them, and how a
 // directory resolves them from its repository's config.
 //
-// It carries no formatter. The native printers and the goja oracle both take these options, and
-// keeping them here is what lets the cohere binary link the printers without linking goja.
+// It carries no formatter, so the printers and the tests' recorded oracle answers, keyed by these
+// options, share them without either importing the other.
 package format_options
 
 // Options are the Prettier settings a file formats with.

@@ -1,0 +1,8 @@
+{
+ "digest": "61573b94b6f4507420b448b348c232f988c86f60dc9b23d089ce3b179b2afc98",
+ "answers": {
+  "16aa432d29e4e376f9b12dec6bf74886094490c6b6aa75bfd6cbed33fc8b4989": {"error": "formatting Probe.css: SyntaxError: CssSyntaxError: Unclosed string (1:12)\n> 1 | a { color: \"unclosed; }\n    |            ^\n  2 |"},
+  "6eb6e09602cb2725a1d3cffff577572d811261ef8a9e3352ad6568351a1969e5": {"error": "formatting Probe.css: SyntaxError: CssSyntaxError: Unexpected } (1:1)\n> 1 | }\n    | ^\n  2 |"},
+  "9605b46f738c23b577b7d2b1e9aaa02e02d5e0d1d96d6760dd70b3de856dcb2a": {"error": "formatting Probe.css: SyntaxError: CssSyntaxError: Unclosed block (1:1)\n> 1 | a { color: red;\n    | ^\n  2 |"}
+ }
+}

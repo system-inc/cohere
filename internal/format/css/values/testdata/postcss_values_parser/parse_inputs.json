@@ -1,0 +1,336 @@
+{
+    "about": "The inputs of TestParseAgreesWithPostcssValuesParser (oracle_test.go): values as Prettier's parser-postcss.js hands them to parseValue. postcss-values-parser 2.0.1's answers for them, with { loose: true } and { loose: false }, are recorded in parse_answers.json by record-postcss-values-parser.mjs, attached to #yah3d69; a changed or added input is recorded again there. malformed says the library refuses the text with { loose: true }, as Prettier runs it.",
+    "inputs": [
+        {
+            "name": "calc with var fallback",
+            "text": "calc(100% - var(--x, 2px))"
+        },
+        {
+            "name": "color-mix",
+            "text": "color-mix(in oklab, var(--color-red-500) 50%, transparent)"
+        },
+        {
+            "name": "nested functions three deep",
+            "text": "translate(calc(var(--a) * -1), min(10px, max(1vw, 2em)))"
+        },
+        {
+            "name": "function after a function",
+            "text": "rgb(0 0 0 / 0.5) linear-gradient(to right, #fff 0%, rgba(0, 0, 0, .5) 100%)"
+        },
+        {
+            "name": "parenthesized group",
+            "text": "(min-width: 100px) and (max-width: 200px)"
+        },
+        {
+            "name": "nested parens in calc",
+            "text": "calc((1px + 2px) * (3 - 4))"
+        },
+        {
+            "name": "empty function",
+            "text": "foo()"
+        },
+        {
+            "name": "function with spaces inside",
+            "text": "var( --x , 1px )"
+        },
+        {
+            "name": "atword then paren",
+            "text": "@foo(bar)"
+        },
+        {
+            "name": "number then paren",
+            "text": "5(a)"
+        },
+        {
+            "name": "signed and dotted numbers",
+            "text": "-.5em +2 1e3 .5e+3 1e-10 -1E+2px 10.px 0.0 +.5"
+        },
+        {
+            "name": "numbers with units",
+            "text": "10px 1.5rem 100% 3s 45deg 2fr 1x"
+        },
+        {
+            "name": "number then letters with e",
+            "text": "1e1e 2em 3e"
+        },
+        {
+            "name": "minus number after a word",
+            "text": "a -5px"
+        },
+        {
+            "name": "minus after a minus",
+            "text": "a - -5px"
+        },
+        {
+            "name": "number followed by an at",
+            "text": "5@x"
+        },
+        {
+            "name": "custom property name",
+            "text": "--foo"
+        },
+        {
+            "name": "dash dash number",
+            "text": "--5"
+        },
+        {
+            "name": "vendor prefixed word",
+            "text": "-webkit-box -moz-calc(1px)"
+        },
+        {
+            "name": "lone minus and dashes",
+            "text": "- -- ---"
+        },
+        {
+            "name": "hex colors",
+            "text": "#fff #ffff #ffffff #ffffff80 #abcdeg #12345 #FFF"
+        },
+        {
+            "name": "hash alone",
+            "text": "# #- #{a}"
+        },
+        {
+            "name": "braces",
+            "text": "{a} { } }"
+        },
+        {
+            "name": "backslash",
+            "text": "a\\b \\@x \\"
+        },
+        {
+            "name": "word with form feed inside",
+            "text": "a\fb"
+        },
+        {
+            "name": "important-free keywords",
+            "text": "solid red !ie"
+        },
+        {
+            "name": "atwords",
+            "text": "@media @a@b x@y"
+        },
+        {
+            "name": "strings with escapes",
+            "text": "\"a\\\"b\" 'c\\'d' \"e\\\\\" 'f\\\\\\'g' \"multi\\\nline\""
+        },
+        {
+            "name": "empty strings",
+            "text": "\"\" ''"
+        },
+        {
+            "name": "url unquoted",
+            "text": "url(foo/bar.png)"
+        },
+        {
+            "name": "url quoted",
+            "text": "url(\"foo bar.png\") url('x')"
+        },
+        {
+            "name": "url with a double slash",
+            "text": "url(https://example.com/a.png)"
+        },
+        {
+            "name": "url with spaces",
+            "text": "url( a.png )"
+        },
+        {
+            "name": "url empty",
+            "text": "url()"
+        },
+        {
+            "name": "url with nested parens",
+            "text": "url(a(b)c)"
+        },
+        {
+            "name": "url after url",
+            "text": "url(a) url(//b)"
+        },
+        {
+            "name": "inline comment after url",
+            "text": "url(a) // trailing"
+        },
+        {
+            "name": "commas and slashes",
+            "text": "1px/2px, 3px / 4px,5px"
+        },
+        {
+            "name": "grid area",
+            "text": "1 / 2 / span 3"
+        },
+        {
+            "name": "colons",
+            "text": "a:b : c"
+        },
+        {
+            "name": "operators with spaces",
+            "text": "calc(1px + 2px - 3px * 4 / 5)"
+        },
+        {
+            "name": "operators without spaces",
+            "text": "calc(1px+2px-3px*4/5)"
+        },
+        {
+            "name": "operator after operator",
+            "text": "1 + -2 * +3"
+        },
+        {
+            "name": "operator then word",
+            "text": "a +b"
+        },
+        {
+            "name": "calc minus before number",
+            "text": "calc(1 -2)"
+        },
+        {
+            "name": "calc doubled operators",
+            "text": "calc(1 -+2)"
+        },
+        {
+            "name": "calc leading signed",
+            "text": "calc(-0.5 + 2)"
+        },
+        {
+            "name": "doubled operators outside calc",
+            "text": "+-4px 5+ 5"
+        },
+        {
+            "name": "asterisk",
+            "text": "* a*b"
+        },
+        {
+            "name": "unicode ranges",
+            "text": "U+0025-00FF, u+4??, U+0-7F, u+"
+        },
+        {
+            "name": "u then plus inside word",
+            "text": "menu+u+1"
+        },
+        {
+            "name": "unicode range stops at a letter past f",
+            "text": "u+00fg U+0A-0G"
+        },
+        {
+            "name": "hash before a line separator",
+            "text": "#\u2028a #a\u2028"
+        },
+        {
+            "name": "comments inside values",
+            "text": "1px /* one */ 2px/* two */,/**/3px"
+        },
+        {
+            "name": "comment with stars",
+            "text": "a /* * / ** */ b /*/ c */"
+        },
+        {
+            "name": "multi-line comment",
+            "text": "a /* one\ntwo\nthree */ b"
+        },
+        {
+            "name": "inline comment",
+            "text": "a // rest of line\nb"
+        },
+        {
+            "name": "inline comment at end",
+            "text": "a //tail"
+        },
+        {
+            "name": "multi-line value",
+            "text": "a,\n  b\n  c(\n    d\n  )"
+        },
+        {
+            "name": "tabs and carriage returns",
+            "text": "a\t\tb\r\nc"
+        },
+        {
+            "name": "trailing space",
+            "text": "a b "
+        },
+        {
+            "name": "space before close paren",
+            "text": "foo(a )"
+        },
+        {
+            "name": "space before comma",
+            "text": "a , b"
+        },
+        {
+            "name": "non-ASCII words",
+            "text": "café 日本語 1px"
+        },
+        {
+            "name": "emoji in a string",
+            "text": "\"😀\" a"
+        },
+        {
+            "name": "emoji before an operator",
+            "text": "😀 + 1"
+        },
+        {
+            "name": "non-ASCII before a function",
+            "text": "é calc(1px + 2px) 😀x(a)"
+        },
+        {
+            "name": "non-ASCII on a later line",
+            "text": "é\n😀 b /* é\né */ c"
+        },
+        {
+            "malformed": true,
+            "name": "only whitespace",
+            "text": " "
+        },
+        {
+            "malformed": true,
+            "name": "lone plus",
+            "text": "+"
+        },
+        {
+            "malformed": true,
+            "name": "trailing doubled operator",
+            "text": "a + +"
+        },
+        {
+            "malformed": true,
+            "name": "unclosed function",
+            "text": "a(b"
+        },
+        {
+            "malformed": true,
+            "name": "stray close paren",
+            "text": "a) b"
+        },
+        {
+            "malformed": true,
+            "name": "unclosed double quote",
+            "text": "\"abc"
+        },
+        {
+            "malformed": true,
+            "name": "unclosed single quote",
+            "text": "'abc"
+        },
+        {
+            "malformed": true,
+            "name": "escaped closing quote",
+            "text": "\"abc\\\""
+        },
+        {
+            "malformed": true,
+            "name": "unclosed comment",
+            "text": "a /* x"
+        },
+        {
+            "malformed": true,
+            "name": "unclosed comment on a later line",
+            "text": "a\nb /* x"
+        },
+        {
+            "malformed": true,
+            "name": "space before trailing close paren",
+            "text": " )"
+        },
+        {
+            "name": "leading space then comma",
+            "text": " ,a"
+        }
+    ]
+}

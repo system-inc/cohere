@@ -1,0 +1,6 @@
+{
+ "digest": "61573b94b6f4507420b448b348c232f988c86f60dc9b23d089ce3b179b2afc98",
+ "answers": {
+  "f90765d9fe024b418724d0ad92a9dde1afe268b34632fb33553871f9f80d88e5": {"output": "# Probe\n\n```tsx\n<Component label=\"one\" onChange={(value) => setValue(value)} />\n```\n\n```jsx\n<div className=\"x\">{value}</div>\n```\n\n```tsx\nconst a = <A />;\nconst b = 1;\n```\n\n```ts\nfunction identity<T>(value: T) {\n    return value;\n}\n```\n\n```json\n{ \"a\": 1, \"b\": [1, 2] }\n```\n\n- item\n\n    ```tsx\n    <Nested prop={1} />\n    ```\n"}
+ }
+}

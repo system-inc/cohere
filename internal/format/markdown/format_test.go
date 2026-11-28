@@ -7,8 +7,6 @@ import (
 	"github.com/system-inc/cohere/internal/format/differential"
 	"github.com/system-inc/cohere/internal/format/format_options"
 	"github.com/system-inc/cohere/internal/format/oracle_testing"
-	"github.com/system-inc/cohere/internal/format/prettier"
-	"github.com/system-inc/cohere/internal/testing/needs"
 )
 
 // formatFixtures reach the printer's branches the corpora rarely or never do: our markdown is almost all
@@ -273,6 +271,13 @@ func compareFormat(test *testing.T, inputs []string) int {
 			if actual != expected {
 				failures++
 				test.Errorf("variant %d, %q: %s", variantIndex, input, differential.FirstDifference(expected, actual))
+				continue
+			}
+			// Formatted output formats to itself, or every run rewrites what the last one wrote.
+			if again, againError := Format(expected, options, nil); againError != nil || again != expected {
+				failures++
+				test.Errorf("variant %d, %q: formatted again (%v): %s", variantIndex, input, againError,
+					differential.FirstDifference(expected, again))
 			}
 		}
 	}
@@ -301,53 +306,4 @@ func TestFormatOracleCanFail(test *testing.T) {
 	if strings.EqualFold(expected, actual) {
 		test.Fatal("the comparison found no difference between a bullet list and an ordered one")
 	}
-}
-
-// TestExhaustiveDelimitersMatchOracle formats every string of up to five of `a`, `*`, `_`, space and `.`,
-// bare and inside emphasis and strong: the escapes word.js adds to delimiter runs depend on which side
-// of a run is flanking, and only an exhaustive sweep reaches every combination. A measuring run.
-func TestExhaustiveDelimitersMatchOracle(test *testing.T) {
-	test.Parallel()
-	needs.OptIn(
-		test,
-		"COHERE_MARKDOWN_EXHAUSTIVE",
-		"a sweep of every delimiter string up to five long against the oracle",
-	)
-	alphabet := []string{"a", "*", "_", " ", "."}
-	var inputs []string
-	var extend func(prefix string, length int)
-	extend = func(prefix string, length int) {
-		if prefix != "" {
-			inputs = append(inputs, prefix, "*"+prefix+"*", "**"+prefix+"**", "_"+prefix+"_", "x "+prefix+" y")
-		}
-		if length == 5 {
-			return
-		}
-		for _, letter := range alphabet {
-			extend(prefix+letter, length+1)
-		}
-	}
-	extend("", 0)
-
-	// The live oracle, not a golden (see oracle_testing): an opt-in measuring sweep of some 19,500 inputs that
-	// no default run reaches, so recording it would check in its answers for nothing a default run reads.
-	formatter, newPrettierError := prettier.New(format_options.Default())
-	if newPrettierError != nil {
-		test.Fatal(newPrettierError)
-	}
-	failures := 0
-	for _, input := range inputs {
-		expected, formatError := formatter.Format("fixture.md", input)
-		if formatError != nil {
-			continue
-		}
-		actual, formatError := Format(input, format_options.Default(), nil)
-		if formatError != nil || actual != expected {
-			failures++
-			if failures <= 20 {
-				test.Errorf("%q: %v %s", input, formatError, differential.FirstDifference(expected, actual))
-			}
-		}
-	}
-	test.Logf("%d of %d inputs differ", failures, len(inputs))
 }

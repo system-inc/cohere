@@ -1,0 +1,21 @@
+{
+  "source": "yaml-unist-parser 3.2.0, node_modules/yaml-unist-parser/dist/index.mjs in the Prettier fork, run by node v24.14.1 with yaml 2.9.0: parse(text, { uniqueKeys: false })",
+  "recorded": "2026-11-25",
+  "answers": [
+    {"name":"astral and multi-byte","text":"é: 🍐\n'中': \"x\"\n","root":"4bdcb51c62f0b597:1841"},
+    {"name":"markdown/front-matter/unicode.md (front matter)","sha256":"f1429ee72570c7c6120bc82bb8da7c8a3a8a22e78f731eb789891680ae718a56","root":"4e3004c5c3689d09:1150"},
+    {"name":"markdown/yaml/complex.md (front matter)","sha256":"29bc581d9e018cecbc486e16be26afc8ab2e510c1b3fdafffe280ce87da9671a","root":"b0d59d4848afd3f5:1913"},
+    {"name":"markdown/yaml/simple-2.md (front matter)","sha256":"159957ba44c5d6b3a112e41fb2925afea5eeda40f8c61990ed97d8625faee9c8","root":"08deabfbbba7ed46:1130"},
+    {"name":"markdown/yaml/simple.md (front matter)","sha256":"159957ba44c5d6b3a112e41fb2925afea5eeda40f8c61990ed97d8625faee9c8","root":"08deabfbbba7ed46:1130"},
+    {"name":"markdown/yaml/trailing-spaces.md (front matter)","sha256":"c7cca4199ac32ea242b64a75fa7214dc5fec4dab2757cbdda0293d2b52b6f4ea","root":"0bdb254919675575:388"},
+    {"name":"misc/check-ignore-pragma/disabled/markdown/front-matter-with-noformat-pragma.md (front matter)","sha256":"3fc9b689459d738f8c88a3a48aa9e33542016b7a4052e001aaa536fca74813cb","root":"7992cf8f69967acd:393"},
+    {"name":"misc/check-ignore-pragma/disabled/markdown/front-matter-with-noprettier-pragma.md (front matter)","sha256":"3fc9b689459d738f8c88a3a48aa9e33542016b7a4052e001aaa536fca74813cb","root":"7992cf8f69967acd:393"},
+    {"name":"misc/check-ignore-pragma/markdown/front-matter-with-noformat-pragma.md (front matter)","sha256":"3fc9b689459d738f8c88a3a48aa9e33542016b7a4052e001aaa536fca74813cb","root":"7992cf8f69967acd:393"},
+    {"name":"misc/check-ignore-pragma/markdown/front-matter-with-noprettier-pragma.md (front matter)","sha256":"3fc9b689459d738f8c88a3a48aa9e33542016b7a4052e001aaa536fca74813cb","root":"7992cf8f69967acd:393"},
+    {"name":"misc/embedded-language-formatting/in-markdown/front-matter-pandoc.md (front matter)","sha256":"c5f66de3793b6d8198e7f6eea76a16573d730572c8ff3fd09fb16218beb1874e","root":"5b547abfef1036ee:1856"},
+    {"name":"misc/embedded-language-formatting/in-markdown/issue-16342.md (front matter)","sha256":"0fb3ef08cac0e7921400f5965c6dee306dd7e811033f4d66a2df49c95c50f8e5","root":"7e46c8501e510e45:2334"},
+    {"name":"misc/insert-pragma/markdown/front-matter.md (front matter)","sha256":"3fc9b689459d738f8c88a3a48aa9e33542016b7a4052e001aaa536fca74813cb","root":"7992cf8f69967acd:393"},
+    {"name":"misc/require-pragma/markdown/front-matter-with-pragma.md (front matter)","sha256":"3fc9b689459d738f8c88a3a48aa9e33542016b7a4052e001aaa536fca74813cb","root":"7992cf8f69967acd:393"},
+    {"name":"misc/require-pragma/markdown/front-matter-without-pragma.md (front matter)","sha256":"3fc9b689459d738f8c88a3a48aa9e33542016b7a4052e001aaa536fca74813cb","root":"7992cf8f69967acd:393"}
+  ]
+}

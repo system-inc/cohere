@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/format/format_options"
-	"github.com/system-inc/cohere/internal/format/prettier"
+	"github.com/system-inc/cohere/internal/format/oracle_testing"
 )
 
 // TestEmbeddedCodeMatchesTheFork formats markdown whose fences embed TypeScript, JavaScript and JSON,
@@ -25,10 +25,8 @@ func TestEmbeddedCodeMatchesTheFork(test *testing.T) {
 		"```json\n{ \"a\": 1, b: [1,2,], }\n```\n\n" +
 		"- item\n\n  ```tsx\n  <Nested prop={1} />\n  ```\n"
 	options := format_options.Default()
-	oracle, newPrettierError := prettier.New(options)
-	if newPrettierError != nil {
-		test.Fatal(newPrettierError)
-	}
+	// The oracle's answers, recorded (see oracle_testing), so no JavaScript runs here.
+	oracle := oracle_testing.Open(test, test.Name()).Formatter(options)
 	expected, formatError := oracle.Format("Probe.md", source)
 	if formatError != nil {
 		test.Fatal(formatError)
@@ -121,13 +119,12 @@ const empty = css` + "`  `" + `;
 // With the embed not recognizing styled templates, they print as written, and this fails.
 func TestCssTemplatesMatchTheFork(test *testing.T) {
 	test.Parallel()
+	// The oracle's answers, recorded (see oracle_testing), so no JavaScript runs here.
+	golden := oracle_testing.Open(test, test.Name())
 	for _, width := range []int{120, 80} {
 		options := format_options.Default()
 		options.PrintWidth = width
-		oracle, newPrettierError := prettier.New(options)
-		if newPrettierError != nil {
-			test.Fatal(newPrettierError)
-		}
+		oracle := golden.Formatter(options)
 		expected, formatError := oracle.Format("Probe.tsx", cssTemplatesSource)
 		if formatError != nil {
 			test.Fatal(formatError)
@@ -153,13 +150,12 @@ func TestCssTemplatesMatchTheFork(test *testing.T) {
 // embed not recognizing these templates, they print as written, and this fails.
 func TestGraphqlTemplatesMatchTheFork(test *testing.T) {
 	test.Parallel()
+	// The oracle's answers, recorded (see oracle_testing), so no JavaScript runs here.
+	golden := oracle_testing.Open(test, test.Name())
 	for _, width := range []int{120, 80} {
 		options := format_options.Default()
 		options.PrintWidth = width
-		oracle, newPrettierError := prettier.New(options)
-		if newPrettierError != nil {
-			test.Fatal(newPrettierError)
-		}
+		oracle := golden.Formatter(options)
 		expected, formatError := oracle.Format("Probe.ts", graphqlTemplatesSource)
 		if formatError != nil {
 			test.Fatal(formatError)
@@ -212,14 +208,13 @@ func TestCssYamlFrontMatterMatchesTheFork(test *testing.T) {
 	if len(files) < 9 {
 		test.Fatalf("found %d css fixtures with front matter, want the 9 or more the fork's tests hold", len(files))
 	}
+	// The oracle's answers, recorded (see oracle_testing), so no JavaScript runs here.
+	golden := oracle_testing.Open(test, test.Name())
 	for name, options := range map[string]format_options.Options{
 		"house":    format_options.Default(),
 		"defaults": format_options.PrettierDefaults(),
 	} {
-		oracle, newPrettierError := prettier.New(options)
-		if newPrettierError != nil {
-			test.Fatal(newPrettierError)
-		}
+		oracle := golden.Formatter(options)
 		formatter := Formatter{Options: options}
 		printed := 0
 		for _, file := range files {
