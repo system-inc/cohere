@@ -19,8 +19,7 @@ func flushStream(test testing.TB, stream *bufio.Writer) {
 // under it the stream it was given.
 // Not parallel: it sets the package-level activeOutput, which the printers' parallel tests read
 func TestALineNoOneReadsIsDiscarded(test *testing.T) {
-	saved := activeOutput
-	defer func() { activeOutput = saved }()
+	restorePackageStateAfter(test)
 
 	var out strings.Builder
 	stream := bufio.NewWriter(&out)

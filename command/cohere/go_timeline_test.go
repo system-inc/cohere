@@ -228,8 +228,7 @@ func TestANarrowedRunOfNoGoProjectRefusesAGoOnlySwitch(test *testing.T) {
 // where no wall passed. A record of a timed run says its shape once.
 // Not parallel: it swaps the package-level activeOutput and activeSummary, which the record acceptors read and set
 func TestAGoRunPrintsItsTimeline(test *testing.T) {
-	saved, savedSummary := activeOutput, activeSummary
-	defer func() { activeOutput, activeSummary = saved, savedSummary }()
+	restorePackageStateAfter(test)
 
 	lines := goTimelineStream(test)
 	for _, mode := range []outputMode{outputVerbose, outputHuman} {
@@ -278,8 +277,7 @@ func TestAGoRunPrintsItsTimeline(test *testing.T) {
 // as it wrote them, before the summary, and no table.
 // Not parallel: it swaps the package-level activeOutput and activeSummary, which the record acceptors read and set
 func TestAGoTimelineRecordIsWrittenThroughUnderJson(test *testing.T) {
-	saved, savedSummary := activeOutput, activeSummary
-	defer func() { activeOutput, activeSummary = saved, savedSummary }()
+	restorePackageStateAfter(test)
 
 	lines := goTimelineStream(test)
 	output, renderError := renderGoTimeline(test, outputJson, true, lines)
@@ -306,8 +304,7 @@ func TestAGoTimelineRecordIsWrittenThroughUnderJson(test *testing.T) {
 // contract writes `[]`, each break the stream, as every record out of its place does.
 // Not parallel: it swaps the package-level activeOutput and activeSummary, which the record acceptors read and set
 func TestABrokenGoTimelineRecordIsRefused(test *testing.T) {
-	saved, savedSummary := activeOutput, activeSummary
-	defer func() { activeOutput, activeSummary = saved, savedSummary }()
+	restorePackageStateAfter(test)
 
 	lines := goTimelineStream(test)
 	timeline := goTimelineIndex(test, lines)

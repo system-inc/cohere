@@ -140,7 +140,7 @@ func renderContractCrashes(test *testing.T, language contractLanguage, crashes [
 }
 
 // renderCrashesIn renders through the child in the view asked for, from an empty summary, and returns what it
-// printed and the summary it left. Both package-level settings are restored after.
+// printed and the summary it left. Its callers restore both package-level settings with restorePackageStateAfter.
 func renderCrashesIn(
 	test *testing.T,
 	mode outputMode,
@@ -148,8 +148,6 @@ func renderCrashesIn(
 	crashes []runCrash,
 ) (string, runSummary) {
 	test.Helper()
-	savedOutput, savedSummary := activeOutput, activeSummary
-	defer func() { activeOutput, activeSummary = savedOutput, savedSummary }()
 	activeOutput, activeSummary = outputSettings{Mode: mode}, runSummary{}
 	output := language.render(test, crashes)
 	return output, activeSummary
@@ -170,6 +168,7 @@ func crashedFilesOf(language crashLanguage, prefix string, count int, cause stri
 
 // Not parallel: its subtests swap the package-level activeOutput and activeSummary
 func TestADefaultRunNamesEachCrashGroupedByCause(test *testing.T) {
+	restorePackageStateAfter(test)
 	for _, language := range crashLanguages {
 		// Not parallel: it swaps the package-level activeOutput and activeSummary
 		test.Run(language.name+": one crash names its file and its cause", func(test *testing.T) {
@@ -263,6 +262,7 @@ func TestADefaultRunNamesEachCrashGroupedByCause(test *testing.T) {
 // TypeScript crash is a panic, and keeps cohere's words.
 // Not parallel: its subtests swap the package-level activeOutput and activeSummary
 func TestASwiftCrashSaysCohereSwiftsWordsInEveryView(test *testing.T) {
+	restorePackageStateAfter(test)
 	cohereWords := []string{"bug in cohere", "nothing in this file was checked", reportBugsAt}
 	for _, language := range crashLanguages {
 		for _, mode := range []outputMode{outputHuman, outputVerbose} {
@@ -288,6 +288,7 @@ func TestASwiftCrashSaysCohereSwiftsWordsInEveryView(test *testing.T) {
 
 // Not parallel: its subtests swap the package-level activeOutput and activeSummary
 func TestVerboseNamesEveryCrashOnceAndNoGroup(test *testing.T) {
+	restorePackageStateAfter(test)
 	for _, language := range crashLanguages {
 		// Not parallel: it swaps the package-level activeOutput and activeSummary
 		test.Run(language.name, func(test *testing.T) {
@@ -306,6 +307,7 @@ func TestVerboseNamesEveryCrashOnceAndNoGroup(test *testing.T) {
 
 // Not parallel: its subtests swap the package-level activeOutput and activeSummary
 func TestJsonListsEveryCrashBesideTheCounts(test *testing.T) {
+	restorePackageStateAfter(test)
 	for _, language := range crashLanguages {
 		// Not parallel: it swaps the package-level activeOutput and activeSummary
 		test.Run(language.name, func(test *testing.T) {

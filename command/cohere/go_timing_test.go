@@ -96,8 +96,7 @@ func timingSection(test *testing.T, output string) string {
 // and what measuring cost. A record whose rules arrive in another order prints the same table.
 // Not parallel: it swaps the package-level activeOutput and activeSummary, which the record acceptors read and set
 func TestAGoRunPrintsItsTimingTable(test *testing.T) {
-	saved, savedSummary := activeOutput, activeSummary
-	defer func() { activeOutput, activeSummary = saved, savedSummary }()
+	restorePackageStateAfter(test)
 
 	lines := goTimingStream(test, nil)
 	output, renderError := renderGoTiming(test, outputVerbose, true, lines)
@@ -207,8 +206,7 @@ func TestAGoRunPrintsItsTimingTable(test *testing.T) {
 // clock and without it, and a record of a run with none says nothing of builds.
 // Not parallel: it swaps the package-level activeOutput and activeSummary, which the record acceptors read and set
 func TestAGoTimingRecordSaysItsExtraBuildsRestoredNothing(test *testing.T) {
-	saved, savedSummary := activeOutput, activeSummary
-	defer func() { activeOutput, activeSummary = saved, savedSummary }()
+	restorePackageStateAfter(test)
 
 	sentence := "  builds: 2 extra builds restored nothing from the host's run, because a timed run keeps nothing " +
 		"for them, so every package of every build was checked from source and the rows include that work\n"
@@ -240,8 +238,7 @@ func TestAGoTimingRecordSaysItsExtraBuildsRestoredNothing(test *testing.T) {
 // columns out rather than printing zeros, and keeps the counts, as printTimings does for TypeScript.
 // Not parallel: it swaps the package-level activeOutput and activeSummary, which the record acceptors read and set
 func TestAGoTimingRecordWithNoClockKeepsItsCounts(test *testing.T) {
-	saved, savedSummary := activeOutput, activeSummary
-	defer func() { activeOutput, activeSummary = saved, savedSummary }()
+	restorePackageStateAfter(test)
 
 	output, renderError := renderGoTiming(test, outputHuman, true, goTimingStream(test,
 		func(record *contract.TimingRecord) {
@@ -274,8 +271,7 @@ func TestAGoTimingRecordWithNoClockKeepsItsCounts(test *testing.T) {
 // as an empty table that reads as every rule being free.
 // Not parallel: it swaps the package-level activeOutput and activeSummary, which the record acceptors read and set
 func TestAGoTimingRecordWithNoRulesSaysSo(test *testing.T) {
-	saved, savedSummary := activeOutput, activeSummary
-	defer func() { activeOutput, activeSummary = saved, savedSummary }()
+	restorePackageStateAfter(test)
 
 	output, renderError := renderGoTiming(test, outputHuman, true, goTimingStream(test,
 		func(record *contract.TimingRecord) { record.Rules = []contract.RuleTiming{} }))
@@ -291,8 +287,7 @@ func TestAGoTimingRecordWithNoRulesSaysSo(test *testing.T) {
 // fields as it wrote them, before the summary, and no table.
 // Not parallel: it swaps the package-level activeOutput and activeSummary, which the record acceptors read and set
 func TestAGoTimingRecordIsWrittenThroughUnderJson(test *testing.T) {
-	saved, savedSummary := activeOutput, activeSummary
-	defer func() { activeOutput, activeSummary = saved, savedSummary }()
+	restorePackageStateAfter(test)
 
 	lines := goTimingStream(test, nil)
 	output, renderError := renderGoTiming(test, outputJson, true, lines)
@@ -320,8 +315,7 @@ func TestAGoTimingRecordIsWrittenThroughUnderJson(test *testing.T) {
 // break the stream, as every record out of its place does.
 // Not parallel: it swaps the package-level activeOutput and activeSummary, which the record acceptors read and set
 func TestABrokenGoTimingRecordIsRefused(test *testing.T) {
-	saved, savedSummary := activeOutput, activeSummary
-	defer func() { activeOutput, activeSummary = saved, savedSummary }()
+	restorePackageStateAfter(test)
 
 	lines := goTimingStream(test, nil)
 	timing := slices.IndexFunc(lines, func(line string) bool { return strings.HasPrefix(line, `{"kind":"timing"`) })

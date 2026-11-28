@@ -32,8 +32,7 @@ func goStreamWithTypesField(test *testing.T, field string) []string {
 // Not parallel: it renders through contractRun, whose record acceptors set the package-level activeOutput and
 // activeSummary.
 func TestAGoRunWhoseHeadersWereNotSharedSaysWhy(test *testing.T) {
-	savedOutput, savedSummary := activeOutput, activeSummary
-	defer func() { activeOutput, activeSummary = savedOutput, savedSummary }()
+	restorePackageStateAfter(test)
 
 	reason, marshalError := json.Marshal(unsharedHeaders)
 	if marshalError != nil {

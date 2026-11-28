@@ -112,6 +112,7 @@ func TestSwiftRequestedPhasesReadTheFlagsAsTheTypeScriptRunDoes(test *testing.T)
 // complete, which it is (documentation/contract/Contract.md, `complete`). LintOnly.jsonl is a real stream of that run.
 // Not parallel: it renders a check run through contractRun, whose record acceptors set the package-level activeSummary
 func TestALintRunThatSkipsWhatItWasNotAskedForIsComplete(test *testing.T) {
+	restorePackageStateAfter(test)
 	lint := contractRequestedPhases(flagsOf("lint"))
 
 	output, exitCode, renderRequestedError := renderRequested(test, contractFixture(test, "LintOnly.jsonl"), lint, 1)
@@ -145,6 +146,7 @@ func TestALintRunThatSkipsWhatItWasNotAskedForIsComplete(test *testing.T) {
 // A phase the caller asked for that comes back skipped still fails, whatever the child calls it.
 // Not parallel: it renders a check run through contractRun, whose record acceptors set the package-level activeSummary
 func TestARequestedPhaseThatComesBackSkippedStillFails(test *testing.T) {
+	restorePackageStateAfter(test)
 	// Skipped as not requested when it was requested: a bare run reported as though it were --lint. The
 	// child is refused rather than believed.
 	_, _, renderRequestedError := renderRequested(
@@ -202,6 +204,7 @@ func TestARequestedPhaseThatComesBackSkippedStillFails(test *testing.T) {
 //
 // Not parallel: it renders a check run through contractRun, whose record acceptors set the package-level activeSummary
 func TestFormatOnlyAsksForTheFixPhaseAlone(test *testing.T) {
+	restorePackageStateAfter(test)
 	given, value := flagsOf("no-fix", "format-only")
 	requested := contractRequestedPhases(given, value)
 	if !requested[phaseFix] || requested[phaseTypes] || requested[phaseLint] || requested[phaseUnused] {

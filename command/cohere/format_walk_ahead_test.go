@@ -29,6 +29,7 @@ func (formatter *countingFormatter) Enumerate(root string) (format_files.Enumera
 // for the same formatter and root, it equals a walk made on the spot, and it is taken once. A walk of another
 // root, or by another formatter, is made on the spot.
 func TestTheFormatWalkBegunAheadIsTheOneTheFixPhaseWouldMake(test *testing.T) {
+	restorePackageStateAfter(test)
 	root := test.TempDir()
 	for name, contents := range map[string]string{
 		"a.ts":          "export const a = 1;\n",
@@ -55,7 +56,6 @@ func TestTheFormatWalkBegunAheadIsTheOneTheFixPhaseWouldMake(test *testing.T) {
 	if newResolvingError != nil {
 		test.Fatal(newResolvingError)
 	}
-	test.Cleanup(func() { aheadFormatWalk = nil })
 
 	direct, enumerateError := resolving.Enumerate(root)
 	if enumerateError != nil {

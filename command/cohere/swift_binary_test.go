@@ -52,6 +52,7 @@ func runFakeSwiftBinary(test *testing.T, body string, mode contractMode) (string
 // Not parallel: its subtests drive check runs through contractRun, whose record acceptors set the package-level
 // activeSummary
 func TestRunContractBinaryEndings(test *testing.T) {
+	restorePackageStateAfter(test)
 	fixtures, absolutePathError := filepath.Abs(contractFixtureDirectory)
 	if absolutePathError != nil {
 		test.Fatal(absolutePathError)

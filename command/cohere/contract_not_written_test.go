@@ -49,8 +49,7 @@ func renderGoStreamExiting(test *testing.T, mode outputMode, lines []string, exi
 // record shows what it did not do.
 // Not parallel: it swaps the package-level activeOutput and activeSummary, which the record acceptors set
 func TestAGoRunNamesTheFilesItDidNotWrite(test *testing.T) {
-	saved, savedSummary := activeOutput, activeSummary
-	defer func() { activeOutput, activeSummary = saved, savedSummary }()
+	restorePackageStateAfter(test)
 	stream := goStreamNotWritten(test, false)
 	wantGap := []notWrittenFile{{File: "/project/shared/sum.go", RealPath: "/elsewhere/shared/sum.go"}}
 	const marker = " • ⚠ not written: 1 file reached through a link outside the root"
@@ -100,8 +99,7 @@ func TestAGoRunNamesTheFilesItDidNotWrite(test *testing.T) {
 // `--json` or in the footer.
 // Not parallel: it swaps the package-level activeOutput and activeSummary, which the record acceptors set
 func TestAGoRunThatWroteEverythingNamesNoFileNotWritten(test *testing.T) {
-	saved, savedSummary := activeOutput, activeSummary
-	defer func() { activeOutput, activeSummary = saved, savedSummary }()
+	restorePackageStateAfter(test)
 	empty := contractFixture(test, "GoClean.jsonl")
 	for index, line := range empty {
 		if strings.HasPrefix(line, `{"kind":"fix"`) {
