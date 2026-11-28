@@ -121,7 +121,16 @@ func stampTreeTimes(tree string) ([]string, error) {
 	slices.SortStableFunc(directories, func(first treeEntry, second treeEntry) int {
 		return strings.Count(second.path, "/") - strings.Count(first.path, "/")
 	})
-	for _, entry := range slices.Concat(files, directories, []treeEntry{{kind: "tree", id: rootId, path: "."}}) {
+	// The tree's own .git, a worktree's file naming its git directory, is written whenever the tree is laid, and git
+	// never tracks it, so it is stamped at directoryTime too, before the root: a test that lists the root reads its
+	// stat, and one that finds the repository opens it (#ntrewm3). Shackler lays each job's tree afresh, and a .git
+	// written anew each job reran every package whose tests read the root, 48 of 441 on an identical tree (J-pn426fv).
+	gitEntry := treeEntry{kind: "git", path: ".git"}
+	for _, entry := range slices.Concat(
+		files,
+		directories,
+		[]treeEntry{gitEntry, {kind: "tree", id: rootId, path: "."}},
+	) {
 		when := directoryTime
 		if entry.kind == "blob" {
 			stamp, timeError := objectTime(entry.id)
@@ -132,8 +141,9 @@ func stampTreeTimes(tree string) ([]string, error) {
 		}
 		place := filepath.Join(tree, filepath.FromSlash(entry.path))
 		if changeError := os.Chtimes(place, when, when); changeError != nil {
-			if entry.kind == "tree" && errors.Is(changeError, os.ErrNotExist) {
-				// A directory git tracks only through files that aren't checked out has nothing on disk to stamp.
+			if entry.kind != "blob" && errors.Is(changeError, os.ErrNotExist) {
+				// A directory git tracks only through files that aren't checked out has nothing on disk to stamp, and a
+				// tree laid without a .git of its own has none.
 				continue
 			}
 			return nil, fmt.Errorf("stamping %s: %w", entry.path, changeError)
