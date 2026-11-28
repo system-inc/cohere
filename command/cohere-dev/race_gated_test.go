@@ -41,6 +41,32 @@ func TestEveryRaceGatedEntryIsAPackageThatSaysWhy(test *testing.T) {
 	}
 }
 
+// The -race list internal/testing/guard reads by parsing race_gated.go is the list the gate runs: raceGated as this
+// binary holds it, in order, and racePatterns' tokens one for each, so an init or another file that changed the list
+// at run time would leave the guard reading one list while the gate ran another (the Go Square's S1 on #0zdyk51).
+func TestTheParsedRaceListIsTheOneTheGateRuns(test *testing.T) {
+	test.Parallel()
+	parsed, parseError := concurrency_tests.RaceGatedDirectories("race_gated.go", nil)
+	if parseError != nil {
+		test.Fatal(parseError)
+	}
+	running := []string{}
+	for _, entry := range raceGated {
+		running = append(running, entry.directory)
+	}
+	if !slices.Equal(parsed, running) {
+		test.Errorf("race_gated.go's raceGated parses as %q, and the gate runs %q", parsed, running)
+	}
+	tokens := []string{}
+	for _, token := range racePatterns(filepath.Join("..", "..")) {
+		directory, _, _ := strings.Cut(strings.TrimPrefix(token, "./"), raceRunSeparator)
+		tokens = append(tokens, directory)
+	}
+	if !slices.Equal(tokens, running) {
+		test.Errorf("racePatterns names %q, and raceGated %q", tokens, running)
+	}
+}
+
 // raceGateContext is the build a gate's -race run compiles a package's tests under: macBoxPlatform, the platform of
 // the toolchain the integrate job's script pins, with cgo on and the race tag the race detector sets.
 var raceGateContext = func() build.Context {

@@ -6,6 +6,8 @@
 package concurrency_tests
 
 import (
+	"errors"
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -13,6 +15,8 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
+	"strconv"
 	"strings"
 )
 
@@ -95,4 +99,92 @@ func Directories(root string) (map[string]string, error) {
 func holdsModule(directory string) bool {
 	_, statError := os.Stat(filepath.Join(directory, "go.mod"))
 	return statError == nil
+}
+
+// RaceGatedDirectories are the directories the -race list names in source, command/cohere-dev's race_gated.go, in
+// order: each entry's `directory` field of the one `var raceGated = []raceEntry{...}`. It refuses, by what it found, a
+// source with no such list or two, a list spec naming more than raceGated, a list that is no literal, an entry that is
+// no literal, and an entry whose directory is no string literal, so the guard reading it never checks the module
+// against less than the list says. command/cohere-dev's own test holds what it reads equal to the list the gate runs.
+// source is the file's text, or nil to read file itself.
+func RaceGatedDirectories(file string, source []byte) ([]string, error) {
+	// The parser reads file only when handed an untyped nil: a nil slice would parse as an empty source.
+	var parsed *ast.File
+	var parseError error
+	if source == nil {
+		parsed, parseError = parser.ParseFile(token.NewFileSet(), file, nil, parser.SkipObjectResolution)
+	} else {
+		parsed, parseError = parser.ParseFile(token.NewFileSet(), file, source, parser.SkipObjectResolution)
+	}
+	if parseError != nil {
+		return nil, parseError
+	}
+	var list *ast.CompositeLit
+	for _, declaration := range parsed.Decls {
+		general, isGeneral := declaration.(*ast.GenDecl)
+		if !isGeneral || general.Tok != token.VAR {
+			continue
+		}
+		for _, specification := range general.Specs {
+			value, isValue := specification.(*ast.ValueSpec)
+			if !isValue || !slices.ContainsFunc(value.Names, func(name *ast.Ident) bool {
+				return name.Name == "raceGated"
+			}) {
+				continue
+			}
+			if len(value.Names) != 1 || len(value.Values) != 1 {
+				return nil, fmt.Errorf("%s declares raceGated beside another name or with no single value", file)
+			}
+			if list != nil {
+				return nil, fmt.Errorf("%s declares raceGated twice", file)
+			}
+			literal, isLiteral := value.Values[0].(*ast.CompositeLit)
+			if !isLiteral {
+				return nil, fmt.Errorf("%s's raceGated is no list literal", file)
+			}
+			list = literal
+		}
+	}
+	if list == nil {
+		return nil, fmt.Errorf("%s declares no raceGated", file)
+	}
+	directories := []string{}
+	for _, element := range list.Elts {
+		entry, isEntry := element.(*ast.CompositeLit)
+		if !isEntry {
+			return nil, fmt.Errorf("%s's raceGated holds an entry that is no literal", file)
+		}
+		directory, directoryError := entryDirectory(entry)
+		if directoryError != nil {
+			return nil, fmt.Errorf("%s's raceGated: %w", file, directoryError)
+		}
+		directories = append(directories, directory)
+	}
+	if len(directories) == 0 {
+		return nil, fmt.Errorf("%s's raceGated names no directory", file)
+	}
+	return directories, nil
+}
+
+// errorNoDirectory is an entry of the -race list with no `directory` written as a string literal.
+var errorNoDirectory = errors.New("an entry has no directory written as a string literal")
+
+// entryDirectory is the string literal entry's `directory` field holds, or errNoDirectory.
+func entryDirectory(entry *ast.CompositeLit) (string, error) {
+	for _, field := range entry.Elts {
+		keyed, isKeyed := field.(*ast.KeyValueExpr)
+		if !isKeyed {
+			continue
+		}
+		key, isIdentifier := keyed.Key.(*ast.Ident)
+		if !isIdentifier || key.Name != "directory" {
+			continue
+		}
+		literal, isLiteral := keyed.Value.(*ast.BasicLit)
+		if !isLiteral || literal.Kind != token.STRING {
+			return "", errorNoDirectory
+		}
+		return strconv.Unquote(literal.Value)
+	}
+	return "", errorNoDirectory
 }
