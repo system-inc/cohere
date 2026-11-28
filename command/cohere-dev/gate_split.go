@@ -59,9 +59,10 @@ const gateSplitWaitDefault = 10 * time.Minute
 // the last split gate, plain and under -race, and each box's last half, which the next split weighs its halves by.
 const gateTimesFile = "gate-times.json"
 
-// gateShardedDirectory is the package the box runs in shards (boxShardedPackage), by its directory. It runs alone after
-// a half's plain run on all of her cores, so its weight counts at full value on either half rather than scaled by the
-// box's factor, and the Square's starting split runs it alone on one half until a split gate has written gateTimesFile.
+// gateShardedDirectory is the package the box runs in shards (boxShardTable's first row), by its directory. It runs
+// alone after a half's plain run on all of her cores, so its weight counts at full value on either half rather than
+// scaled by the box's factor, and the Square's starting split runs it alone on one half until a split gate has written
+// gateTimesFile.
 const gateShardedDirectory = "internal/go_language"
 
 // gateSplitUnweighed is the seconds a package or race token weighs when gateTimesFile holds no time of its kind at all.
