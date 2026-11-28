@@ -1099,10 +1099,27 @@ func (job *integrateJobRun) tests(share func(string) []string) (string, int) {
 		trees = append(trees, filepath.Join(job.tree, "TypeScript"))
 	}
 	job.sayTree("before tests", trees)
+	// The tests write nothing into the tree they test (holdTreeStill): every directory of it is read-only while they
+	// run, and given back its own mode on every way out.
+	releaseTree, holdError := holdTreeStill(job.tree)
+	if holdError != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: %v, so no test ran\n", holdError)
+		return "", 1
+	}
+	defer func() {
+		if releaseError := releaseTree(); releaseError != nil {
+			fmt.Fprintf(streams.Errors, "cohere-dev: giving the laid tree back its modes: %v\n", releaseError)
+		}
+	}()
 	before := job.readCache()
 	output, runError := runIntegrateJobScript(job.scratch, script, arguments)
+	if releaseError := releaseTree(); releaseError != nil {
+		fmt.Fprintf(streams.Errors, "cohere-dev: giving the laid tree back its modes after the tests: %v, so nothing "+
+			"integrates\n", releaseError)
+		return "", 1
+	}
 	job.sayCache(before, job.readCache())
-	job.sayTree("after tests", trees)
+	moved := job.sayTree("after tests", trees)
 	for _, line := range testEnvironment(output) {
 		job.say("test environment %s", line)
 	}
@@ -1131,6 +1148,13 @@ func (job *integrateJobRun) tests(share func(string) []string) (string, int) {
 	code, where := verdictLine(job.tree, covered, verdict, "shared uid, "+job.cacheSaid())
 	if code != 0 {
 		return "", code
+	}
+	// A test that wrote into the laid tree saved its key with an input the next job's fresh tree won't have, so every
+	// package reading what it moved reruns on every landing after (#d49qcjg): the landing is refused, naming the paths.
+	if len(moved) > 0 {
+		fmt.Fprintf(streams.Errors, "cohere-dev: the tests moved %d path(s) of the laid tree off its stamp, so "+
+			"nothing integrates: %s\n", len(moved), strings.Join(moved, ", "))
+		return "", 1
 	}
 	tested := testedNamed(covered) + " " + where
 	job.ran = append(job.ran, tested)

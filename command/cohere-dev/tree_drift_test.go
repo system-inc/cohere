@@ -3,6 +3,7 @@
 package main
 
 import (
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -61,8 +62,9 @@ func TestATreeOffItsStampIsNamed(test *testing.T) {
 }
 
 // The account names each package that ran, rather than replayed, with its test binary's seconds, and every path of the
-// laid tree off its stamp before the tests and after: here none before, and after the scratch a test wrote into the
-// tree, with the root it was written in (#ntrewm3).
+// laid tree off its stamp before the tests and after (#ntrewm3). A test's scratch written into the tree is refused by
+// the kernel, since every directory of it is read-only while the tests run (holdTreeStill, #d49qcjg), so the tree
+// reads as still after them, and its directories have their own modes back.
 func TestAnIntegrateJobsAccountNamesWhatRanAndWhatMoved(test *testing.T) {
 	test.Parallel()
 	fixture := newIntegrateJobFixture(test)
@@ -77,10 +79,7 @@ func TestAnIntegrateJobsAccountNamesWhatRanAndWhatMoved(test *testing.T) {
 	for _, line := range []string{
 		`ran tests example\.com/fixture/[a-z/]+ 1\.0s`,
 		`laid tree before tests 0 off the stamp \(a walk, [0-9.]+s\)`,
-		`laid tree after tests 2 off the stamp \(a walk, [0-9.]+s\)`,
-		`laid tree after tests moved \. [0-9T:.Z-]+`,
-		`laid tree after tests untracked test-scratch`,
-		`laid tree after tests difference none: no tracked file's bytes differ from its HEAD`,
+		`laid tree after tests 0 off the stamp \(a walk, [0-9.]+s\)`,
 	} {
 		if want := regexp.MustCompile(`(?m)^` + integrateJobMarker + line + `$`); !want.MatchString(ran.errors) {
 			test.Errorf("the account doesn't match %s:\n%s", want, ran.errors)
@@ -89,11 +88,20 @@ func TestAnIntegrateJobsAccountNamesWhatRanAndWhatMoved(test *testing.T) {
 	if strings.Contains(ran.errors, integrateJobMarker+"ran tests example.com/fixture/alpha ") {
 		test.Errorf("the account names a package that replayed as one that ran:\n%s", ran.errors)
 	}
+	if _, statError := os.Lstat(filepath.Join(tree, "test-scratch")); !errors.Is(statError, os.ErrNotExist) {
+		test.Errorf("a test wrote its scratch into the laid tree while the tests ran: %v", statError)
+	}
+	for _, directory := range []string{tree, filepath.Join(tree, "command", "cohere")} {
+		information, statError := os.Stat(directory)
+		if statError != nil || information.Mode().Perm()&0o200 == 0 {
+			test.Errorf("%s wasn't given back its own mode after the tests: %v, %v", directory, information, statError)
+		}
+	}
 }
 
-// A tracked file a test rewrites is named moved, and its new bytes are said as the trees' difference from their `HEAD`,
-// so the account reads a rewrite apart from a touch: go.work.sum moved on Shackler with nothing saying what it gained
-// (#d49qcjg).
+// A tracked file a test rewrites in place, which a read-only directory still lets it write, is named moved, its new
+// bytes are said as the trees' difference from their `HEAD`, so the account reads a rewrite apart from a touch
+// (go.work.sum moved on Shackler with nothing saying what it gained), and the landing is refused, naming it (#d49qcjg).
 func TestAnIntegrateJobsAccountSaysWhatATestRewrote(test *testing.T) {
 	test.Parallel()
 	fixture := newIntegrateJobFixture(test)
@@ -101,8 +109,13 @@ func TestAnIntegrateJobsAccountSaysWhatATestRewrote(test *testing.T) {
 	tree := filepath.Join(fixture.home, integrateJobScratch, "tree")
 	fixture.reply("tests.grows", filepath.Join(tree, "command", "cohere", "main.go"))
 	ran := fixture.integrateJob(fixture.merged())
-	if ran.exit != 0 {
-		test.Fatalf("the integrate job exited %d:\n%s", ran.exit, ran.errors)
+	refused := "cohere-dev: the tests moved 1 path(s) of the laid tree off its stamp, so nothing integrates: moved " +
+		"command/cohere/main.go "
+	if ran.exit == 0 || !strings.Contains(ran.errors, refused) {
+		test.Fatalf("the integrate job exited %d, want it refused saying %q:\n%s", ran.exit, refused, ran.errors)
+	}
+	if strings.Contains(ran.output, "integrated ") {
+		test.Errorf("a refused integration printed its landing:\n%s", ran.output)
 	}
 	for _, line := range []string{
 		`laid tree after tests moved command/cohere/main\.go [0-9T:.Z-]+`,

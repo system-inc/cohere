@@ -177,17 +177,18 @@ func (job *integrateJobRun) sayPackages(output []byte) {
 const treeLinesSaid = 60
 
 // sayTree says, when, `before tests` or `after tests`, every path of trees off its stamp (treeOffTheStamp): how many,
-// with the seconds the walk took, then each, up to treeLinesSaid, the count of the rest after them. Read beside the
-// packages that ran, a path that is there after the tests and not before is one a test's key holds and the next job's
-// lookup doesn't, and a path off the stamp before the tests is one something in the job wrote first.
-func (job *integrateJobRun) sayTree(when string, trees []string) {
+// with the seconds the walk took, then each, up to treeLinesSaid, the count of the rest after them. It returns them
+// all, and a walk it couldn't make as one path off, since a tree that can't be read can't be said to be still. Read
+// beside the packages that ran, a path that is there after the tests and not before is one a test's key holds and the
+// next job's lookup doesn't, and a path off the stamp before the tests is one something in the job wrote first.
+func (job *integrateJobRun) sayTree(when string, trees []string) []string {
 	started := time.Now()
 	off := []string{}
 	for _, tree := range trees {
 		treeOff, offError := treeOffTheStamp(tree)
 		if offError != nil {
 			job.say("laid tree %s unread: %v", when, offError)
-			return
+			return []string{"unread: " + offError.Error()}
 		}
 		for _, line := range treeOff {
 			kind, path, _ := strings.Cut(line, " ")
@@ -212,6 +213,7 @@ func (job *integrateJobRun) sayTree(when string, trees []string) {
 	if len(off) > 0 {
 		job.sayTreeDifference(when, trees)
 	}
+	return off
 }
 
 // treeDifferenceLinesSaid is how many lines of the laid trees' difference from their `HEAD` the account prints at one
