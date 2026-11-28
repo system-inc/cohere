@@ -55,6 +55,7 @@ func acceptGoStream(test *testing.T, mode contractMode, lines []string) (*contra
 // record naming no file, which would match any tree, and an inputs record in a listing, which is no verdict.
 // Not parallel: it renders check runs through contractRun, whose record acceptors set the package-level activeSummary.
 func TestContractRunKeepsTheGoInputsRecord(test *testing.T) {
+	restorePackageStateAfter(test)
 	root := filepath.Join(test.TempDir(), "module")
 	run, acceptError := acceptGoStream(test, contractModeCheck, goStreamWith(test, goInputsLine(root)))
 	if acceptError != nil {
@@ -260,6 +261,7 @@ func TestGoRunUnrecordableKeepsAllButAVerdict(test *testing.T) {
 // the fix record counts with the formatter's.
 // Not parallel: it renders a check run through contractRun, whose record acceptors set the package-level activeSummary.
 func TestARenamingGoRunIsNeverRecorded(test *testing.T) {
+	restorePackageStateAfter(test)
 	golden := filepath.Join("..", "..", "internal", "go_language", "testdata", "rename-rewritten", "expected.jsonl")
 	contents, readError := os.ReadFile(golden)
 	if readError != nil {
@@ -289,8 +291,7 @@ func TestARenamingGoRunIsNeverRecorded(test *testing.T) {
 // whose child wrote no inputs record is never declared, and one that is no verdict is declined.
 // Not parallel: it sets the package-level activeRunCache for its length.
 func TestDeclareGoRunCacheInputsDeclaresTheChildsAndTheFrontDoors(test *testing.T) {
-	previous := activeRunCache
-	defer func() { activeRunCache = previous }()
+	restorePackageStateAfter(test)
 	root := test.TempDir()
 	present := filepath.Join(root, "CohereSettings.json")
 	if writeError := os.WriteFile(present, []byte(`{"go":{"rules":{}}}`), 0o644); writeError != nil {
@@ -418,8 +419,7 @@ func goStreamWithLintField(test *testing.T, name, value string) []string {
 // its own; a record without it, as every Swift record is, prints neither, so a Swift run's output is as it was.
 // Not parallel: it swaps the package-level activeOutput and activeSummary, which the record acceptors set
 func TestAGoRunSaysWhatItsPackageCacheDid(test *testing.T) {
-	savedOutput, savedSummary := activeOutput, activeSummary
-	defer func() { activeOutput, activeSummary = savedOutput, savedSummary }()
+	restorePackageStateAfter(test)
 	cases := []struct {
 		name        string
 		lines       []string
@@ -607,8 +607,7 @@ const goCleanSummaryJson = `{"kind":"summary","schemaVersion":1,"verdict":"pass"
 // (pinMeasuredTotal), from a process started 100ms before the render.
 // Not parallel: it swaps the package-level activeOutput and activeSummary, which the record acceptors set
 func TestAGoRunSaysWhichBuildsItChecked(test *testing.T) {
-	savedOutput, savedSummary := activeOutput, activeSummary
-	defer func() { activeOutput, activeSummary = savedOutput, savedSummary }()
+	restorePackageStateAfter(test)
 	footerLine := regexp.MustCompile(`(?m)^✓ 💎 .*\n`)
 	secondsField := regexp.MustCompile(`^(\{"kind":"summary","schemaVersion":1,"verdict":"pass","seconds":)[0-9.e-]+,`)
 	for _, testCase := range []struct {

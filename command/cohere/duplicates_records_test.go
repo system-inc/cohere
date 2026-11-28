@@ -48,6 +48,7 @@ func streamWithDuplicates(test *testing.T) []string {
 // stay the child's: the record is no finding.
 // Not parallel: contractRun's record acceptors set the package-level activeSummary
 func TestADuplicatesRecordPrintsTheReportAndMovesNoVerdict(test *testing.T) {
+	restorePackageStateAfter(test)
 	output, exitCode, renderError := renderDuplicatesStream(test, streamWithDuplicates(test), true)
 	if renderError != nil || exitCode != 0 {
 		test.Fatalf("exit %d, %v:\n%s", exitCode, renderError, output)
@@ -62,6 +63,7 @@ func TestADuplicatesRecordPrintsTheReportAndMovesNoVerdict(test *testing.T) {
 // a second one, and a run that asked and ended without one.
 // Not parallel: contractRun's record acceptors set the package-level activeSummary
 func TestABrokenDuplicatesStreamIsRefused(test *testing.T) {
+	restorePackageStateAfter(test)
 	clean := contractFixture(test, "Clean.jsonl")
 	withRecord := streamWithDuplicates(test)
 	twice := slices.Insert(slices.Clone(withRecord), len(withRecord)-1, duplicatesRecord)
@@ -93,6 +95,7 @@ func TestABrokenDuplicatesStreamIsRefused(test *testing.T) {
 // root holding Swift beside TypeScript or Go is never refused for asking.
 // Not parallel: contractRun's record acceptors set the package-level activeSummary
 func TestASwiftRunSaysItsDuplicatesReportDidNotRun(test *testing.T) {
+	restorePackageStateAfter(test)
 	var out bytes.Buffer
 	stream := bufio.NewWriter(&out)
 	run := newContractRun(stream, contractModeCheck, swiftLanguage, "", time.Now())

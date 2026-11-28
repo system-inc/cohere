@@ -193,8 +193,7 @@ func TestSwiftBinaryChoiceFollowsTheResolvesOrder(test *testing.T) {
 // makes a rebuilt cohere-swift a miss.
 // Not parallel: it sets the package-level activeRunCache for its length.
 func TestASwiftRecordKeepsNoHoldingDirectoryItDidNotList(test *testing.T) {
-	previous := activeRunCache
-	defer func() { activeRunCache = previous }()
+	restorePackageStateAfter(test)
 	root := test.TempDir()
 	write := func(name string) string {
 		path := filepath.Join(root, name)

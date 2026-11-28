@@ -302,108 +302,54 @@ func TestTheBuildsWidthReachesNoKey(test *testing.T) {
 	}
 }
 
-// Extra builds side by side load side by side, and their loads share the run's one memory limit (loadMemory): over the
-// fixture at width 3 with the limit watched, every load runs and ends under the cap, a raise landing only once no load
-// is in flight, and no limit the run sets ever passes the cap plus lateMemoryAllowance, the run's worst case (#44n0vap,
-// #b2t9xmf).
-func TestBuildsSideBySideNeverPassTheCapPlusOneAllowance(test *testing.T) {
-	test.Parallel()
-	watch := &memoryWatch{current: memoryCap}
-	// during is the limit at every look inside a load, as package load asks for a file's held bytes.
-	var during []int64
-	configure := func(pipeline *pipeline) {
-		pipeline.memory = capMemoryWatched(watch, watch.collecting)
-		pipeline.memory.duringLoad = func() {
-			watch.lock.Lock()
-			defer watch.lock.Unlock()
-			during = append(during, watch.current)
-		}
-		pipeline.loads = newLoadMemory(pipeline.memory, false)
-		pipeline.buildsWidthForced = 3
-	}
-	pipeline, _ := runOverConfigured(test, threeExtraBuilds(test), exitFindings, configure, "--no-cache")
-	if pipeline.buildsAtOnce != 3 || len(pipeline.buildRuns) != 4 {
-		test.Fatalf("the run ran %d builds beside the host's, %d at once, want 3 at once", len(pipeline.buildRuns)-1,
-			pipeline.buildsAtOnce)
-	}
-	ceiling := memoryCap + lateMemoryAllowance
-	watch.lock.Lock()
-	defer watch.lock.Unlock()
-	if !watch.raised || len(watch.endedUnder) == 0 {
-		test.Fatalf("the run raised %t and ended %d loads, want a raise after a load", watch.raised,
-			len(watch.endedUnder))
-	}
-	for _, limit := range watch.set {
-		if limit > ceiling {
-			test.Errorf("the run set its limit to %d, past the cap plus one allowance, %d", limit, ceiling)
-		}
-	}
-	if len(during) == 0 {
-		test.Fatal("no look inside a load read the limit, so what the loads ran under went unread")
-	}
-	for index, limit := range during {
-		if limit != memoryCap {
-			test.Errorf("look %d of %d inside a load read a limit of %d, want the cap, %d", index+1, len(during),
-				limit, memoryCap)
-		}
-	}
-	for index, limit := range watch.endedUnder {
-		if limit != memoryCap {
-			test.Errorf("load %d of %d ended under a limit of %d, want the cap, %d", index+1, len(watch.endedUnder),
-				limit, memoryCap)
-		}
-	}
-}
-
-// The width is as many builds as the memory cap holds beside the host's live heap, each taken at its lint's peak,
-// floor((cap - live) / (holding * factor)), the factor 3.5 with a findings store and 2.5 without one (#hv090f4), and
+// The width is as many builds as the memory limit holds beside the host's live heap, each taken at its lint's peak,
+// floor((limit - live) / (holding * factor)), the factor 3.5 with a findings store and 2.5 without one (#hv090f4), and
 // one more where the slack fits it (TestTheBuildsWidthSlack), no more than the builds and at least one, and one at a
-// time under
-// `--single-threaded`, without a memory decision, a live heap or a holding read, and under any limit but the cap
-// (#rmzehfg). The cap here is 8 GiB.
+// time under `--single-threaded`, without a memory decision, a live heap or a holding read, and under a limit the
+// environment set or the bound for memory that could not be read (#rmzehfg). The limit here is half of 16 GiB available
+// but where a case says, and a limit under 8 GiB runs side by side as far as its budget holds (#jrr6a5x).
 func TestTheBuildsWidth(test *testing.T) {
 	test.Parallel()
-	underCap := &memoryAccount{record: contract.Memory{LimitBytes: memoryCap, CapBytes: memoryCap,
-		Source: contract.MemorySourceCap}}
-	underSource := func(source contract.MemorySource) *memoryAccount {
-		return &memoryAccount{record: contract.Memory{LimitBytes: memoryCap, CapBytes: memoryCap,
-			Source: source}}
+	underEight := halfOfAvailable(eightGibibytes)
+	underSource := func(source contract.MemorySource) *contract.Memory {
+		return &contract.Memory{LimitBytes: eightGibibytes, Source: source}
 	}
 	const gibibyte = uint64(1) << 30
 	for _, each := range []struct {
 		name           string
 		extras         int
 		singleThreaded bool
-		memory         *memoryAccount
+		memory         *contract.Memory
 		live           uint64
 		holding        uint64
 		withoutStore   bool
 		want           int
 	}{
 		// 7 GiB of room over peaks of 3.5 GiB: without the factor, the holding alone would make it seven.
-		{name: "each build taken at its peak", extras: 6, memory: underCap, live: gibibyte, holding: gibibyte,
+		{name: "each build taken at its peak", extras: 6, memory: underEight, live: gibibyte, holding: gibibyte,
 			want: 2},
 		// Peaks of 2.625 GiB with a store and 1.875 GiB without one, in 7 GiB of room: two and three by the factors,
 		// and without a store the slack's fourth, four builds at 2.16 times 0.75 GiB and the margin filling 6.98 GiB.
-		{name: "a store's peak", extras: 6, memory: underCap, live: gibibyte, holding: gibibyte * 3 / 4, want: 2},
-		{name: "a peak without a store", extras: 6, memory: underCap, live: gibibyte, holding: gibibyte * 3 / 4,
+		{name: "a store's peak", extras: 6, memory: underEight, live: gibibyte, holding: gibibyte * 3 / 4, want: 2},
+		{name: "a peak without a store", extras: 6, memory: underEight, live: gibibyte, holding: gibibyte * 3 / 4,
 			withoutStore: true, want: 4},
-		{name: "memory holds every build", extras: 6, memory: underCap, live: gibibyte / 2, holding: gibibyte / 4,
+		{name: "memory holds every build", extras: 6, memory: underEight, live: gibibyte / 2, holding: gibibyte / 4,
 			want: 6},
-		{name: "builds are two", extras: 2, memory: underCap, live: gibibyte, holding: gibibyte / 4, want: 2},
-		{name: "room for one peak", extras: 6, memory: underCap, live: 4 * gibibyte, holding: gibibyte, want: 1},
-		{name: "a peak past the room", extras: 6, memory: underCap, live: gibibyte, holding: 3 * gibibyte, want: 1},
-		{name: "a tiny holding", extras: 6, memory: underCap, live: gibibyte, holding: 1, want: 6},
-		{name: "a holding past any peak", extras: 6, memory: underCap, live: gibibyte, holding: 1 << 63, want: 1},
-		{name: "the live heap past the cap", extras: 6, memory: underCap, live: 9 * gibibyte, holding: gibibyte,
+		{name: "builds are two", extras: 2, memory: underEight, live: gibibyte, holding: gibibyte / 4, want: 2},
+		{name: "room for one peak", extras: 6, memory: underEight, live: 4 * gibibyte, holding: gibibyte, want: 1},
+		{name: "a peak past the room", extras: 6, memory: underEight, live: gibibyte, holding: 3 * gibibyte, want: 1},
+		{name: "a tiny holding", extras: 6, memory: underEight, live: gibibyte, holding: 1, want: 6},
+		{name: "a holding past any peak", extras: 6, memory: underEight, live: gibibyte, holding: 1 << 63, want: 1},
+		{name: "the live heap past the limit", extras: 6, memory: underEight, live: 9 * gibibyte, holding: gibibyte,
 			want: 1},
-		{name: "single-threaded", extras: 6, singleThreaded: true, memory: underCap, live: gibibyte,
+		{name: "single-threaded", extras: 6, singleThreaded: true, memory: underEight, live: gibibyte,
 			holding: gibibyte / 4, want: 1},
 		{name: "no memory decision", extras: 6, live: gibibyte, holding: gibibyte / 4, want: 1},
-		{name: "no live heap read", extras: 6, memory: underCap, holding: gibibyte / 4, want: 1},
-		{name: "no holding read", extras: 6, memory: underCap, live: gibibyte, want: 1},
-		{name: "half the memory available", extras: 6, memory: underSource(contract.MemorySourceAvailable),
-			live: gibibyte, holding: gibibyte / 4, want: 1},
+		{name: "no live heap read", extras: 6, memory: underEight, holding: gibibyte / 4, want: 1},
+		{name: "no holding read", extras: 6, memory: underEight, live: gibibyte, want: 1},
+		// 3 GiB of room over peaks of 0.875 GiB: three by the factor, though the limit is under 8 GiB (#jrr6a5x).
+		{name: "a half of available under 8 GiB", extras: 6, memory: halfOfAvailable(4 << 30), live: gibibyte,
+			holding: gibibyte / 4, want: 3},
 		{name: "the environment's limit", extras: 6, memory: underSource(contract.MemorySourceEnvironment),
 			live: gibibyte, holding: gibibyte / 4, want: 1},
 		{name: "no memory read", extras: 6, memory: underSource(contract.MemorySourceUnreadable), live: gibibyte,
@@ -422,12 +368,11 @@ func TestTheBuildsWidth(test *testing.T) {
 // width is fewer than the builds (#ewkp7w0). Each bound is met to the byte and missed by one. deeafbf4's measured
 // heaps under `--no-cache` give 3 with and without the 9.5 MB more live heap that tipped its width to 2, and cohere
 // root's, read by the unlabelled release binary, give 5 under `--no-cache`, the slack's fifth, with about 540 MB to
-// spare, and 3 with a store. The cap is 8 GiB but where a case says.
+// spare, and 3 with a store, each measured under an 8 GiB limit. The limit is 8 GiB but where a case says.
 func TestTheBuildsWidthSlack(test *testing.T) {
 	test.Parallel()
-	underLimit := func(limit uint64) *memoryAccount {
-		return &memoryAccount{record: contract.Memory{LimitBytes: int64(limit), CapBytes: int64(limit),
-			Source: contract.MemorySourceCap}}
+	underLimit := func(limit uint64) *contract.Memory {
+		return halfOfAvailable(int64(limit))
 	}
 	const gibibyte = uint64(1) << 30
 	// fitting is the room, beyond the live heap, in which builds builds of holding fit by measured with the margin
@@ -465,26 +410,68 @@ func TestTheBuildsWidthSlack(test *testing.T) {
 		// the slack adds the seventh alone.
 		{name: "never two past", extras: 10, limit: 70*gibibyte + 3*gibibyte/4, live: gibibyte,
 			holding: 4 * gibibyte, want: 7, wantSlack: true},
-		{name: "deeafbf4 under --no-cache", extras: 8, limit: uint64(memoryCap), live: 569_200_000,
+		{name: "deeafbf4 under --no-cache", extras: 8, limit: uint64(eightGibibytes), live: 569_200_000,
 			holding: 1_069_200_000, want: 3},
-		{name: "deeafbf4 under --no-cache with 9.5 MB more live", extras: 8, limit: uint64(memoryCap),
+		{name: "deeafbf4 under --no-cache with 9.5 MB more live", extras: 8, limit: uint64(eightGibibytes),
 			live: 578_700_000, holding: 1_069_200_000, want: 3, wantSlack: true},
-		{name: "root under --no-cache", extras: 7, limit: uint64(memoryCap), live: 456_300_000,
+		{name: "root under --no-cache", extras: 7, limit: uint64(eightGibibytes), live: 456_300_000,
 			holding: 653_400_000, want: 5, wantSlack: true},
-		{name: "root with a store", extras: 7, limit: uint64(memoryCap), live: 456_300_000,
+		{name: "root with a store", extras: 7, limit: uint64(eightGibibytes), live: 456_300_000,
 			holding: 653_400_000, withStore: true, want: 3},
 		// A phase-labelled throwaway binary inflates root's holding to 701.2 MB, where the fifth build fits by 9.5 MB
 		// and misses with 32 MB less room: a knife edge the release binary does not have, so a pair judging the width
 		// runs unlabelled binaries.
-		{name: "root at a labelled binary's holding", extras: 7, limit: uint64(memoryCap), live: 470_600_000,
+		{name: "root at a labelled binary's holding", extras: 7, limit: uint64(eightGibibytes), live: 470_600_000,
 			holding: 701_200_000, want: 5, wantSlack: true},
 		{name: "root at a labelled binary's holding with 32 MB less room", extras: 7,
-			limit: uint64(memoryCap) - 32_000_000, live: 470_600_000, holding: 701_200_000, want: 4},
+			limit: uint64(eightGibibytes) - 32_000_000, live: 470_600_000, holding: 701_200_000, want: 4},
 	} {
 		got, slack := buildsWidth(each.extras, false, underLimit(each.limit), each.live, each.holding, each.withStore)
 		if got != each.want || slack != each.wantSlack {
 			test.Errorf("%s: the width is %d, the slack's %t, want %d, %t", each.name, got, slack, each.want,
 				each.wantSlack)
+		}
+	}
+}
+
+// The width on two machines, each limited to half the memory it had available, with cohere root's heaps as the
+// unlabelled release binary read them, the host's live heap 456.3 MB and each of its 7 extra builds holding 653.4 MB
+// (#jrr6a5x). Monkee, 16 GB with 11.5 GB available and so a 5.75 GB limit, runs the builds the budget allows: 3 under
+// `--no-cache`, as its rows read, and 2 with a store. A 250 GB machine runs every build at once. On both, the host's
+// live heap and every build at the largest peak measured, with 512 MiB to spare where the slack added a build, stay
+// under the limit: the count alone could be right while the peak passes it. The ratios are the measured maxima as
+// numbers, 2.16 without a store and 3.22 with one (#hv090f4, #ewkp7w0), so a change to the width's own factors moves
+// the width and not this bound.
+func TestTheBuildsWidthOnTwoMachines(test *testing.T) {
+	test.Parallel()
+	const live = 456_300_000
+	const holding = 653_400_000
+	for _, each := range []struct {
+		name      string
+		limit     int64
+		withStore bool
+		want      int
+	}{
+		{name: "Monkee under --no-cache", limit: monkeeLimitBytes, want: 3},
+		{name: "Monkee with a store", limit: monkeeLimitBytes, withStore: true, want: 2},
+		{name: "a 250 GB machine under --no-cache", limit: largeLimitBytes, want: 7},
+		{name: "a 250 GB machine with a store", limit: largeLimitBytes, withStore: true, want: 7},
+	} {
+		got, slack := buildsWidth(7, false, halfOfAvailable(each.limit), live, holding, each.withStore)
+		if got != each.want {
+			test.Errorf("%s: the width is %d, want %d", each.name, got, each.want)
+		}
+		largestMeasured := 2.16
+		if each.withStore {
+			largestMeasured = 3.22
+		}
+		peak := math.Ceil(float64(got) * holding * largestMeasured)
+		if slack {
+			peak += 512 << 20
+		}
+		if live+peak > float64(each.limit) {
+			test.Errorf("%s: the host's %d bytes and %d builds at their peaks, %.0f bytes, pass the limit, %d",
+				each.name, live, got, live+peak, each.limit)
 		}
 	}
 }
@@ -576,8 +563,7 @@ func TestTheBuildsWidthIsTheSameWhateverTheCollectorLastSaw(test *testing.T) {
 	// here has no findings store, 6 holdings, and a quarter more: three peaks of the holding unbudgeted, 7.5, would
 	// fit in less, and the slack's third build, 3 times 1.2 times 2.16, 7.8 holdings, with 512 MiB to spare would not.
 	limit := int64(hostLive + 8*buildBytes + buildBytes/4)
-	pipeline := &pipeline{memory: &memoryAccount{record: contract.Memory{LimitBytes: limit, CapBytes: limit,
-		Source: contract.MemorySourceCap}}}
+	pipeline := &pipeline{memory: halfOfAvailable(limit)}
 	build := make([]byte, buildBytes)
 	for index := range build {
 		build[index] = 1
@@ -624,8 +610,7 @@ func TestAStoresMeasuredHoldingIsNotBudgeted(test *testing.T) {
 	hostLive := forcedLiveHeapBytes()
 	limit := int64(hostLive + 16*buildBytes)
 	pipeline := &pipeline{
-		memory: &memoryAccount{record: contract.Memory{LimitBytes: limit, CapBytes: limit,
-			Source: contract.MemorySourceCap}},
+		memory:  halfOfAvailable(limit),
 		session: check.NewCacheSession(&check.Caching{Store: cache.Open(test.TempDir(), nil)}, nil),
 	}
 	if !pipeline.withFindingsStore() {
@@ -650,7 +635,7 @@ func TestAStoresMeasuredHoldingIsNotBudgeted(test *testing.T) {
 }
 
 // Builds that restore nothing from the host's run run one at a time, whatever width is asked: each checks every
-// package, and two of those side by side under the cap made a run slower (extraBuildsWidth). With the restore off, a
+// package, and two of those side by side under the limit made a run slower (extraBuildsWidth). With the restore off, a
 // run asked for three at once over three extra builds runs one at a time and says so.
 func TestBuildsThatRestoreNothingRunOneAtATime(test *testing.T) {
 	test.Parallel()
@@ -962,24 +947,13 @@ func TestTheGateAdmitsInTheOrderTheBuildsCome(test *testing.T) {
 	}
 }
 
-// Many light builds and one near-full side by side share the run's one memory limit as they share the gate: over
-// nearFullWindows with four more tagged builds at width 4 with the limit watched, no lint held weight beside windows',
-// every load runs under the cap, no limit the run sets passes the cap plus lateMemoryAllowance, and every raise lands
-// at exactly that, the one raise (#44n0vap, #b2t9xmf).
-func TestManyLightBuildsAndANearFullOneNeverPassTheOneRaise(test *testing.T) {
+// Many light builds and one near-full side by side share the gate (#b2t9xmf): over nearFullWindows with four more
+// tagged builds at width 4, windows alone checked at least half its packages from source, and no lint held weight
+// beside windows'.
+func TestManyLightBuildsNeverLintBesideANearFullOne(test *testing.T) {
 	test.Parallel()
 	steps := newGateSteps()
-	watch := &memoryWatch{current: memoryCap}
-	// during is the limit at every look inside a load, as package load asks for a file's held bytes.
-	var during []int64
 	configure := func(pipeline *pipeline) {
-		pipeline.memory = capMemoryWatched(watch, watch.collecting)
-		pipeline.memory.duringLoad = func() {
-			watch.lock.Lock()
-			defer watch.lock.Unlock()
-			during = append(during, watch.current)
-		}
-		pipeline.loads = newLoadMemory(pipeline.memory, false)
 		pipeline.buildsWidthForced = 4
 		pipeline.lintSteps = steps.step
 	}
@@ -998,35 +972,9 @@ func TestManyLightBuildsAndANearFullOneNeverPassTheOneRaise(test *testing.T) {
 		test.Errorf("%d builds checked at least half their packages from source, want windows alone", heavy)
 	}
 	steps.lock.Lock()
+	defer steps.lock.Unlock()
 	if len(steps.beside) > 0 {
 		test.Errorf("lints held weight beside a near-full one: %q", steps.beside)
-	}
-	steps.lock.Unlock()
-	ceiling := memoryCap + lateMemoryAllowance
-	watch.lock.Lock()
-	defer watch.lock.Unlock()
-	for _, limit := range watch.set {
-		if limit > ceiling {
-			test.Errorf("the run set its limit to %d, past the cap plus one allowance, %d", limit, ceiling)
-		}
-	}
-	if len(during) == 0 {
-		test.Fatal("no look inside a load read the limit, so what the loads ran under went unread")
-	}
-	for index, limit := range during {
-		if limit != memoryCap {
-			test.Errorf("look %d of %d inside a load read a limit of %d, want the cap, %d", index+1, len(during),
-				limit, memoryCap)
-		}
-	}
-	raised := pipeline.loads.raisedTo()
-	if len(raised) == 0 {
-		test.Fatal("no load's raise landed, so the one raise went unread")
-	}
-	for _, limit := range raised {
-		if limit != ceiling {
-			test.Errorf("a raise landed at %d, want every raise at the cap plus one allowance, %d", limit, ceiling)
-		}
 	}
 }
 

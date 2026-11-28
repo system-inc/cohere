@@ -119,9 +119,6 @@ type summaryJson struct {
 
 	// PackageCache is what cohere-go's per-package findings cache did, absent for every other run.
 	PackageCache *packageCacheUse `json:"packageCache,omitempty"`
-	// MemoryRaisedToBytes is each limit a Go run raised its heap to after its load, absent when it raised none, for
-	// a replay, and for every other run.
-	MemoryRaisedToBytes []int64 `json:"memoryRaisedToBytes,omitempty"`
 	// HeadersUnshared is why a Go run's listings did not share each Go file's header, absent when they shared them,
 	// for a replay, and for every other run.
 	HeadersUnshared string `json:"headersUnshared,omitempty"`
@@ -220,7 +217,6 @@ func summaryAsJson(summary runSummary) summaryJson {
 		FormattingSeconds:           summary.Formatting.Seconds(),
 		Cache:                       summary.Cache,
 		PackageCache:                summary.PackageCache,
-		MemoryRaisedToBytes:         summary.MemoryRaisedToBytes,
 		HeadersUnshared:             summary.HeadersUnshared,
 		Builds:                      summary.Builds,
 		BuildsAtOnce:                summary.BuildsAtOnce,

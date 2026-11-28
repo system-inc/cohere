@@ -137,7 +137,7 @@ func runIsolated(
 	standardOutput io.Writer,
 	standardError io.Writer,
 	registered []rule.Rule,
-	memory *memoryAccount,
+	memory *contract.Memory,
 ) int {
 	test.Helper()
 	return runWithStandardLibrary(arguments, standardOutput, standardError, registered, memory,

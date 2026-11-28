@@ -41,8 +41,6 @@ func pinnedDuplicatesReport() duplicate_functions.Report {
 // renderDuplicates prints a report in one view.
 func renderDuplicates(test *testing.T, mode outputMode, report duplicate_functions.Report) string {
 	test.Helper()
-	saved := activeOutput
-	defer func() { activeOutput = saved }()
 	activeOutput = outputSettings{Mode: mode}
 	var out strings.Builder
 	stream := bufio.NewWriter(&out)
@@ -91,6 +89,7 @@ const pinnedDuplicatesJson = `{"kind":"duplicate","size":136,"digest":"010000000
 // The report's three views, pinned byte for byte.
 // Not parallel: it sets the package-level activeOutput, which the printers' parallel tests read
 func TestTheDuplicatesReportIsPinnedInEveryView(test *testing.T) {
+	restorePackageStateAfter(test)
 	report := pinnedDuplicatesReport()
 	for _, view := range []struct {
 		name     string
@@ -111,6 +110,7 @@ func TestTheDuplicatesReportIsPinnedInEveryView(test *testing.T) {
 // its absence is never read as no duplicates.
 // Not parallel: it sets the package-level activeOutput, which the printers' parallel tests read
 func TestADuplicatesReportThatDidNotRunSaysWhy(test *testing.T) {
+	restorePackageStateAfter(test)
 	report := duplicate_functions.Report{Floor: 11, NotRun: "types bailed with 1 type diagnostics"}
 	human := renderDuplicates(test, outputHuman, report)
 	if human != "\nduplicates: a report, not a gate, nothing here fails a build\n  not run: types bailed with 1 type "+

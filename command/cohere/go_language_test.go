@@ -379,6 +379,7 @@ func runFakeGoChild(test *testing.T, body string) (string, int, error) {
 // Not parallel: its subtests drive check runs through contractRun, whose record acceptors set the
 // package-level activeSummary.
 func TestAGoChildThatDoesNotFinishChecksNothing(test *testing.T) {
+	restorePackageStateAfter(test)
 	fixture, absoluteError := filepath.Abs(filepath.Join(contractFixtureDirectory, "GoClean.jsonl"))
 	if absoluteError != nil {
 		test.Fatal(absoluteError)
@@ -499,6 +500,7 @@ func TestARealGoRunNamesTheFilesOnlyAnotherPlatformBuilds(test *testing.T) {
 //
 // Not parallel: it drives check runs through contractRun, whose record acceptors set the package-level activeSummary.
 func TestAGoRunThatExcludedEveryFileFails(test *testing.T) {
+	restorePackageStateAfter(test)
 	stream := func(filesOurs int, excluded string) string {
 		return strings.Join([]string{
 			`{"kind":"provenance","contract":4,"program":"cohere-go","version":"0.1.0","commit":"dev",` +
@@ -561,6 +563,7 @@ func TestAGoRunThatExcludedEveryFileFails(test *testing.T) {
 //
 // Not parallel: it reads and sets the package-level activeSummary, as countExcludedWhenNothingChecked does.
 func TestAManifestIsNoReasonANothingCheckedRunCounts(test *testing.T) {
+	restorePackageStateAfter(test)
 	type excludedEntry = struct {
 		File   string `json:"file"`
 		Reason string `json:"reason"`

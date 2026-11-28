@@ -43,6 +43,29 @@ func init() {
 // memoryCeilingFraction is the share of available memory one run may take before collecting.
 const memoryCeilingFraction = 0.5
 
+// memoryShareVariable is how many processes one cohere run starts at once to share its half of available memory, set
+// by a run that checks several projects on each Go and TypeScript project child it starts (projectMemoryShares), and
+// inherited by the child's own cohere-go (#jrr6a5x). Each process that reads it takes its half divided by it, so the
+// heavy project children one run holds at once stay within that run's half together, and a run never piles into
+// itself. Runs other minds start are not counted:
+// each reads what is available as it starts, and holds what it needs, not its ceiling (#jrr6a5x's rows, five cold
+// runs at once at 10 GiB each under a 34 GiB ceiling). Only cohere's own parent writes it, so a value that is not a
+// whole number of at least 1 is read as no share.
+const memoryShareVariable = "COHERE_MEMORY_SHARE"
+
+// memoryShare is how many processes share this run's half, from memoryShareVariable, 1 when none is named.
+func memoryShare(lookupEnvironment func(string) (string, bool)) uint64 {
+	value, present := lookupEnvironment(memoryShareVariable)
+	if !present {
+		return 1
+	}
+	share, parseError := strconv.ParseUint(value, 10, 64)
+	if parseError != nil || share < 1 {
+		return 1
+	}
+	return share
+}
+
 func decideMemoryPolicy(lookupEnvironment func(string) (string, bool), available func() (uint64, error)) memoryPolicy {
 	var set []string
 	for _, name := range []string{"GOGC", "GOMEMLIMIT"} {
@@ -60,7 +83,12 @@ func decideMemoryPolicy(lookupEnvironment func(string) (string, bool), available
 	if bytes == 0 {
 		return memoryPolicy{unreadable: fmt.Errorf("it read as zero")}
 	}
-	return memoryPolicy{available: bytes, ceiling: uint64(float64(bytes) * memoryCeilingFraction)}
+	share := memoryShare(lookupEnvironment)
+	return memoryPolicy{
+		available: bytes,
+		share:     share,
+		ceiling:   uint64(float64(bytes) * memoryCeilingFraction / float64(share)),
+	}
 }
 
 // darwinAvailableMemory is free pages, plus file-backed pages (the cache the kernel drops before anything

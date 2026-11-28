@@ -33,8 +33,7 @@ func TestTagLinesTagsEveryLine(test *testing.T) {
 // existed.
 // Not parallel: it sets the package-level activeRunCache for its length
 func TestTheTagPrintersTagOnlyARecordedRun(test *testing.T) {
-	previous := activeRunCache
-	defer func() { activeRunCache = previous }()
+	restorePackageStateAfter(test)
 	printed := func() string {
 		var out bytes.Buffer
 		stream := bufio.NewWriter(&out)
@@ -193,6 +192,7 @@ func TestProvenanceLinesAreKeptTaggedAndReplayedWithTheirSource(test *testing.T)
 // covers it but by a cache never shown to be correct for it.
 // Not parallel: it sets os.Args and the package-level cacheOff, which runCacheEligible reads
 func TestRunCacheEligibility(test *testing.T) {
+	restorePackageStateAfter(test)
 	previous := os.Args
 	defer func() { os.Args = previous }()
 
@@ -226,7 +226,6 @@ func TestRunCacheEligibility(test *testing.T) {
 	// `--no-cache` is refused by name, so it holds even for an argument shape that is otherwise admitted.
 	os.Args = []string{"cohere"}
 	cacheOff = true
-	defer func() { cacheOff = false }()
 	if runCacheEligible() {
 		test.Error("--no-cache left a bare run eligible, so a cold run could read or record the cache")
 	}

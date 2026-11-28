@@ -27,8 +27,8 @@ const (
 // lintWeight is what an extra build's lint takes of the gate's budget, from what its first load checked from source,
 // checkedFromSource of the packagesLoaded of its whole graph: that share of the budget, rounded up so a build that
 // checked anything weighs something, or the whole budget once the share is at or above heavyLintShare's one half,
-// since two near-full builds linting at once under the memory cap drive the collector (#b2t9xmf). A load of no package
-// weighs nothing.
+// since two near-full builds linting at once under the memory limit drive the collector (#b2t9xmf). A load of no
+// package weighs nothing.
 func lintWeight(checkedFromSource int, packagesLoaded int) int {
 	if packagesLoaded <= 0 {
 		return 0
@@ -41,7 +41,7 @@ func lintWeight(checkedFromSource int, packagesLoaded int) int {
 
 // lintGate is a weighted semaphore that admits in arrival order, which the extra builds' lints share (#b2t9xmf): a
 // build's share of its packages checked from source is exact only once its load has ended, and two near-full builds
-// linting side by side under the cap cost about 70 user-s and 6 to 8 s of wall at cohere's root, so each build takes
+// linting side by side under the limit cost about 70 user-s and 6 to 8 s of wall at cohere's root, so each build takes
 // its weight (lintWeight) between its load and its rules. golang.org/x/sync's semaphore is only an indirect dependency
 // of the module, and the go_language package had no weighted one, so this is its own.
 //

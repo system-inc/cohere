@@ -20,6 +20,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/system-inc/cohere/internal/go_language/cache"
+	"github.com/system-inc/cohere/internal/go_language/contract"
 	"github.com/system-inc/cohere/internal/go_language/format"
 	"github.com/system-inc/cohere/internal/go_language/rule"
 	"github.com/system-inc/cohere/internal/go_language/rules"
@@ -73,6 +74,7 @@ var mainHasRun atomic.Bool
 func Main(
 	arguments []string,
 	availableMemoryBytes uint64,
+	memoryShare uint64,
 	standardInput io.Reader,
 	standardOutput io.Writer,
 	standardError io.Writer,
@@ -84,15 +86,9 @@ func Main(
 		return refuse(standardError, errors.New("refusing a second run in one process, since the first run's "+
 			"rule options are still set on the analyzers; start a new executable process for each project"))
 	}
-	// Here rather than in run, so a test running cohere-go in process never changes its own memory limit. The limit
-	// the front door's policy set is read before capMemory lowers it, since a late raise never passes it (lateLimit).
-	inheritedBytes := debug.SetMemoryLimit(-1)
-	memory := memoryAccount{
-		record:         capMemory(os.LookupEnv, debug.SetMemoryLimit, availableMemoryBytes),
-		inheritedBytes: inheritedBytes,
-		setMemoryLimit: debug.SetMemoryLimit,
-		collecting:     collectorMarking,
-	}
+	// Here rather than in run, so a test running cohere-go in process never changes its own memory limit. Nothing
+	// sets the limit after this, which a test holds the package to (TestOnlyMainSetsTheMemoryLimit).
+	memory := decideMemory(os.LookupEnv, debug.SetMemoryLimit, availableMemoryBytes, memoryShare)
 	// A save writes no file, refused where every write of a source file passes (format.RefuseWrites), so no phase, one
 	// added later included, can write over a file the editor holds unsaved. Here rather than in run, as the memory
 	// limit is, since the refusal is process-wide, and a test running cohere-go in process writes files beside it.
@@ -117,13 +113,13 @@ func Main(
 // runWithStandardLibrary is Main with the analyzer rules handed in, no standard input, and source as where its standard
 // library comes from and goes, so a test can run cohere-go with a rule planted in place of the registry's, such as
 // one that panics, or give a run a system cache and a stamp of its own. memory is what Main decided about the memory
-// limit, nil in a test, which decides nothing and never raises the limit.
+// limit, nil in a test, which decides nothing.
 func runWithStandardLibrary(
 	arguments []string,
 	standardOutput io.Writer,
 	standardError io.Writer,
 	registered []rule.Rule,
-	memory *memoryAccount,
+	memory *contract.Memory,
 	source standardLibrarySource,
 ) int {
 	return runOverlapping(arguments, nil, standardOutput, standardError, registered, memory, source, true, nil)
@@ -140,7 +136,7 @@ func runOverlapping(
 	standardOutput io.Writer,
 	standardError io.Writer,
 	registered []rule.Rule,
-	memory *memoryAccount,
+	memory *contract.Memory,
 	source standardLibrarySource,
 	overlaps bool,
 	answersInPart map[string]bool,

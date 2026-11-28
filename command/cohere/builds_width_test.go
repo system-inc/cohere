@@ -14,8 +14,7 @@ import (
 // running the child alone (#qwb6ns8), and writes none when the lint record carries none.
 // Not parallel: acceptLint sets the package-level activeSummary.
 func TestASummaryForwardsTheHeapTheBuildsWidthWasDecidedFrom(test *testing.T) {
-	saved := activeSummary
-	defer func() { activeSummary = saved }()
+	restorePackageStateAfter(test)
 	summaryOf := func(lint string) string {
 		test.Helper()
 		activeSummary = runSummary{}

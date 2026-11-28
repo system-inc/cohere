@@ -43,8 +43,7 @@ func goStreamWithOtherBuildTypeError(test *testing.T, typeErrors string) []strin
 // type error out of its counts is still refused, so a finding record no count holds never passes unnoticed.
 // Not parallel: it swaps the package-level activeOutput and activeSummary, which the record acceptors set
 func TestATypeErrorOnlyAnotherBuildFindsIsAFindingOfTheRun(test *testing.T) {
-	savedOutput, savedSummary := activeOutput, activeSummary
-	defer func() { activeOutput, activeSummary = savedOutput, savedSummary }()
+	restorePackageStateAfter(test)
 
 	activeOutput, activeSummary = outputSettings{Mode: outputJson}, runSummary{}
 	output, exitCode, renderError := renderRecordsStartedAt(test, goLanguage("module"), contractModeCheck,

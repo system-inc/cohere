@@ -16,6 +16,7 @@ import (
 // two files as kept out for a reason cohere did not record.
 // Not parallel: settleNothingChecked writes the package-level activeSummary, which it reads back.
 func TestACheckThatDroppedEveryFileUncountedFails(test *testing.T) {
+	restorePackageStateAfter(test)
 	graph, directory := buildNarrowFixtureGraph(test, map[string]string{
 		"first.ts":  "export const first = 1;\n",
 		"second.ts": "export const second = 2;\n",
@@ -63,6 +64,7 @@ func TestTheFactAloneFailsARunThatCheckedNothing(test *testing.T) {
 // summary exits 0, and the front door fails it, naming the three as unrecorded.
 // Not parallel: it renders a check run through contractRun, whose record acceptors set the package-level activeSummary.
 func TestAContractRunThatDroppedEveryFileUncountedFails(test *testing.T) {
+	restorePackageStateAfter(test)
 	records := contractFixture(test, "Clean.jsonl")
 	records[1] = projectRecordAt(test, records[1], "/project", nil)
 	records[1] = strings.Replace(records[1], `"filesInScope":2`, `"filesInScope":0`, 1)

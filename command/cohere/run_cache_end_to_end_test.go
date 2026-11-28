@@ -165,7 +165,7 @@ func TestRunCacheEndToEnd(test *testing.T) {
 			"lint: ",
 			"phases: ",
 			"  total ",
-			"  memory: ",
+			"  memory",
 			"  cache: off, by --no-cache",
 			"✓ 💎 ",
 			"✗ ☠️ ",
@@ -182,7 +182,7 @@ func TestRunCacheEndToEnd(test *testing.T) {
 			"cached: ",
 			"phases: replayed ",
 			"  this run: ",
-			"  memory: ",
+			"  memory",
 			"✓ 💎 ",
 			"✗ ☠️ ",
 		), "\n")

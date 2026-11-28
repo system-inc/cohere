@@ -334,8 +334,9 @@ type contractRun struct {
 	// timelineReceived says the one record came.
 	timelineRequested bool
 	timelineReceived  bool
-	// memoryReceived is set by the memory record, which comes once (acceptMemory).
-	memoryReceived bool
+	// goMemory is the limit a Go run's child held its heap under, from its types record, kept until the lint record
+	// says how many builds ran at once beside it, or the summary says none will (sayGoMemory).
+	goMemory *goMemory
 
 	// notLinted is each file a Go build compiled that no rule ran on, by path, with why (checkedBuild.NotLinted), from
 	// the lint record, so writeExcluded names it as not checked rather than as checked by that build (#ytnvt8k).
@@ -478,8 +479,6 @@ func (run *contractRun) accept(line []byte) error {
 		return decodeRecord(line, &contract.TimingRecord{}, run.acceptTiming)
 	case "timeline":
 		return decodeRecord(line, &contract.TimelineRecord{}, run.acceptTimeline)
-	case "memory":
-		return decodeRecord(line, &contract.MemoryRecord{}, run.acceptMemory)
 	case "summary":
 		return decodeRecord(line, &contractSummaryRecord{}, run.acceptSummary)
 	default:
@@ -921,10 +920,8 @@ func (run *contractRun) acceptTypes(record *contractTypesRecord) error {
 		activeSummary.Swift = &swiftSummary{SdkIndexSeed: seed}
 	}
 
-	// The invocation's, as the types line is: the limit this run's child held its heap under, and why.
-	if record.Memory != nil {
-		printInvocation(accountOutput(run.out), "  memory: %s\n", record.Memory.line())
-	}
+	// Said once the lint record says how many builds ran at once under it (sayGoMemory).
+	run.goMemory = record.Memory
 	// The invocation's too: a binary whose go/build is not the child's copy reads the same listing at more CPU, and
 	// a reader timing a run needs to know which binary it timed (#fnsk1jv).
 	if record.HeadersUnshared != "" {
@@ -1017,6 +1014,7 @@ func (run *contractRun) acceptLint(record *contractLintRecord) error {
 	}
 	activeSummary.Builds = record.Builds
 	activeSummary.BuildsAtOnce = record.BuildsAtOnce
+	run.sayGoMemory(record.BuildsAtOnce)
 	activeSummary.BuildsWidthLiveBytes = record.BuildsWidthLiveBytes
 	activeSummary.BuildsWidthFromHostLive = record.BuildsWidthFromHostLive
 	for _, build := range record.Builds {
@@ -1418,44 +1416,17 @@ func (run *contractRun) acceptTimeline(record *contract.TimelineRecord) error {
 	return nil
 }
 
-// acceptMemory reads the memory limits a Go run raised its heap to (#5shepvt), once, after its last phase and before
-// its inputs, as the contract places it. A run that raised says so in the account `--verbose` prints, beside the
-// types phase's `memory:` line that stated the limit it began under, and under `--json` in the summary's
-// `memoryRaisedToBytes`. Both are the invocation's: a replay started no child and raised nothing, so its account
-// prints no raise and its summary carries none (replayedSummary). A record that is a second one, arrives out of its
-// place, or holds no list where the contract writes `[]` is refused, for the reason accept refuses an unknown record.
-func (run *contractRun) acceptMemory(record *contract.MemoryRecord) error {
-	if run.mode != contractModeCheck {
-		return fmt.Errorf("a memory record in a %s run", run.mode)
+// sayGoMemory prints, once, the limit a Go run's child held its heap under and why, with buildsAtOnce, how many
+// builds beside the host's ran side by side under it, 0 for a run of one build or one whose lint never ran (#jrr6a5x).
+// It is the invocation's, as the types line is, since a replay started no child. The lint record says the width, so
+// the line waits for it, and the summary says it for a run that wrote none.
+func (run *contractRun) sayGoMemory(buildsAtOnce int) {
+	if run.goMemory == nil {
+		return
 	}
-	if run.memoryReceived {
-		return fmt.Errorf("a second memory record")
-	}
-	if run.inputs != nil {
-		return fmt.Errorf("a memory record after the inputs record, and the contract places it before")
-	}
-	if run.nextPhase < len(phaseOrder) {
-		return fmt.Errorf("a memory record before the %s phase, and it comes after every phase",
-			phaseOrder[run.nextPhase])
-	}
-	if run.duplicatesRequested && !run.duplicatesWritten {
-		return fmt.Errorf("a memory record before the duplicates record, and the contract places it after")
-	}
-	if record.RaisedToBytes == nil {
-		return fmt.Errorf("a memory record with no raisedToBytes, which the contract writes [] when nothing raised")
-	}
-	run.memoryReceived = true
-	if len(record.RaisedToBytes) == 0 {
-		return nil
-	}
-	activeSummary.MemoryRaisedToBytes = record.RaisedToBytes
-	raises := make([]string, 0, len(record.RaisedToBytes))
-	for _, limit := range record.RaisedToBytes {
-		raises = append(raises, gigabytes(uint64(max(limit, 0))))
-	}
-	printInvocation(accountOutput(run.out), "  memory: raised to %s after the load\n", strings.Join(raises, ", then "))
+	printInvocation(accountOutput(run.out), "  %s\n", run.goMemory.line(buildsAtOnce))
+	run.goMemory = nil
 	streams.Show(run.out)
-	return nil
 }
 
 func (run *contractRun) acceptSummary(record *contractSummaryRecord) error {
@@ -1483,6 +1454,7 @@ func (run *contractRun) acceptSummary(record *contractSummaryRecord) error {
 	if run.duplicatesRequested && !run.duplicatesWritten {
 		return fmt.Errorf("a summary with no duplicates record, which --duplicates asked for")
 	}
+	run.sayGoMemory(0)
 	if *record.Findings != run.findings {
 		return fmt.Errorf(
 			"the summary counts %d findings and %d finding records arrived",

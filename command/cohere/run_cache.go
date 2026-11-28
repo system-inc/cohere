@@ -663,8 +663,6 @@ func replayedSummary(recorded runSummary, elapsed time.Duration) runSummary {
 	replayed.Cache = cacheUse{Replayed: true, FilesReplayed: recorded.FilesInScope}
 	// The child's cache was not consulted by a replay, which started no child, so what it did is the recorded run's.
 	replayed.PackageCache = nil
-	// Nor did a replay raise its heap: the raises were the recorded run's (#5shepvt).
-	replayed.MemoryRaisedToBytes = nil
 	// Nor did it read any listing, so whether a listing shared its headers is the recorded run's too (#fnsk1jv).
 	replayed.HeadersUnshared = ""
 	// Cached is what the recorded run accounted for, checked or cached: a file it never examined, the cache cannot

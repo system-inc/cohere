@@ -63,10 +63,9 @@ func isTheReplaysFooter(footerLine string, recorded runSummary) error {
 // would print a verdict with no footer.
 // Not parallel: it sets the package-level verdictSent, which cacheNote reads to choose where a note goes
 func TestARunWithNoSummaryIsNotRecorded(test *testing.T) {
+	restorePackageStateAfter(test)
 	directory := test.TempDir()
-	sent := verdictSent
 	verdictSent = true // so the note is kept beside the table, where the test can read it
-	defer func() { verdictSent = sent }()
 
 	session := &runCacheSession{directory: directory}
 	if recorded := session.record(0); recorded != nil {

@@ -12,8 +12,7 @@ import (
 // both gate.
 // Not parallel: it swaps the package-level activeOutput and activeSummary, and acceptFinding counts into activeSummary
 func TestASwiftWarningIsAWarning(test *testing.T) {
-	saved, savedSummary := activeOutput, activeSummary
-	defer func() { activeOutput, activeSummary = saved, savedSummary }()
+	restorePackageStateAfter(test)
 	activeOutput, activeSummary = outputSettings{Mode: outputHuman}, runSummary{}
 
 	var out bytes.Buffer

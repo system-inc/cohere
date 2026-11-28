@@ -126,6 +126,23 @@ func gitDirectoryOf(marker string, isDirectory bool) (string, error) {
 	return filepath.Clean(gitDirectory), nil
 }
 
+// TrackedPaths is every path the index of the repository at repositoryRoot tracks, relative to that root and slash
+// separated, sorted by bytes, each once, read in process from the index file and from nothing else: no walk of the
+// tree and no git child. An index that says nothing is an error wrapping one of the Err values above: a root with no
+// `.git`, a repository with no index yet, or an index this reader does not read.
+func TrackedPaths(repositoryRoot string) ([]string, error) {
+	marker := filepath.Join(repositoryRoot, ".git")
+	information, statError := os.Stat(marker)
+	if statError != nil {
+		return nil, fmt.Errorf("%w: %s holds no .git", ErrNoIndex, repositoryRoot)
+	}
+	index, _, readError := readRepositoryIndex(marker, information.IsDir())
+	if readError != nil {
+		return nil, readError
+	}
+	return index.paths, nil
+}
+
 // readRepositoryIndex reads the index of the repository whose `.git` is marker, and the file it read or looked for.
 // Every error is a reason to fall back to the ignore files alone, and wraps one of the Err values above.
 func readRepositoryIndex(marker string, isDirectory bool) (*trackedIndex, string, error) {
